@@ -4,6 +4,29 @@ Portable OpenClaw skill for writing Chinese university experiment reports from e
 
 See [`demo/README.md`](demo/README.md) for GitHub-friendly preview assets and a ready-made 2x2 image layout example.
 
+## At A Glance
+
+This repository is for people who want to go from:
+
+- an experiment topic or tutorial URL
+- local screenshots
+- a blank `docx` template
+
+to:
+
+- a generated Chinese lab report body
+- a deterministically filled `docx`
+- grouped screenshots with captions
+- a cleaner final submission-style document
+
+## Preview
+
+| Step Screenshot | Result Screenshot |
+| --- | --- |
+| ![Network config preview](demo/assets/step-network-config.png) | ![Ping result preview](demo/assets/result-ping.png) |
+
+For a full 2x2 preview block, see [`demo/README.md`](demo/README.md).
+
 ## What It Does
 
 - Writes the full report before touching template formatting.

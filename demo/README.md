@@ -1,6 +1,6 @@
 # Demo
 
-This directory contains lightweight assets intended for GitHub repository preview and quick manual checks.
+This directory contains lightweight assets intended for GitHub previews, documentation screenshots, and quick manual layout checks.
 
 ## Included Preview Assets
 
