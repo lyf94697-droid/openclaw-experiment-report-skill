@@ -1,8 +1,13 @@
 ﻿# OpenClaw Experiment Report Skill
 
+[![Quality Checks](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml)
+[![Smoke Tests](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Portable OpenClaw skill for writing Chinese university experiment reports from experiment topics, requirements, code, screenshots, data, tutorial pages, and blank WPS/Word/docx templates.
 
 See [`demo/README.md`](demo/README.md) for GitHub-friendly preview assets and a ready-made 2x2 image layout example.
+See [`docs/GITHUB_LAUNCH.md`](docs/GITHUB_LAUNCH.md) for the recommended GitHub description, topics, release notes, and social-preview setup.
 
 ## At A Glance
 
@@ -26,6 +31,13 @@ to:
 | ![Network config preview](demo/assets/step-network-config.png) | ![Ping result preview](demo/assets/result-ping.png) |
 
 For a full 2x2 preview block, see [`demo/README.md`](demo/README.md).
+
+## Typical Workflow
+
+1. Provide a topic, tutorial URL, screenshots, or an existing report body.
+2. Generate a complete Chinese experiment report body through OpenClaw.
+3. Fill a blank `docx` template with deterministic field and body mapping.
+4. Insert grouped screenshots with captions and apply final submission-style formatting.
 
 ## What It Does
 
