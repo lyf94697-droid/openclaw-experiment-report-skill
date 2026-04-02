@@ -1,0 +1,48 @@
+{
+  "images": [
+    {
+      "path": "E:\\reports\\images\\result-a.png",
+      "section": "实验结果",
+      "caption": "图1 主机 A 连通性测试结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    },
+    {
+      "path": "E:\\reports\\images\\result-b.png",
+      "section": "实验结果",
+      "caption": "图2 主机 B 连通性测试结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    },
+    {
+      "path": "E:\\reports\\images\\arp-a.png",
+      "section": "实验结果",
+      "caption": "图3 主机 A 的 arp -a 邻居缓存结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    },
+    {
+      "path": "E:\\reports\\images\\arp-b.png",
+      "section": "实验结果",
+      "caption": "图4 主机 B 的 arp -a 邻居缓存结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    }
+  ]
+}

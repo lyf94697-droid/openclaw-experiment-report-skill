@@ -1,0 +1,16 @@
+{
+  "images": [
+    {
+      "anchor": "P8",
+      "path": "E:\\reports\\images\\step-1.png",
+      "caption": "图1 网络参数配置界面",
+      "widthCm": 11.5
+    },
+    {
+      "anchor": "T1R6C1",
+      "path": "E:\\reports\\images\\result-1.png",
+      "caption": "图2 ping 连通性测试结果",
+      "widthCm": 10.5
+    }
+  ]
+}

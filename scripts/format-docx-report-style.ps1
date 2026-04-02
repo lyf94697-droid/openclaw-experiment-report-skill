@@ -1,0 +1,902 @@
+﻿[CmdletBinding()]
+param(
+  [Parameter(Mandatory = $true)]
+  [string]$DocxPath,
+
+  [string]$OutPath,
+
+  [switch]$Overwrite,
+
+  [ValidateSet("auto", "default", "compact", "school")]
+  [string]$Profile = "default",
+
+  [string]$ProfilePath,
+
+  [int]$BodyFirstLineTwips = 420,
+
+  [int]$BodyLineTwips = 360,
+
+  [int]$BodyAfterTwips = 0,
+
+  [int]$HeadingBeforeTwips = 120,
+
+  [int]$HeadingAfterTwips = 80,
+
+  [int]$CaptionAfterTwips = 80,
+
+  [int]$TitleAfterTwips = 160,
+
+  [int]$ImageBeforeTwips = 80,
+
+  [int]$ImageAfterTwips = 80
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+$sectionHeadingRules = @(
+  [pscustomobject]@{ aliases = @("实验目的") },
+  [pscustomobject]@{ aliases = @("实验环境", "实验设备与环境") },
+  [pscustomobject]@{ aliases = @("实验原理或任务要求", "实验原理", "任务要求") },
+  [pscustomobject]@{ aliases = @("实验步骤", "实验过程") },
+  [pscustomobject]@{ aliases = @("实验结果", "实验现象与结果记录") },
+  [pscustomobject]@{ aliases = @("问题分析", "结果分析") },
+  [pscustomobject]@{ aliases = @("实验总结", "总结与思考", "实验小结") },
+  [pscustomobject]@{ aliases = @("实验内容") }
+)
+$metadataPrefixes = @("课程名称", "实验名称", "学号", "姓名", "班级", "实验性质", "实验时间", "实验地点", "指导教师", "日期")
+$styleSettingNames = @(
+  "BodyFirstLineTwips",
+  "BodyLineTwips",
+  "BodyAfterTwips",
+  "HeadingBeforeTwips",
+  "HeadingAfterTwips",
+  "CaptionAfterTwips",
+  "TitleAfterTwips",
+  "ImageBeforeTwips",
+  "ImageAfterTwips"
+)
+
+function Get-StyleSettingNames {
+  return $styleSettingNames
+}
+
+function Get-StyleProfileSettings {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ProfileName
+  )
+
+  switch ($ProfileName.ToLowerInvariant()) {
+    "default" {
+      return [ordered]@{
+        BodyFirstLineTwips = 420
+        BodyLineTwips = 360
+        BodyAfterTwips = 0
+        HeadingBeforeTwips = 120
+        HeadingAfterTwips = 80
+        CaptionAfterTwips = 80
+        TitleAfterTwips = 160
+        ImageBeforeTwips = 80
+        ImageAfterTwips = 80
+      }
+    }
+    "compact" {
+      return [ordered]@{
+        BodyFirstLineTwips = 420
+        BodyLineTwips = 320
+        BodyAfterTwips = 0
+        HeadingBeforeTwips = 80
+        HeadingAfterTwips = 40
+        CaptionAfterTwips = 40
+        TitleAfterTwips = 80
+        ImageBeforeTwips = 40
+        ImageAfterTwips = 40
+      }
+    }
+    "school" {
+      return [ordered]@{
+        BodyFirstLineTwips = 420
+        BodyLineTwips = 400
+        BodyAfterTwips = 0
+        HeadingBeforeTwips = 160
+        HeadingAfterTwips = 100
+        CaptionAfterTwips = 120
+        TitleAfterTwips = 220
+        ImageBeforeTwips = 100
+        ImageAfterTwips = 100
+      }
+    }
+    default {
+      throw "Unsupported style profile: $ProfileName"
+    }
+  }
+}
+
+function ConvertTo-ValidatedTwipsValue {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+
+    [AllowNull()]
+    [object]$Value
+  )
+
+  if ($null -eq $Value) {
+    throw "Style setting '$Name' cannot be null."
+  }
+
+  try {
+    $parsedValue = [int]$Value
+  } catch {
+    throw "Style setting '$Name' must be an integer, got '$Value'."
+  }
+
+  if ($parsedValue -lt 0) {
+    throw "Style setting '$Name' must be greater than or equal to 0."
+  }
+
+  return $parsedValue
+}
+
+function Get-OptionalObjectPropertyValue {
+  param(
+    [AllowNull()]
+    [object]$Object,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if ($null -eq $Object) {
+    return $null
+  }
+
+  $property = $Object.PSObject.Properties[$Name]
+  if ($null -eq $property) {
+    return $null
+  }
+
+  return $property.Value
+}
+
+function Read-StyleProfileFile {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $resolvedProfilePath = (Resolve-Path -LiteralPath $Path).Path
+  $rawProfileJson = Get-Content -LiteralPath $resolvedProfilePath -Raw -Encoding UTF8
+  if ([string]::IsNullOrWhiteSpace($rawProfileJson)) {
+    throw "Style profile file is empty: $resolvedProfilePath"
+  }
+
+  try {
+    $profileDocument = $rawProfileJson | ConvertFrom-Json
+  } catch {
+    throw "Style profile file is not valid JSON: $resolvedProfilePath. $($_.Exception.Message)"
+  }
+
+  if ($null -eq $profileDocument) {
+    throw "Style profile file did not produce a JSON object: $resolvedProfilePath"
+  }
+
+  $baseProfileValue = Get-OptionalObjectPropertyValue -Object $profileDocument -Name "baseProfile"
+  $profileAliasValue = Get-OptionalObjectPropertyValue -Object $profileDocument -Name "profile"
+  if (
+    -not [string]::IsNullOrWhiteSpace([string]$baseProfileValue) -and
+    -not [string]::IsNullOrWhiteSpace([string]$profileAliasValue) -and
+    (-not [string]::Equals([string]$baseProfileValue, [string]$profileAliasValue, [System.StringComparison]::OrdinalIgnoreCase))
+  ) {
+    throw "Style profile file cannot define different values for 'baseProfile' and 'profile'."
+  }
+
+  $baseProfile = if (-not [string]::IsNullOrWhiteSpace([string]$baseProfileValue)) {
+    [string]$baseProfileValue
+  } elseif (-not [string]::IsNullOrWhiteSpace([string]$profileAliasValue)) {
+    [string]$profileAliasValue
+  } else {
+    $null
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($baseProfile)) {
+    $baseProfile = $baseProfile.ToLowerInvariant()
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($baseProfile) -and @("auto", "default", "compact", "school") -notcontains $baseProfile) {
+    throw "Style profile file has unsupported baseProfile/profile value '$baseProfile'."
+  }
+
+  $settingsNode = Get-OptionalObjectPropertyValue -Object $profileDocument -Name "settings"
+  if ($null -eq $settingsNode) {
+    $settingsNode = $profileDocument
+  }
+
+  $overrides = [ordered]@{}
+  foreach ($settingName in (Get-StyleSettingNames)) {
+    $settingValue = Get-OptionalObjectPropertyValue -Object $settingsNode -Name $settingName
+    if ($null -ne $settingValue) {
+      $overrides[$settingName] = ConvertTo-ValidatedTwipsValue -Name $settingName -Value $settingValue
+    }
+  }
+
+  return [pscustomobject]@{
+    path = $resolvedProfilePath
+    baseProfile = $baseProfile
+    overrides = [pscustomobject]$overrides
+  }
+}
+
+function Normalize-OpenXmlText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return ""
+  }
+
+  return (($Text -replace "\s+", " ").Trim())
+}
+
+function Get-ParagraphText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $parts = New-Object System.Collections.Generic.List[string]
+  foreach ($textNode in @($Paragraph.SelectNodes(".//w:t | .//w:instrText", $NamespaceManager))) {
+    [void]$parts.Add($textNode.InnerText)
+  }
+  return Normalize-OpenXmlText -Text ($parts -join "")
+}
+
+function Get-HeadingPattern {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Aliases
+  )
+
+  $escapedAliases = foreach ($alias in $Aliases) {
+    [regex]::Escape($alias)
+  }
+
+  return '^(?:第?[0-9一二三四五六七八九十]+(?:章|节)?[.\)\u3001]?\s*)?(?:' + ($escapedAliases -join '|') + ')\s*(?:[:\uFF1A])?$'
+}
+
+function Test-IsSectionHeading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  foreach ($rule in $sectionHeadingRules) {
+    if ($Text -match (Get-HeadingPattern -Aliases $rule.aliases)) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Test-IsMetadataParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  foreach ($prefix in $metadataPrefixes) {
+    if ($Text -match ('^' + [regex]::Escape($prefix) + '\s*[:：]')) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Test-IsTitleParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $compact = ($Text -replace '\s+', '')
+  return ($compact -match '实验报告(?:[（(][^）)]+[）)])?$')
+}
+
+function Test-IsCaptionParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return ($Text -match '^图\d+\s*')
+}
+
+function Get-OrCreateChildElement {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Parent,
+
+    [Parameter(Mandatory = $true)]
+    [string]$LocalName
+  )
+
+  $existing = $Parent.SelectSingleNode("./w:$LocalName", $script:namespaceManager)
+  if ($null -ne $existing) {
+    return $existing
+  }
+
+  $child = $Parent.OwnerDocument.CreateElement("w", $LocalName, $wordNamespace)
+  $Parent.AppendChild($child) | Out-Null
+  return $child
+}
+
+function Get-OrCreateParagraphProperties {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph
+  )
+
+  $existing = $Paragraph.SelectSingleNode("./w:pPr", $script:namespaceManager)
+  if ($null -ne $existing) {
+    return $existing
+  }
+
+  $pPr = $Paragraph.OwnerDocument.CreateElement("w", "pPr", $wordNamespace)
+  if ($Paragraph.HasChildNodes) {
+    $Paragraph.InsertBefore($pPr, $Paragraph.FirstChild) | Out-Null
+  } else {
+    $Paragraph.AppendChild($pPr) | Out-Null
+  }
+  return $pPr
+}
+
+function Get-OrCreateCellProperties {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Cell
+  )
+
+  $existing = $Cell.SelectSingleNode("./w:tcPr", $script:namespaceManager)
+  if ($null -ne $existing) {
+    return $existing
+  }
+
+  $tcPr = $Cell.OwnerDocument.CreateElement("w", "tcPr", $wordNamespace)
+  if ($Cell.HasChildNodes) {
+    $Cell.InsertBefore($tcPr, $Cell.FirstChild) | Out-Null
+  } else {
+    $Cell.AppendChild($tcPr) | Out-Null
+  }
+  return $tcPr
+}
+
+function Set-WordAttribute {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlElement]$Element,
+
+    [Parameter(Mandatory = $true)]
+    [string]$LocalName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Value
+  )
+
+  [void]$Element.SetAttribute($LocalName, $wordNamespace, $Value)
+}
+
+function Remove-WordChildElement {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Parent,
+
+    [Parameter(Mandatory = $true)]
+    [string]$LocalName
+  )
+
+  $existing = $Parent.SelectSingleNode("./w:$LocalName", $script:namespaceManager)
+  if ($null -ne $existing) {
+    $Parent.RemoveChild($existing) | Out-Null
+    return $true
+  }
+
+  return $false
+}
+
+function Set-ParagraphJustification {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Value
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $jc = Get-OrCreateChildElement -Parent $pPr -LocalName "jc"
+  Set-WordAttribute -Element $jc -LocalName "val" -Value $Value
+}
+
+function Set-ParagraphIndent {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [AllowNull()]
+    [int]$FirstLine
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $ind = Get-OrCreateChildElement -Parent $pPr -LocalName "ind"
+  $ind.RemoveAttribute("firstLine", $wordNamespace)
+  $ind.RemoveAttribute("hanging", $wordNamespace)
+
+  if ($null -ne $FirstLine) {
+    Set-WordAttribute -Element $ind -LocalName "firstLine" -Value ([string]$FirstLine)
+  }
+}
+
+function Set-ParagraphSpacing {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [AllowNull()]
+    [int]$Before,
+
+    [AllowNull()]
+    [int]$After,
+
+    [AllowNull()]
+    [int]$Line
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $spacing = Get-OrCreateChildElement -Parent $pPr -LocalName "spacing"
+  if ($null -ne $Before) {
+    Set-WordAttribute -Element $spacing -LocalName "before" -Value ([string]$Before)
+  }
+  if ($null -ne $After) {
+    Set-WordAttribute -Element $spacing -LocalName "after" -Value ([string]$After)
+  }
+  if ($null -ne $Line) {
+    Set-WordAttribute -Element $spacing -LocalName "line" -Value ([string]$Line)
+    Set-WordAttribute -Element $spacing -LocalName "lineRule" -Value "auto"
+  }
+}
+
+function Set-ParagraphBold {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $rPr = Get-OrCreateChildElement -Parent $pPr -LocalName "rPr"
+  [void](Get-OrCreateChildElement -Parent $rPr -LocalName "b")
+  [void](Get-OrCreateChildElement -Parent $rPr -LocalName "bCs")
+
+  foreach ($run in @($Paragraph.SelectNodes("./w:r", $script:namespaceManager))) {
+    $runRPr = $run.SelectSingleNode("./w:rPr", $script:namespaceManager)
+    if ($null -eq $runRPr) {
+      $runRPr = $Paragraph.OwnerDocument.CreateElement("w", "rPr", $wordNamespace)
+      if ($run.HasChildNodes) {
+        $run.InsertBefore($runRPr, $run.FirstChild) | Out-Null
+      } else {
+        $run.AppendChild($runRPr) | Out-Null
+      }
+    }
+    [void](Get-OrCreateChildElement -Parent $runRPr -LocalName "b")
+    [void](Get-OrCreateChildElement -Parent $runRPr -LocalName "bCs")
+  }
+}
+
+function Set-CellVerticalAlignmentTop {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Cell
+  )
+
+  $tcPr = Get-OrCreateCellProperties -Cell $Cell
+  $vAlign = Get-OrCreateChildElement -Parent $tcPr -LocalName "vAlign"
+  Set-WordAttribute -Element $vAlign -LocalName "val" -Value "top"
+}
+
+function Test-IsBodyTableRow {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Row
+  )
+
+  $paragraphs = @($Row.SelectNodes(".//w:p", $script:namespaceManager))
+  if ($paragraphs.Count -eq 0) {
+    return $false
+  }
+
+  $texts = New-Object System.Collections.Generic.List[string]
+  $metadataParagraphCount = 0
+  foreach ($paragraph in $paragraphs) {
+    $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $script:namespaceManager
+    if ([string]::IsNullOrWhiteSpace($text)) {
+      continue
+    }
+
+    [void]$texts.Add($text)
+    if (Test-IsMetadataParagraph -Text $text) {
+      $metadataParagraphCount++
+    }
+    if (Test-IsSectionHeading -Text $text) {
+      return $true
+    }
+  }
+
+  if ($null -ne $Row.SelectSingleNode(".//w:drawing", $script:namespaceManager)) {
+    return $true
+  }
+
+  if ($texts.Count -eq 0) {
+    return $false
+  }
+
+  $combined = Normalize-OpenXmlText -Text ($texts -join " ")
+  if ($metadataParagraphCount -eq $texts.Count) {
+    return $false
+  }
+
+  return ($combined.Length -ge 80)
+}
+
+function Normalize-TableRowLayout {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Row
+  )
+
+  if (-not (Test-IsBodyTableRow -Row $Row)) {
+    return $false
+  }
+
+  $trPr = $Row.SelectSingleNode("./w:trPr", $script:namespaceManager)
+  if ($null -ne $trPr) {
+    [void](Remove-WordChildElement -Parent $trPr -LocalName "cantSplit")
+    [void](Remove-WordChildElement -Parent $trPr -LocalName "trHeight")
+    if (-not $trPr.HasChildNodes) {
+      $Row.RemoveChild($trPr) | Out-Null
+    }
+  }
+
+  foreach ($cell in @($Row.SelectNodes("./w:tc", $script:namespaceManager))) {
+    Set-CellVerticalAlignmentTop -Cell $cell
+  }
+
+  return $true
+}
+
+function Get-TopLevelTableProfileSignal {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Table
+  )
+
+  $nonEmptyTextCount = 0
+  $metadataParagraphCount = 0
+  $rowCount = 0
+  $hasSectionHeading = $false
+  $hasDrawing = ($null -ne $Table.SelectSingleNode(".//w:drawing", $script:namespaceManager))
+
+  foreach ($row in @($Table.SelectNodes("./w:tr", $script:namespaceManager))) {
+    $rowCount++
+    foreach ($paragraph in @($row.SelectNodes("./w:tc//w:p", $script:namespaceManager))) {
+      $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $script:namespaceManager
+      if ([string]::IsNullOrWhiteSpace($text)) {
+        continue
+      }
+
+      $nonEmptyTextCount++
+      if (Test-IsMetadataParagraph -Text $text) {
+        $metadataParagraphCount++
+      }
+      if (Test-IsSectionHeading -Text $text) {
+        $hasSectionHeading = $true
+      }
+    }
+  }
+
+  return [pscustomobject]@{
+    RowCount = $rowCount
+    NonEmptyTextCount = $nonEmptyTextCount
+    MetadataParagraphCount = $metadataParagraphCount
+    HasSectionHeading = $hasSectionHeading
+    HasDrawing = $hasDrawing
+  }
+}
+
+function Resolve-StyleProfileDecision {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RequestedProfile,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  if ($RequestedProfile -ne "auto") {
+    return [pscustomobject]@{
+      RequestedProfile = $RequestedProfile
+      ResolvedProfile = $RequestedProfile
+      Reason = "Profile explicitly requested."
+    }
+  }
+
+  $metadataParagraphCountBeforeHeading = 0
+  $firstPreHeadingTableSignal = $null
+
+  foreach ($child in @($Body.ChildNodes)) {
+    if ($child.LocalName -eq "p") {
+      $text = Get-ParagraphText -Paragraph $child -NamespaceManager $script:namespaceManager
+      if ([string]::IsNullOrWhiteSpace($text) -or (Test-IsTitleParagraph -Text $text)) {
+        continue
+      }
+
+      if (Test-IsSectionHeading -Text $text) {
+        break
+      }
+
+      if (Test-IsMetadataParagraph -Text $text) {
+        $metadataParagraphCountBeforeHeading++
+      }
+
+      continue
+    }
+
+    if ($child.LocalName -eq "tbl" -and $null -eq $firstPreHeadingTableSignal) {
+      $firstPreHeadingTableSignal = Get-TopLevelTableProfileSignal -Table $child
+      continue
+    }
+  }
+
+  if ($null -ne $firstPreHeadingTableSignal -and -not $firstPreHeadingTableSignal.HasDrawing -and -not $firstPreHeadingTableSignal.HasSectionHeading -and $firstPreHeadingTableSignal.RowCount -ge 4 -and $firstPreHeadingTableSignal.MetadataParagraphCount -ge 4) {
+    return [pscustomobject]@{
+      RequestedProfile = $RequestedProfile
+      ResolvedProfile = "compact"
+      Reason = "Detected a cover-style metadata table before the first report section."
+    }
+  }
+
+  if ($null -eq $firstPreHeadingTableSignal -and $metadataParagraphCountBeforeHeading -ge 3) {
+    return [pscustomobject]@{
+      RequestedProfile = $RequestedProfile
+      ResolvedProfile = "school"
+      Reason = "Detected a paragraph-based cover area with multiple metadata lines before the first report section."
+    }
+  }
+
+  return [pscustomobject]@{
+    RequestedProfile = $RequestedProfile
+    ResolvedProfile = "default"
+    Reason = "No auto-profile cover-layout heuristic matched, so the default profile was used."
+  }
+}
+
+function Write-OpenXmlPackage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$SourceDirectory,
+
+    [Parameter(Mandatory = $true)]
+    [string]$DestinationPath
+  )
+
+  if (Test-Path -LiteralPath $DestinationPath) {
+    Remove-Item -LiteralPath $DestinationPath -Force
+  }
+
+  $archive = [System.IO.Compression.ZipFile]::Open($DestinationPath, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($file in Get-ChildItem -LiteralPath $SourceDirectory -Recurse -File) {
+      $relativePath = $file.FullName.Substring($SourceDirectory.Length).TrimStart('\', '/') -replace '\\', '/'
+      $entry = $archive.CreateEntry($relativePath)
+      $entryStream = $entry.Open()
+      try {
+        $fileStream = [System.IO.File]::OpenRead($file.FullName)
+        try {
+          $fileStream.CopyTo($entryStream)
+        } finally {
+          $fileStream.Dispose()
+        }
+      } finally {
+        $entryStream.Dispose()
+      }
+    }
+  } finally {
+    $archive.Dispose()
+  }
+}
+
+$resolvedDocxPath = (Resolve-Path -LiteralPath $DocxPath).Path
+if ([System.IO.Path]::GetExtension($resolvedDocxPath).ToLowerInvariant() -ne ".docx") {
+  throw "Only .docx files are supported: $resolvedDocxPath"
+}
+
+if ([string]::IsNullOrWhiteSpace($OutPath)) {
+  $directory = Split-Path -Parent $resolvedDocxPath
+  $fileName = [System.IO.Path]::GetFileNameWithoutExtension($resolvedDocxPath)
+  $OutPath = Join-Path $directory ($fileName + ".styled.docx")
+}
+
+$resolvedOutPath = [System.IO.Path]::GetFullPath($OutPath)
+if ((-not $Overwrite) -and (Test-Path -LiteralPath $resolvedOutPath)) {
+  throw "Output file already exists: $resolvedOutPath. Re-run with -Overwrite to replace it."
+}
+
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openclaw-docx-style-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+
+try {
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($resolvedDocxPath, $tempRoot)
+
+  $documentXmlPath = Join-Path $tempRoot "word\document.xml"
+  if (-not (Test-Path -LiteralPath $documentXmlPath)) {
+    throw "word/document.xml was not found in $resolvedDocxPath"
+  }
+
+  [xml]$documentXml = [System.IO.File]::ReadAllText($documentXmlPath, (New-Object System.Text.UTF8Encoding($false)))
+  $script:namespaceManager = New-Object System.Xml.XmlNamespaceManager($documentXml.NameTable)
+  $script:namespaceManager.AddNamespace("w", $wordNamespace)
+
+  $body = $documentXml.SelectSingleNode("/w:document/w:body", $script:namespaceManager)
+  if ($null -eq $body) {
+    throw "Could not locate /w:document/w:body in $resolvedDocxPath"
+  }
+
+  $fileProfile = $null
+  if (-not [string]::IsNullOrWhiteSpace($ProfilePath)) {
+    $fileProfile = Read-StyleProfileFile -Path $ProfilePath
+  }
+
+  $requestedProfile = if ($PSBoundParameters.ContainsKey("Profile")) {
+    $Profile
+  } elseif ($null -ne $fileProfile -and -not [string]::IsNullOrWhiteSpace([string]$fileProfile.baseProfile)) {
+    [string]$fileProfile.baseProfile
+  } else {
+    $Profile
+  }
+
+  $profileDecision = Resolve-StyleProfileDecision -RequestedProfile $requestedProfile -Body $body
+  $profileSettings = Get-StyleProfileSettings -ProfileName $profileDecision.ResolvedProfile
+  $effectiveStyleSettings = [ordered]@{}
+  foreach ($settingName in (Get-StyleSettingNames)) {
+    $effectiveStyleSettings[$settingName] = if ($PSBoundParameters.ContainsKey($settingName)) {
+      Get-Variable -Name $settingName -ValueOnly
+    } elseif ($null -ne $fileProfile -and $null -ne $fileProfile.overrides.PSObject.Properties[$settingName]) {
+      $fileProfile.overrides.$settingName
+    } else {
+      $profileSettings[$settingName]
+    }
+  }
+  $styleSettings = [pscustomobject]$effectiveStyleSettings
+
+  $paragraphs = @($documentXml.SelectNodes("//w:p", $script:namespaceManager))
+  $styledTitleCount = 0
+  $styledHeadingCount = 0
+  $styledBodyCount = 0
+  $styledCaptionCount = 0
+  $styledImageCount = 0
+  $styledMetadataCount = 0
+  $normalizedBodyRowCount = 0
+
+  foreach ($paragraph in $paragraphs) {
+    $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $script:namespaceManager
+    $hasDrawing = ($null -ne $paragraph.SelectSingleNode(".//w:drawing", $script:namespaceManager))
+
+    if ($hasDrawing) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "center"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.ImageBeforeTwips -After $styleSettings.ImageAfterTwips -Line $null
+      $styledImageCount++
+      continue
+    }
+
+    if ([string]::IsNullOrWhiteSpace($text)) {
+      continue
+    }
+
+    if (Test-IsTitleParagraph -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "center"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.TitleAfterTwips -Line $styleSettings.BodyLineTwips
+      Set-ParagraphBold -Paragraph $paragraph
+      $styledTitleCount++
+      continue
+    }
+
+    if (Test-IsCaptionParagraph -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "center"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $styleSettings.BodyLineTwips
+      $styledCaptionCount++
+      continue
+    }
+
+    if (Test-IsSectionHeading -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.HeadingBeforeTwips -After $styleSettings.HeadingAfterTwips -Line $styleSettings.BodyLineTwips
+      Set-ParagraphBold -Paragraph $paragraph
+      $styledHeadingCount++
+      continue
+    }
+
+    if (Test-IsMetadataParagraph -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.BodyLineTwips
+      $styledMetadataCount++
+      continue
+    }
+
+    Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+    Set-ParagraphIndent -Paragraph $paragraph -FirstLine $styleSettings.BodyFirstLineTwips
+    Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
+    $styledBodyCount++
+  }
+
+  foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
+    if (Normalize-TableRowLayout -Row $row) {
+      $normalizedBodyRowCount++
+    }
+  }
+
+  [System.IO.File]::WriteAllText($documentXmlPath, $documentXml.OuterXml, (New-Object System.Text.UTF8Encoding($false)))
+  Write-OpenXmlPackage -SourceDirectory $tempRoot -DestinationPath $resolvedOutPath
+
+  [pscustomobject]@{
+    docxPath = $resolvedDocxPath
+    outPath = $resolvedOutPath
+    profilePath = $(if ($null -ne $fileProfile) { [string]$fileProfile.path } else { $null })
+    requestedProfile = $profileDecision.RequestedProfile
+    resolvedProfile = $profileDecision.ResolvedProfile
+    profileReason = $profileDecision.Reason
+    styleProfile = $profileDecision.ResolvedProfile
+    appliedSettings = $styleSettings
+    styledTitleCount = $styledTitleCount
+    styledHeadingCount = $styledHeadingCount
+    styledBodyCount = $styledBodyCount
+    styledCaptionCount = $styledCaptionCount
+    styledImageCount = $styledImageCount
+    styledMetadataCount = $styledMetadataCount
+    normalizedBodyRowCount = $normalizedBodyRowCount
+  }
+} finally {
+  if (Test-Path -LiteralPath $tempRoot) {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force
+  }
+}

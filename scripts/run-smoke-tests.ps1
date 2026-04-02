@@ -1,0 +1,1281 @@
+﻿[CmdletBinding()]
+param(
+  [string]$OpenClawCmd = $env:OPENCLAW_CMD
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.Drawing
+
+function Assert-True {
+  param(
+    [Parameter(Mandatory = $true)]
+    [bool]$Condition,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Message
+  )
+
+  if (-not $Condition) {
+    throw $Message
+  }
+}
+
+function Normalize-OutlineForComparison {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Text
+  )
+
+  $normalizedLines = foreach ($line in ($Text -split "\r?\n")) {
+    if ($line -notmatch '^\s*-\s*Source:\s+') {
+      $line
+    }
+  }
+
+  return (($normalizedLines -join [Environment]::NewLine).Trim())
+}
+
+function New-SampleTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>计算机网络实验报告</w:t></w:r></w:p>
+    <w:p><w:r><w:t>课程名称：</w:t></w:r></w:p>
+    <w:p><w:r><w:t>班级：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验名称：保留原值</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>姓名</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>指导教师：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>实验目的</w:t></w:r></w:p>
+    <w:p><w:r><w:t></w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验步骤</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验结果</w:t></w:r></w:p>
+    <w:p><w:r><w:t></w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
+function New-CoverBodyTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>实 验 报 告</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学号：</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>姓名：</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>班级：</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>课程名称：</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>实验名称：</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>实验性质： ①综合性实验 ②设计性实验 ③验证性实验：</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>实验时间：</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>实验地点：</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>一. 实验目的二. 实验内容</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>三. 实验步骤六.实验小结</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t></w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
+function New-ParagraphCoverTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>计算机网络实验报告</w:t></w:r></w:p>
+    <w:p><w:r><w:t>课程名称：计算机网络</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验名称：局域网搭建与常用 DOS 命令使用</w:t></w:r></w:p>
+    <w:p><w:r><w:t>姓名：张三</w:t></w:r></w:p>
+    <w:p><w:r><w:t>学号：20260001</w:t></w:r></w:p>
+    <w:p><w:r><w:t>班级：计科 2201</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验目的</w:t></w:r></w:p>
+    <w:p><w:r><w:t>通过本次实验掌握局域网的基本搭建方法，并理解 DOS 命令在网络排查中的作用。</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验总结</w:t></w:r></w:p>
+    <w:p><w:r><w:t>本次实验完成了局域网搭建与常用 DOS 命令使用。</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
+function New-SamplePngImage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Text,
+
+    [string]$BackgroundHex = "#E8F1FB"
+  )
+
+  $bitmap = New-Object System.Drawing.Bitmap 360, 200
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  try {
+    $graphics.Clear([System.Drawing.ColorTranslator]::FromHtml($BackgroundHex))
+    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $font = New-Object System.Drawing.Font("Microsoft YaHei", 18, [System.Drawing.FontStyle]::Bold)
+    $brush = [System.Drawing.Brushes]::Black
+    $graphics.DrawString($Text, $font, $brush, 18, 74)
+    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+  } finally {
+    if ($null -ne $font) {
+      $font.Dispose()
+    }
+    $graphics.Dispose()
+    $bitmap.Dispose()
+  }
+}
+
+function Test-PowerShellSyntax {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $tokens = $null
+  $errors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors) | Out-Null
+  Assert-True -Condition ($errors.Count -eq 0) -Message ("Syntax errors in {0}: {1}" -f $Path, (($errors | ForEach-Object { $_.Message }) -join "; "))
+}
+
+function Test-HasUtf8Bom {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $bytes = [System.IO.File]::ReadAllBytes($Path)
+  return $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+}
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openclaw-exp-report-smoke-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+
+$results = New-Object System.Collections.Generic.List[string]
+
+try {
+  foreach ($requiredPath in @(
+      (Join-Path $repoRoot 'SKILL.md'),
+      (Join-Path $repoRoot '.gitattributes'),
+      (Join-Path $repoRoot 'CHANGELOG.md'),
+      (Join-Path $repoRoot 'CODE_OF_CONDUCT.md'),
+      (Join-Path $repoRoot 'CONTRIBUTING.md'),
+      (Join-Path $repoRoot 'ROADMAP.md'),
+      (Join-Path $repoRoot 'SECURITY.md'),
+      (Join-Path $repoRoot 'SUPPORT.md'),
+      (Join-Path $repoRoot 'agents\openai.yaml'),
+      (Join-Path $repoRoot '.github\ISSUE_TEMPLATE\bug_report.md'),
+      (Join-Path $repoRoot '.github\ISSUE_TEMPLATE\feature_request.md'),
+      (Join-Path $repoRoot '.github\ISSUE_TEMPLATE\document_profile_request.md'),
+      (Join-Path $repoRoot '.github\ISSUE_TEMPLATE\config.yml'),
+      (Join-Path $repoRoot '.github\pull_request_template.md'),
+      (Join-Path $repoRoot '.github\workflows\quality.yml'),
+      (Join-Path $repoRoot 'demo\README.md'),
+      (Join-Path $repoRoot 'demo\assets\step-network-config.png'),
+      (Join-Path $repoRoot 'demo\assets\step-ipconfig.png'),
+      (Join-Path $repoRoot 'demo\assets\result-ping.png'),
+      (Join-Path $repoRoot 'demo\assets\result-arp.png'),
+      (Join-Path $repoRoot 'examples\docx-field-map.json'),
+      (Join-Path $repoRoot 'examples\docx-image-map.json'),
+      (Join-Path $repoRoot 'examples\docx-image-map-row.json'),
+      (Join-Path $repoRoot 'examples\docx-image-specs.json'),
+      (Join-Path $repoRoot 'examples\docx-image-specs-row.json'),
+      (Join-Path $repoRoot 'examples\docx-report-metadata.json'),
+      (Join-Path $repoRoot 'examples\feishu-local-files-prompt.md'),
+      (Join-Path $repoRoot 'examples\feishu-hybrid-images-prompt.md'),
+      (Join-Path $repoRoot 'examples\feishu-one-shot-script-prompt.md'),
+      (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md'),
+      (Join-Path $repoRoot 'examples\sample-report.txt'),
+      (Join-Path $repoRoot 'examples\e2e-sample-prompt.txt'),
+      (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
+      (Join-Path $repoRoot 'references\template-fit.md'),
+      (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
+      (Join-Path $repoRoot 'scripts\build-report.ps1'),
+      (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1'),
+      (Join-Path $repoRoot 'scripts\build-report-from-url.ps1'),
+      (Join-Path $repoRoot 'scripts\extract-docx-template.ps1'),
+      (Join-Path $repoRoot 'scripts\fetch-csdn-article.ps1'),
+      (Join-Path $repoRoot 'scripts\fetch-web-article.ps1'),
+      (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1'),
+      (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1'),
+      (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1'),
+      (Join-Path $repoRoot 'scripts\generate-report-chat.ps1'),
+      (Join-Path $repoRoot 'scripts\install-skill.ps1'),
+      (Join-Path $repoRoot 'scripts\insert-docx-images.ps1'),
+      (Join-Path $repoRoot 'scripts\prepare-report-prompt.ps1'),
+      (Join-Path $repoRoot 'scripts\report-defaults.ps1'),
+      (Join-Path $repoRoot 'scripts\reset-openclaw-session.ps1'),
+      (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1'),
+      (Join-Path $repoRoot 'scripts\self-check.ps1'),
+      (Join-Path $repoRoot 'scripts\validate-report-draft.ps1')
+    )) {
+    Assert-True -Condition (Test-Path -LiteralPath $requiredPath) -Message "Missing required path: $requiredPath"
+  }
+  $results.Add('repository structure OK') | Out-Null
+
+  Assert-True -Condition (-not (Test-HasUtf8Bom -Path (Join-Path $repoRoot 'SKILL.md'))) -Message 'SKILL.md must not start with a UTF-8 BOM because OpenClaw frontmatter parsing will fail.'
+  $results.Add('skill frontmatter encoding OK') | Out-Null
+
+  $exampleFieldMap = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-field-map.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleFieldMap) -Message 'Example field-map JSON did not parse.'
+  Assert-True -Condition ($exampleFieldMap.PSObject.Properties.Name -contains '课程名称') -Message 'Example field-map JSON is missing the course-name key.'
+  Assert-True -Condition ($exampleFieldMap.PSObject.Properties.Name -contains 'P4') -Message 'Example field-map JSON is missing the example location key.'
+  Assert-True -Condition ($exampleFieldMap.PSObject.Properties.Name -contains '实验目的') -Message 'Example field-map JSON is missing the example block key.'
+  Assert-True -Condition ($exampleFieldMap.实验目的.paragraphs.Count -ge 2) -Message 'Example field-map JSON is missing example block paragraphs.'
+  Assert-True -Condition ($exampleFieldMap.PSObject.Properties.Name -contains 'P10') -Message 'Example field-map JSON is missing the example block location key.'
+  $results.Add('example field map JSON OK') | Out-Null
+
+  $exampleImageMap = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-image-map.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleImageMap) -Message 'Example image-map JSON did not parse.'
+  Assert-True -Condition (@($exampleImageMap.images).Count -ge 2) -Message 'Example image-map JSON is missing example images.'
+  Assert-True -Condition ([string]$exampleImageMap.images[0].anchor -eq 'P8') -Message 'Example image-map JSON is missing the expected paragraph anchor.'
+  Assert-True -Condition ([string]$exampleImageMap.images[1].anchor -eq 'T1R6C1') -Message 'Example image-map JSON is missing the expected cell anchor.'
+  $results.Add('example image map JSON OK') | Out-Null
+
+  $exampleRowImageMap = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-image-map-row.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleRowImageMap) -Message 'Example row image-map JSON did not parse.'
+  Assert-True -Condition (@($exampleRowImageMap.images).Count -eq 4) -Message 'Example row image-map JSON should include four images.'
+  Assert-True -Condition ([string]$exampleRowImageMap.images[0].layout.mode -eq 'row') -Message 'Example row image-map JSON is missing the row layout mode.'
+  Assert-True -Condition ([int]$exampleRowImageMap.images[0].layout.columns -eq 2) -Message 'Example row image-map JSON is missing the expected layout columns.'
+  $results.Add('example row image map JSON OK') | Out-Null
+
+  $exampleImageSpecs = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-image-specs.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleImageSpecs) -Message 'Example image-specs JSON did not parse.'
+  Assert-True -Condition (@($exampleImageSpecs.images).Count -ge 2) -Message 'Example image-specs JSON is missing example images.'
+  Assert-True -Condition ([string]$exampleImageSpecs.images[0].section -eq '实验步骤') -Message 'Example image-specs JSON is missing the expected first section.'
+  Assert-True -Condition ([string]$exampleImageSpecs.images[1].section -eq '实验结果') -Message 'Example image-specs JSON is missing the expected second section.'
+  $results.Add('example image specs JSON OK') | Out-Null
+
+  $exampleRowImageSpecs = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-image-specs-row.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleRowImageSpecs) -Message 'Example row image-specs JSON did not parse.'
+  Assert-True -Condition (@($exampleRowImageSpecs.images).Count -eq 4) -Message 'Example row image-specs JSON should include four images.'
+  Assert-True -Condition ([string]$exampleRowImageSpecs.images[0].layout.mode -eq 'row') -Message 'Example row image-specs JSON is missing the row layout mode.'
+  Assert-True -Condition ([int]$exampleRowImageSpecs.images[0].layout.columns -eq 2) -Message 'Example row image-specs JSON is missing the expected layout columns.'
+  $results.Add('example row image specs JSON OK') | Out-Null
+
+  $exampleMetadata = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleMetadata) -Message 'Example docx metadata JSON did not parse.'
+  Assert-True -Condition ([string]$exampleMetadata.姓名 -eq '张三') -Message 'Example docx metadata JSON is missing the expected student name.'
+  Assert-True -Condition ([string]$exampleMetadata.学号 -eq '20260001') -Message 'Example docx metadata JSON is missing the expected student id.'
+  Assert-True -Condition ([string]$exampleMetadata.课程名称 -eq '计算机网络') -Message 'Example docx metadata JSON is missing the expected course name.'
+  Assert-True -Condition ([string]$exampleMetadata.实验性质 -eq '③验证性实验') -Message 'Example docx metadata JSON is missing the expected experiment property.'
+  $results.Add('example docx metadata JSON OK') | Out-Null
+
+  $feishuPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-local-files-prompt.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($feishuPromptExample -match '无法访问哪个路径') -Message 'Feishu local-files prompt example is missing the path-access guard wording.'
+  Assert-True -Condition ($feishuPromptExample -match '实验性质这一项要表现为勾选 ③验证性实验') -Message 'Feishu local-files prompt example is missing the experiment-property checkbox requirement.'
+  $results.Add('example Feishu prompt OK') | Out-Null
+
+  $feishuWrapperPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-one-shot-script-prompt.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($feishuWrapperPromptExample -match 'build-report-from-feishu\.ps1') -Message 'Feishu one-shot prompt example is missing the wrapper script reference.'
+  Assert-True -Condition ($feishuWrapperPromptExample -match '-DetailLevel full') -Message 'Feishu one-shot prompt example is missing the full detail-level guidance.'
+  Assert-True -Condition ($feishuWrapperPromptExample -match '可以省略') -Message 'Feishu one-shot prompt example is missing the remembered-name guidance.'
+  $results.Add('example Feishu one-shot prompt OK') | Out-Null
+
+  $feishuHybridPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-hybrid-images-prompt.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($feishuHybridPromptExample -match '上传的图片附件') -Message 'Feishu hybrid prompt example is missing the uploaded-image guidance.'
+  Assert-True -Condition ($feishuHybridPromptExample -match '最终插图仍使用我给出的本地路径文件') -Message 'Feishu hybrid prompt example is missing the local-path insertion guidance.'
+  Assert-True -Condition ($feishuHybridPromptExample -match '可以省略') -Message 'Feishu hybrid prompt example is missing the remembered-name guidance.'
+  $results.Add('example Feishu hybrid prompt OK') | Out-Null
+
+  $feishuUploadedPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($feishuUploadedPromptExample -match '\[media attached') -Message 'Feishu uploaded-images prompt example is missing the media-attached extraction guidance.'
+  Assert-True -Condition ($feishuUploadedPromptExample -match '最终 docx 也要把这些附件图片真正插进去') -Message 'Feishu uploaded-images prompt example is missing the final docx insertion requirement.'
+  Assert-True -Condition ($feishuUploadedPromptExample -match '可以省略') -Message 'Feishu uploaded-images prompt example is missing the remembered-name guidance.'
+  $results.Add('example Feishu uploaded-images prompt OK') | Out-Null
+
+  $exampleRequirements = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($null -ne $exampleRequirements) -Message 'Example e2e requirements JSON did not parse.'
+  Assert-True -Condition ($exampleRequirements.sections.Count -ge 7) -Message 'Example e2e requirements JSON is missing required sections.'
+  Assert-True -Condition ($exampleRequirements.requiredKeywords.Count -ge 5) -Message 'Example e2e requirements JSON is missing required keywords.'
+  $results.Add('example e2e requirements JSON OK') | Out-Null
+
+  $demoReadme = Get-Content -LiteralPath (Join-Path $repoRoot 'demo\README.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($demoReadme -match '2x2 Layout Preview') -Message 'Demo README is missing the expected layout preview section.'
+  Assert-True -Condition ($demoReadme -match 'demo-grid') -Message 'Demo README is missing the shared row-layout example.'
+  $results.Add('demo documentation OK') | Out-Null
+
+  $repoReadme = Get-Content -LiteralPath (Join-Path $repoRoot 'README.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($repoReadme -match 'build-report-from-feishu\.ps1') -Message 'README is missing the Feishu wrapper script documentation.'
+  Assert-True -Condition ($repoReadme -match 'DetailLevel full') -Message 'README is missing the richer detail-level usage guidance.'
+  Assert-True -Condition ($repoReadme -match 'uploaded images and you also provide local image paths') -Message 'README is missing the hybrid uploaded-image plus local-path guidance.'
+  Assert-True -Condition ($repoReadme -match 'media/inbound/example\.png') -Message 'README is missing the uploaded-attachment path guidance.'
+  Assert-True -Condition ($repoReadme -match 'can omit `-ExperimentName`') -Message 'README is missing the remembered experiment-name guidance.'
+  Assert-True -Condition ($repoReadme -match 'ROADMAP\.md') -Message 'README is missing the roadmap link.'
+  Assert-True -Condition ($repoReadme -match 'Repository Health') -Message 'README is missing the repository health section.'
+  $results.Add('README wrapper documentation OK') | Out-Null
+
+  $roadmapText = Get-Content -LiteralPath (Join-Path $repoRoot 'ROADMAP.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($roadmapText -match 'document profiles') -Message 'ROADMAP.md is missing the document-profile direction.'
+  $results.Add('roadmap documentation OK') | Out-Null
+
+  . (Join-Path $repoRoot 'scripts\report-defaults.ps1')
+  $defaultsTempPath = Join-Path $tempRoot 'experiment-report.defaults.json'
+  $savedDefaultsPath = Save-ExperimentReportDefaults -CourseName '计算机网络' -ExperimentName '局域网搭建与常用 DOS 命令使用' -DefaultsPath $defaultsTempPath
+  Assert-True -Condition ($savedDefaultsPath -eq $defaultsTempPath) -Message 'Report-defaults helper returned an unexpected defaults path.'
+  Assert-True -Condition (Test-Path -LiteralPath $defaultsTempPath) -Message 'Report-defaults helper did not create the defaults file.'
+  $resolvedSavedNames = Resolve-ExperimentReportNames -CourseName '' -ExperimentName '' -DefaultsPath $defaultsTempPath
+  Assert-True -Condition ([string]$resolvedSavedNames.courseName -eq '计算机网络') -Message 'Report-defaults helper did not restore the saved course name.'
+  Assert-True -Condition ([string]$resolvedSavedNames.experimentName -eq '局域网搭建与常用 DOS 命令使用') -Message 'Report-defaults helper did not restore the saved experiment name.'
+  Assert-True -Condition ([bool]$resolvedSavedNames.usedStoredExperimentName) -Message 'Report-defaults helper should report that it reused the stored experiment name.'
+  $results.Add('report defaults helper OK') | Out-Null
+
+  foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
+    Test-PowerShellSyntax -Path $scriptPath
+  }
+  $results.Add('PowerShell syntax OK') | Out-Null
+
+  $sampleDocx = Join-Path $tempRoot 'sample-template.docx'
+  New-SampleTemplateDocx -Path $sampleDocx
+  Assert-True -Condition (Test-Path -LiteralPath $sampleDocx) -Message 'Failed to create sample docx fixture.'
+  $results.Add('sample docx fixture OK') | Out-Null
+
+  $markdownOutput = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $sampleDocx -Format markdown | Out-String
+  Assert-True -Condition ($markdownOutput -match 'DOCX Template Outline') -Message 'Markdown extractor output missing header.'
+  Assert-True -Condition ($markdownOutput -match '课程名称') -Message 'Markdown extractor output missing expected paragraph text.'
+  Assert-True -Condition ($markdownOutput -match 'T1R1C2') -Message 'Markdown extractor output missing expected table cell location.'
+  Assert-True -Condition ($markdownOutput -match '实验目的') -Message 'Markdown extractor output missing expected section heading.'
+  $results.Add('docx extractor markdown OK') | Out-Null
+
+  $jsonOutput = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $sampleDocx -Format json | Out-String
+  $jsonResult = $jsonOutput | ConvertFrom-Json
+  Assert-True -Condition ($jsonResult.summary.tableCount -eq 1) -Message 'JSON extractor reported unexpected table count.'
+  Assert-True -Condition ($jsonResult.summary.paragraphCount -ge 9) -Message 'JSON extractor reported unexpected paragraph count.'
+  Assert-True -Condition ($jsonResult.likelyFields.Count -ge 5) -Message 'JSON extractor reported too few likely fields.'
+  Assert-True -Condition (($jsonResult.likelyFields | Where-Object { $_.reason -eq 'common-report-section-heading' }).Count -ge 2) -Message 'JSON extractor did not detect common section headings.'
+  $results.Add('docx extractor json OK') | Out-Null
+
+  $repeatMarkdownOutput = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $sampleDocx -Format markdown | Out-String
+  Assert-True -Condition ((Normalize-OutlineForComparison -Text $markdownOutput) -eq (Normalize-OutlineForComparison -Text $repeatMarkdownOutput)) -Message 'Extractor output changed between repeated runs.'
+  $results.Add('docx extractor repeatability OK') | Out-Null
+
+  $invalidFile = Join-Path $tempRoot 'not-a-docx.txt'
+  [System.IO.File]::WriteAllText($invalidFile, 'placeholder', (New-Object System.Text.UTF8Encoding($true)))
+  $invalidRejected = $false
+  try {
+    & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $invalidFile -Format markdown | Out-Null
+  } catch {
+    $invalidRejected = $true
+  }
+  Assert-True -Condition $invalidRejected -Message 'Extractor should reject non-docx input.'
+  $results.Add('docx extractor invalid-input guard OK') | Out-Null
+
+  $labelMappingFile = Join-Path $tempRoot 'label-field-map.json'
+  @'
+{
+  "课程名称": "计算机网络",
+  "班级": "计科 2201",
+  "姓名": "张三",
+  "学号": "20260001",
+  "指导教师": "李老师",
+  "实验名称": "不应覆盖",
+  "实验目的": {
+    "mode": "after",
+    "paragraphs": [
+      "掌握网络拓扑搭建流程。",
+      "理解常用 DOS 命令的作用。"
+    ]
+  },
+  "实验步骤": [
+    "配置虚拟机网络参数。",
+    "执行 ipconfig 与 ping 验证连通性。"
+  ]
+}
+'@ | Set-Content -LiteralPath $labelMappingFile -Encoding UTF8
+
+  $labelFilledDocx = Join-Path $tempRoot 'sample-template.label-filled.docx'
+  $labelFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $sampleDocx -MappingPath $labelMappingFile -OutPath $labelFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $labelFilledDocx) -Message 'Label-based fill did not create the filled docx.'
+  Assert-True -Condition ($labelFillResult.labelFillCount -ge 4) -Message 'Label-based fill applied too few fields.'
+  Assert-True -Condition ($labelFillResult.blockFillCount -ge 2) -Message 'Label-based fill did not report expected block fills.'
+  Assert-True -Condition ($labelFillResult.insertedParagraphCount -ge 2) -Message 'Label-based fill did not insert expected continuation paragraphs.'
+  $labelFilledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $labelFilledDocx -Format markdown | Out-String
+  Assert-True -Condition ($labelFilledOutline -match '课程名称：计算机网络') -Message 'Label-based fill did not update the course name paragraph.'
+  Assert-True -Condition ($labelFilledOutline -match '班级：计科 2201') -Message 'Label-based fill did not update the class paragraph.'
+  Assert-True -Condition ($labelFilledOutline -match 'T1R1C2: 张三') -Message 'Label-based fill did not update the name cell.'
+  Assert-True -Condition ($labelFilledOutline -match 'T1R2C2: 20260001') -Message 'Label-based fill did not update the student id cell.'
+  Assert-True -Condition ($labelFilledOutline -match '指导教师：李老师') -Message 'Label-based fill did not update the teacher field.'
+  Assert-True -Condition ($labelFilledOutline -match '实验名称：保留原值') -Message 'Label-based fill should not overwrite existing non-placeholder text.'
+  Assert-True -Condition ($labelFilledOutline -match '实验目的') -Message 'Label-based fill should keep the section heading paragraph.'
+  Assert-True -Condition ($labelFilledOutline -match '掌握网络拓扑搭建流程。') -Message 'Label-based block fill did not write the first purpose paragraph.'
+  Assert-True -Condition ($labelFilledOutline -match '理解常用 DOS 命令的作用。') -Message 'Label-based block fill did not write the second purpose paragraph.'
+  Assert-True -Condition ($labelFilledOutline -match '配置虚拟机网络参数。') -Message 'Label-based block fill did not write the first procedure paragraph.'
+  Assert-True -Condition ($labelFilledOutline -match '执行 ipconfig 与 ping 验证连通性。') -Message 'Label-based block fill did not write the second procedure paragraph.'
+  $results.Add('docx fill label mapping OK') | Out-Null
+
+  $locationMappingFile = Join-Path $tempRoot 'location-field-map.json'
+  @'
+{
+  "P4": "实验名称：已按位置覆盖",
+  "T1R2C2": "20261234",
+  "P10": [
+    "实验结果第一段：成功获取 IP 地址。",
+    "实验结果第二段：连通性测试通过。"
+  ]
+}
+'@ | Set-Content -LiteralPath $locationMappingFile -Encoding UTF8
+
+  $locationFilledDocx = Join-Path $tempRoot 'sample-template.location-filled.docx'
+  $locationFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $sampleDocx -MappingPath $locationMappingFile -OutPath $locationFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $locationFilledDocx) -Message 'Location-based fill did not create the filled docx.'
+  Assert-True -Condition ($locationFillResult.directFillCount -ge 3) -Message 'Location-based fill applied too few direct fields.'
+  Assert-True -Condition ($locationFillResult.blockFillCount -ge 1) -Message 'Location-based fill did not report the expected block fill.'
+  $locationFilledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $locationFilledDocx -Format markdown | Out-String
+  Assert-True -Condition ($locationFilledOutline -match '实验名称：已按位置覆盖') -Message 'Location-based fill did not override the experiment name paragraph.'
+  Assert-True -Condition ($locationFilledOutline -match 'T1R2C2: 20261234') -Message 'Location-based fill did not override the target table cell.'
+  Assert-True -Condition ($locationFilledOutline -match '实验结果第一段：成功获取 IP 地址。') -Message 'Location-based block fill did not write the first result paragraph.'
+  Assert-True -Condition ($locationFilledOutline -match '实验结果第二段：连通性测试通过。') -Message 'Location-based block fill did not write the second result paragraph.'
+  $results.Add('docx fill location mapping OK') | Out-Null
+
+  $repeatFilledDocx = Join-Path $tempRoot 'sample-template.label-filled-repeat.docx'
+  & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $sampleDocx -MappingPath $labelMappingFile -OutPath $repeatFilledDocx | Out-Null
+  $repeatFilledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $repeatFilledDocx -Format markdown | Out-String
+  Assert-True -Condition ((Normalize-OutlineForComparison -Text $labelFilledOutline) -eq (Normalize-OutlineForComparison -Text $repeatFilledOutline)) -Message 'Label-based fill output changed between repeated runs.'
+  $results.Add('docx fill repeatability OK') | Out-Null
+
+  $sampleReportPath = Join-Path $tempRoot 'sample-report.md'
+  @'
+计算机网络实验报告
+
+课程名称：计算机网络
+实验名称：局域网搭建与常用 DOS 命令使用
+
+一、实验目的
+通过本次实验掌握局域网的基本搭建方法，并理解 DOS 命令在网络排查中的作用。
+通过独立完成地址配置、连通性验证和缓存查看，熟悉常见网络实验的基本检查流程。
+
+二、实验环境
+实验环境为 Windows 11 主机、VMware Workstation 以及两台 Windows Server 2019 虚拟机。
+两台虚拟机均使用仅主机网络模式，便于在受控环境中完成局域网连通测试。
+
+三、实验原理或任务要求
+本实验要求将两台主机配置到同一网段，通过 ipconfig、ping 和 arp 等命令检查地址信息与互通情况。
+当主机位于同一网段且地址配置正确时，可以通过 ICMP 回显测试和 ARP 缓存记录判断网络通信是否正常建立。
+
+四、实验步骤
+首先将两台虚拟机配置在 192.168.10.0/24 网段，其中主机 A 为 192.168.10.11，主机 B 为 192.168.10.12。
+随后在两台主机上使用 ipconfig 查看配置，确认子网掩码均为 255.255.255.0。
+最后使用 ping 验证连通性，并通过 arp -a 检查邻居缓存记录。
+在实验过程中还需要反复核对网卡是否启用以及地址是否写入到正确的网络接口，避免由于配置位置错误导致测试结果失真。
+
+五、实验结果
+实验结果表明，两台主机能够正常互通，ping 测试延迟稳定且无丢包。
+通过 arp -a 可以看到对端主机的缓存记录，说明局域网通信建立正常。
+从命令输出可以确认两台主机均获取到了预期的静态地址，网络参数与实验要求保持一致。
+
+六、问题分析
+如果网段配置错误或子网掩码不一致，局域网主机之间将无法正常通信，因此在 DOS 命令检查中必须优先确认基础地址参数。
+如果只关注 ping 结果而忽略 ipconfig 与 arp 信息，容易遗漏地址冲突、接口选错或缓存未更新等隐蔽问题。
+
+七、实验总结
+本次实验完成了局域网搭建与常用 DOS 命令使用，进一步掌握了网络参数查看和互通测试方法。
+通过将 DOS 命令结果与网络配置过程对应分析，可以更加系统地理解局域网实验中地址规划、连通验证和故障定位之间的关系。
+'@ | Set-Content -LiteralPath $sampleReportPath -Encoding UTF8
+
+  $validationOutput = & (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $sampleReportPath -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') -Format json | Out-String
+  $validationResult = $validationOutput | ConvertFrom-Json
+  Assert-True -Condition ($validationResult.passed) -Message 'Report validation should pass for the sample report.'
+  Assert-True -Condition ($validationResult.summary.errorCount -eq 0) -Message 'Report validation returned unexpected errors for the sample report.'
+  $results.Add('report validation OK') | Out-Null
+
+  $referenceTextPath = Join-Path $tempRoot 'tutorial-reference.txt'
+  @'
+TITLE: 局域网实验参考流程
+URL: https://example.com/network-lab
+
+首先为两台虚拟机配置同一网段地址，并确认子网掩码一致。
+随后使用 ipconfig 查看地址配置，再通过 ping 验证两台主机之间是否可以正常通信。
+最后执行 arp -a 查看邻居缓存，结合命令结果分析局域网通信是否已经建立。
+'@ | Set-Content -LiteralPath $referenceTextPath -Encoding UTF8
+  $preparedPromptPath = Join-Path $tempRoot 'prepared-prompt.txt'
+  $preparedPromptResult = & (Join-Path $repoRoot 'scripts\prepare-report-prompt.ps1') `
+    -PromptText @'
+/experiment-report
+写一份完整的实验报告正文。
+'@ `
+    -ReferenceTextPaths $referenceTextPath `
+    -OutFile $preparedPromptPath
+  Assert-True -Condition (Test-Path -LiteralPath $preparedPromptPath) -Message 'prepare-report-prompt did not create the prepared prompt file.'
+  Assert-True -Condition ([int]$preparedPromptResult.referenceCount -eq 1) -Message 'prepare-report-prompt reported an unexpected reference count.'
+  Assert-True -Condition ([string]$preparedPromptResult.sources[0] -eq 'https://example.com/network-lab') -Message 'prepare-report-prompt did not preserve the reference source URL.'
+  $preparedPromptText = Get-Content -LiteralPath $preparedPromptPath -Raw -Encoding UTF8
+  Assert-True -Condition ($preparedPromptText -match '/experiment-report') -Message 'prepare-report-prompt did not preserve the base prompt.'
+  Assert-True -Condition ($preparedPromptText -match 'Reference Material 1') -Message 'prepare-report-prompt is missing the appended reference section.'
+  Assert-True -Condition ($preparedPromptText -match 'Source:\s+https://example.com/network-lab') -Message 'prepare-report-prompt is missing the appended reference source.'
+  Assert-True -Condition ($preparedPromptText -match '不要逐字照抄|Do not copy them verbatim') -Message 'prepare-report-prompt is missing the anti-copying guidance.'
+  Assert-True -Condition ($preparedPromptText -match 'ipconfig') -Message 'prepare-report-prompt is missing the reference content body.'
+  $results.Add('report prompt preparation OK') | Out-Null
+
+  $generatedFieldMapPath = Join-Path $tempRoot 'generated-field-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format json `
+    -OutFile $generatedFieldMapPath | Out-Null
+  Assert-True -Condition (Test-Path -LiteralPath $generatedFieldMapPath) -Message 'Field-map generator did not write the output file.'
+  $generatedFieldMapRoot = (Get-Content -LiteralPath $generatedFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($generatedFieldMapRoot.summary.fieldCount -ge 7) -Message 'Field-map generator produced too few fields.'
+  Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '课程名称') -Message 'Field-map generator did not map the course name.'
+  Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '班级') -Message 'Field-map generator did not map the class field.'
+  Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '姓名') -Message 'Field-map generator did not map the student name field.'
+  Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '实验目的') -Message 'Field-map generator did not map the purpose section.'
+  Assert-True -Condition ($generatedFieldMapRoot.fieldMap.实验目的.mode -eq 'after') -Message 'Field-map generator should preserve the purpose heading and fill after it.'
+  Assert-True -Condition (@($generatedFieldMapRoot.fieldMap.实验目的.paragraphs).Count -ge 1) -Message 'Field-map generator did not include purpose section paragraphs.'
+  Assert-True -Condition ($generatedFieldMapRoot.fieldMap.实验步骤.mode -eq 'after') -Message 'Field-map generator should preserve the procedure heading and fill after it.'
+  $results.Add('docx field-map generation OK') | Out-Null
+
+  $generatedFieldMapMarkdown = & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format markdown | Out-String
+  Assert-True -Condition ($generatedFieldMapMarkdown -match 'DOCX Field Map') -Message 'Field-map generator markdown output missing header.'
+  Assert-True -Condition ($generatedFieldMapMarkdown -match '课程名称') -Message 'Field-map generator markdown output missing expected content.'
+  $results.Add('docx field-map markdown OK') | Out-Null
+
+  $generatedFilledDocx = Join-Path $tempRoot 'sample-template.generated-filled.docx'
+  $generatedFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $sampleDocx -MappingPath $generatedFieldMapPath -OutPath $generatedFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $generatedFilledDocx) -Message 'Generated field-map fill did not create the filled docx.'
+  Assert-True -Condition ($generatedFillResult.labelFillCount -ge 5) -Message 'Generated field-map fill applied too few label fields.'
+  Assert-True -Condition ($generatedFillResult.blockFillCount -ge 3) -Message 'Generated field-map fill applied too few block fills.'
+  $generatedFilledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $generatedFilledDocx -Format markdown | Out-String
+  Assert-True -Condition ($generatedFilledOutline -match '课程名称：计算机网络') -Message 'Generated field-map fill did not update the course name paragraph.'
+  Assert-True -Condition ($generatedFilledOutline -match '班级：计科 2201') -Message 'Generated field-map fill did not update the class paragraph.'
+  Assert-True -Condition ($generatedFilledOutline -match 'T1R1C2: 张三') -Message 'Generated field-map fill did not update the student name cell.'
+  Assert-True -Condition ($generatedFilledOutline -match 'T1R2C2: 20260001') -Message 'Generated field-map fill did not update the student id cell.'
+  Assert-True -Condition ($generatedFilledOutline -match '指导教师：李老师') -Message 'Generated field-map fill did not update the teacher field.'
+  Assert-True -Condition ($generatedFilledOutline -match '实验名称：保留原值') -Message 'Generated field-map fill should not overwrite locked experiment text.'
+  Assert-True -Condition ($generatedFilledOutline -match '通过本次实验掌握局域网的基本搭建方法') -Message 'Generated field-map fill did not write the purpose section text.'
+  Assert-True -Condition ($generatedFilledOutline -match '首先将两台虚拟机配置在 192.168.10.0/24 网段') -Message 'Generated field-map fill did not write the procedure section text.'
+  Assert-True -Condition ($generatedFilledOutline -match '实验结果表明，两台主机能够正常互通') -Message 'Generated field-map fill did not write the result section text.'
+  $results.Add('docx fill from generated field map OK') | Out-Null
+
+  $coverBodyDocx = Join-Path $tempRoot 'cover-body-template.docx'
+  New-CoverBodyTemplateDocx -Path $coverBodyDocx
+  Assert-True -Condition (Test-Path -LiteralPath $coverBodyDocx) -Message 'Failed to create the cover-body template fixture.'
+
+  $coverBodyFieldMapPath = Join-Path $tempRoot 'cover-body-field-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $coverBodyDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format json `
+    -OutFile $coverBodyFieldMapPath | Out-Null
+  $coverBodyFieldMapRoot = (Get-Content -LiteralPath $coverBodyFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($coverBodyFieldMapRoot.fieldMap.PSObject.Properties.Name -contains 'T1R3C1') -Message 'Cover-body template mapping did not include the experiment-property option row.'
+  Assert-True -Condition ([string]$coverBodyFieldMapRoot.fieldMap.T1R3C1 -match '√③验证性实验') -Message 'Cover-body template mapping did not mark the selected experiment property option.'
+  Assert-True -Condition ($coverBodyFieldMapRoot.fieldMap.PSObject.Properties.Name -contains 'T1R5C1') -Message 'Cover-body template mapping is missing the composite body start cell.'
+  Assert-True -Condition ([string]$coverBodyFieldMapRoot.fieldMap.T1R5C1.mode -eq 'after-table') -Message 'Cover-body template mapping should use after-table mode.'
+  Assert-True -Condition ([string]$coverBodyFieldMapRoot.fieldMap.T1R5C1.through -eq 'T1R6C1') -Message 'Cover-body template mapping should span the full composite body row range.'
+  Assert-True -Condition (@($coverBodyFieldMapRoot.fieldMap.T1R5C1.paragraphs).Count -ge 6) -Message 'Cover-body template mapping is missing expected body paragraphs.'
+  $results.Add('docx cover-body field-map generation OK') | Out-Null
+
+  $coverBodyFilledDocx = Join-Path $tempRoot 'cover-body-template.filled.docx'
+  $coverBodyFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $coverBodyDocx -MappingPath $coverBodyFieldMapPath -OutPath $coverBodyFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $coverBodyFilledDocx) -Message 'Cover-body fill did not create the filled docx.'
+  Assert-True -Condition ($coverBodyFillResult.removedTableRowCount -eq 2) -Message 'Cover-body fill should remove the two composite body rows from the table.'
+  Assert-True -Condition ($coverBodyFillResult.blockFillCount -ge 1) -Message 'Cover-body fill did not report the moved body block.'
+  $coverBodyFilledOutlineJson = (& (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $coverBodyFilledDocx -Format json | Out-String) | ConvertFrom-Json
+  $coverBodyTableBlock = @($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'table' })[0]
+  Assert-True -Condition ($coverBodyTableBlock.rows.Count -eq 4) -Message 'Cover-body fill should leave only the cover rows in the table.'
+  Assert-True -Condition ([string]$coverBodyTableBlock.rows[0].cells[0].text -eq '学号：20260001') -Message 'Cover-body fill did not update the student id in the cover table.'
+  Assert-True -Condition ([string]$coverBodyTableBlock.rows[0].cells[1].text -eq '姓名：张三') -Message 'Cover-body fill did not update the student name in the cover table.'
+  Assert-True -Condition ([string]$coverBodyTableBlock.rows[1].cells[0].text -eq '课程名称：计算机网络') -Message 'Cover-body fill did not update the course name in the cover table.'
+  Assert-True -Condition ([string]$coverBodyTableBlock.rows[2].cells[0].text -match '实验性质： ①综合性实验 ②设计性实验 √③验证性实验') -Message 'Cover-body fill did not mark the selected experiment property option in the cover table.'
+  Assert-True -Condition ([string]$coverBodyFilledOutlineJson.blocks[2].text -eq '一. 实验目的') -Message 'Cover-body fill should insert the purpose heading immediately after the table.'
+  Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -match '通过本次实验掌握局域网的基本搭建方法' }).Count) -ge 1) -Message 'Cover-body fill did not move the purpose content after the table.'
+  Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '三. 实验步骤' }).Count) -ge 1) -Message 'Cover-body fill did not insert the procedure heading after the table.'
+  Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -match '实验结果表明，两台主机能够正常互通' }).Count) -ge 1) -Message 'Cover-body fill did not move the result content after the table.'
+  $results.Add('docx cover-body fill OK') | Out-Null
+
+  $sampleImageOne = Join-Path $tempRoot 'sample-image-1.png'
+  $sampleImageTwo = Join-Path $tempRoot 'sample-image-2.png'
+  $sampleImageThree = Join-Path $tempRoot 'sample-image-3.png'
+  $sampleImageFour = Join-Path $tempRoot 'sample-image-4.png'
+  New-SamplePngImage -Path $sampleImageOne -Text 'Step 1'
+  New-SamplePngImage -Path $sampleImageTwo -Text 'Result 1' -BackgroundHex '#FCEFD8'
+  New-SamplePngImage -Path $sampleImageThree -Text 'Result 2' -BackgroundHex '#FDE7D6'
+  New-SamplePngImage -Path $sampleImageFour -Text 'ARP A' -BackgroundHex '#F2E7FE'
+  Assert-True -Condition (Test-Path -LiteralPath $sampleImageOne) -Message 'Failed to create the first sample image fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath $sampleImageTwo) -Message 'Failed to create the second sample image fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath $sampleImageThree) -Message 'Failed to create the third sample image fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath $sampleImageFour) -Message 'Failed to create the fourth sample image fixture.'
+
+  $mixedGroupImageSpecsPath = Join-Path $tempRoot 'image-specs-mixed-group.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "section": "实验结果",
+      "caption": "图1 结果A",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "mixed-grid"
+      }
+    },
+    {
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "section": "实验结果",
+      "caption": "图2 结果B",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "mixed-grid"
+      }
+    },
+    {
+      "path": "$($sampleImageThree.Replace('\', '\\'))",
+      "section": "问题分析",
+      "caption": "图3 分析A",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "mixed-grid"
+      }
+    },
+    {
+      "path": "$($sampleImageFour.Replace('\', '\\'))",
+      "section": "问题分析",
+      "caption": "图4 分析B",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "mixed-grid"
+      }
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $mixedGroupImageSpecsPath -Encoding UTF8
+
+  $mixedGroupImageMapPath = Join-Path $tempRoot 'generated-image-map-mixed-group.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $coverBodyFilledDocx -ImageSpecsPath $mixedGroupImageSpecsPath -Format json -OutFile $mixedGroupImageMapPath | Out-Null
+  $mixedGroupImageMapRoot = (Get-Content -LiteralPath $mixedGroupImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (@($mixedGroupImageMapRoot.images).Count -eq 4) -Message 'Mixed-group image-map generator produced an unexpected number of images.'
+  Assert-True -Condition ((@($mixedGroupImageMapRoot.images | Where-Object { $_.layout.groupAnchor -eq '实验结果' }).Count) -eq 4) -Message 'Mixed-group image-map generator should unify the row group under the shared 实验结果 groupAnchor.'
+  Assert-True -Condition ((@($mixedGroupImageMapRoot.notes | Where-Object { $_ -match 'mixed-grid' }).Count) -ge 1) -Message 'Mixed-group image-map generator should explain the shared groupAnchor note.'
+
+  $mixedGroupFilledDocx = Join-Path $tempRoot 'cover-body-template.mixed-group-images.docx'
+  $mixedGroupInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $coverBodyFilledDocx -MappingPath $mixedGroupImageMapPath -OutPath $mixedGroupFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $mixedGroupFilledDocx) -Message 'Mixed-group image insertion did not create the filled docx.'
+  Assert-True -Condition ($mixedGroupInsertResult.insertedImageCount -eq 4) -Message 'Mixed-group image insertion inserted an unexpected number of images.'
+  $mixedGroupInspect = Join-Path $tempRoot 'mixed-group-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($mixedGroupFilledDocx, $mixedGroupInspect)
+  [xml]$mixedGroupDocumentXml = [System.IO.File]::ReadAllText((Join-Path $mixedGroupInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $mixedGroupNamespaceManager = New-Object System.Xml.XmlNamespaceManager($mixedGroupDocumentXml.NameTable)
+  $mixedGroupNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
+  Assert-True -Condition (@($mixedGroupDocumentXml.SelectNodes('//w:tbl', $mixedGroupNamespaceManager)).Count -eq 2) -Message 'Mixed-group image insertion should add exactly one image layout table.'
+  $mixedGroupDocumentText = $mixedGroupDocumentXml.OuterXml
+  $resultHeadingIndex = $mixedGroupDocumentText.IndexOf('四. 实验结果')
+  $analysisHeadingIndex = $mixedGroupDocumentText.IndexOf('五. 问题分析')
+  $analysisCaptionIndex = $mixedGroupDocumentText.IndexOf('图3 分析A')
+  Assert-True -Condition ($resultHeadingIndex -ge 0 -and $analysisHeadingIndex -gt $resultHeadingIndex) -Message 'Mixed-group image insertion document is missing the expected section headings.'
+  Assert-True -Condition ($analysisCaptionIndex -gt $resultHeadingIndex -and $analysisCaptionIndex -lt $analysisHeadingIndex) -Message 'Mixed-group image insertion should keep the whole 2x2 block under the shared 实验结果 anchor.'
+  Remove-Item -LiteralPath $mixedGroupInspect -Recurse -Force
+  $results.Add('docx image-map mixed group-anchor generation OK') | Out-Null
+  $results.Add('docx image insertion mixed group-anchor OK') | Out-Null
+
+  $imageSpecsPath = Join-Path $tempRoot 'image-specs.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "section": "实验步骤"
+    },
+    {
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "section": "实验结果"
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $imageSpecsPath -Encoding UTF8
+
+  $generatedImageMapPath = Join-Path $tempRoot 'generated-image-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $generatedFilledDocx -ImageSpecsPath $imageSpecsPath -Format json -OutFile $generatedImageMapPath | Out-Null
+  Assert-True -Condition (Test-Path -LiteralPath $generatedImageMapPath) -Message 'Image-map generator did not write the output file.'
+  $generatedImageMapRoot = (Get-Content -LiteralPath $generatedImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (@($generatedImageMapRoot.images).Count -eq 2) -Message 'Image-map generator produced an unexpected number of images.'
+  Assert-True -Condition ([string]$generatedImageMapRoot.images[0].section -eq '实验步骤') -Message 'Image-map generator did not keep the first section.'
+  Assert-True -Condition ([string]$generatedImageMapRoot.images[1].section -eq '实验结果') -Message 'Image-map generator did not keep the second section.'
+  Assert-True -Condition ([string]$generatedImageMapRoot.images[0].caption -match '^图1 ') -Message 'Image-map generator did not create the first caption.'
+  Assert-True -Condition ([string]$generatedImageMapRoot.images[1].caption -match '^图2 ') -Message 'Image-map generator did not create the second caption.'
+  $results.Add('docx image-map generation OK') | Out-Null
+
+  $workspaceMediaDir = Join-Path (Split-Path -Parent $repoRoot) 'media\inbound'
+  New-Item -ItemType Directory -Path $workspaceMediaDir -Force | Out-Null
+  $uploadedImageSuffix = [System.Guid]::NewGuid().ToString('N')
+  $uploadedImageOneName = "smoke-uploaded-$uploadedImageSuffix-1.png"
+  $uploadedImageTwoName = "smoke-uploaded-$uploadedImageSuffix-2.png"
+  $uploadedImageOnePath = Join-Path $workspaceMediaDir $uploadedImageOneName
+  $uploadedImageTwoPath = Join-Path $workspaceMediaDir $uploadedImageTwoName
+  Copy-Item -LiteralPath $sampleImageOne -Destination $uploadedImageOnePath -Force
+  Copy-Item -LiteralPath $sampleImageTwo -Destination $uploadedImageTwoPath -Force
+  try {
+    $uploadedRelativeImageMapPath = Join-Path $tempRoot 'generated-image-map-uploaded-relative.json'
+    & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
+      -DocxPath $generatedFilledDocx `
+      -ImagePaths ("media\inbound\{0}" -f $uploadedImageOneName),("media\inbound\{0}" -f $uploadedImageTwoName) `
+      -Format json `
+      -OutFile $uploadedRelativeImageMapPath | Out-Null
+    $uploadedRelativeImageMapRoot = (Get-Content -LiteralPath $uploadedRelativeImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].path -eq $uploadedImageOnePath) -Message 'Image-map generator did not resolve the first uploaded relative media path against the workspace root.'
+    Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[1].path -eq $uploadedImageTwoPath) -Message 'Image-map generator did not resolve the second uploaded relative media path against the workspace root.'
+
+    $uploadedRelativeFilledDocx = Join-Path $tempRoot 'sample-template.uploaded-relative-images.docx'
+    $uploadedRelativeInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $uploadedRelativeImageMapPath -OutPath $uploadedRelativeFilledDocx
+    Assert-True -Condition (Test-Path -LiteralPath $uploadedRelativeFilledDocx) -Message 'Uploaded relative media-path image insertion did not create the filled docx.'
+    Assert-True -Condition ($uploadedRelativeInsertResult.insertedImageCount -eq 2) -Message 'Uploaded relative media-path image insertion inserted an unexpected number of images.'
+  } finally {
+    Remove-Item -LiteralPath $uploadedImageOnePath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $uploadedImageTwoPath -Force -ErrorAction SilentlyContinue
+  }
+  $results.Add('docx image-map uploaded relative-path generation OK') | Out-Null
+  $results.Add('docx image insertion uploaded relative-path OK') | Out-Null
+
+  $sectionImageFilledDocx = Join-Path $tempRoot 'sample-template.section-images.docx'
+  $sectionImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $generatedImageMapPath -OutPath $sectionImageFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $sectionImageFilledDocx) -Message 'Section-based image insertion did not create the filled docx.'
+  Assert-True -Condition ($sectionImageInsertResult.insertedImageCount -eq 2) -Message 'Section-based image insertion inserted an unexpected number of images.'
+  $sectionImageTemp = Join-Path $tempRoot 'section-image-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($sectionImageFilledDocx, $sectionImageTemp)
+  [xml]$sectionImageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $sectionImageTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $sectionNamespaceManager = New-Object System.Xml.XmlNamespaceManager($sectionImageDocumentXml.NameTable)
+  $sectionNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
+  $sectionNamespaceManager.AddNamespace('wp', 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing')
+  Assert-True -Condition (@($sectionImageDocumentXml.SelectNodes('//wp:inline', $sectionNamespaceManager)).Count -ge 2) -Message 'Section-based image insertion is missing expected image drawing nodes.'
+  Assert-True -Condition ($sectionImageDocumentXml.OuterXml -match '图1 实验步骤截图') -Message 'Section-based image insertion is missing the first caption.'
+  Assert-True -Condition ($sectionImageDocumentXml.OuterXml -match '图2 实验结果截图') -Message 'Section-based image insertion is missing the second caption.'
+  Remove-Item -LiteralPath $sectionImageTemp -Recurse -Force
+  $results.Add('docx image insertion by section OK') | Out-Null
+
+  $imageMappingFile = Join-Path $tempRoot 'image-map.json'
+  @"
+{
+  "images": [
+    {
+      "anchor": "P5",
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "caption": "图1 实验目的示意图",
+      "widthCm": 7.5
+    },
+    {
+      "anchor": "T1R3C2",
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "caption": "图2 表格截图示意",
+      "widthCm": 6.0
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $imageMappingFile -Encoding UTF8
+
+  $imageFilledDocx = Join-Path $tempRoot 'sample-template.images.docx'
+  $imageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $sampleDocx -MappingPath $imageMappingFile -OutPath $imageFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $imageFilledDocx) -Message 'Image insertion script did not create the filled docx.'
+  Assert-True -Condition ($imageInsertResult.insertedImageCount -eq 2) -Message 'Image insertion script inserted an unexpected number of images.'
+  Assert-True -Condition ($imageInsertResult.insertedCaptionCount -eq 2) -Message 'Image insertion script inserted an unexpected number of captions.'
+
+  $imageInsertTemp = Join-Path $tempRoot 'image-insert-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($imageFilledDocx, $imageInsertTemp)
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $imageInsertTemp 'word\media\image1.png')) -Message 'Inserted docx is missing the first media image.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $imageInsertTemp 'word\media\image2.png')) -Message 'Inserted docx is missing the second media image.'
+  [xml]$imageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $imageInsertTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  [xml]$imageRelationshipsXml = [System.IO.File]::ReadAllText((Join-Path $imageInsertTemp 'word\_rels\document.xml.rels'), (New-Object System.Text.UTF8Encoding($false)))
+  [xml]$imageContentTypesXml = [System.IO.File]::ReadAllText((Join-Path $imageInsertTemp '[Content_Types].xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $imageNamespaceManager = New-Object System.Xml.XmlNamespaceManager($imageDocumentXml.NameTable)
+  $imageNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
+  $imageNamespaceManager.AddNamespace('wp', 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing')
+  Assert-True -Condition (@($imageDocumentXml.SelectNodes('//wp:inline', $imageNamespaceManager)).Count -ge 2) -Message 'Inserted docx is missing expected image drawing nodes.'
+  Assert-True -Condition ($imageDocumentXml.OuterXml -match '图1 实验目的示意图') -Message 'Inserted docx is missing the first image caption.'
+  Assert-True -Condition ($imageDocumentXml.OuterXml -match '图2 表格截图示意') -Message 'Inserted docx is missing the second image caption.'
+  Assert-True -Condition (@($imageRelationshipsXml.Relationships.Relationship | Where-Object { $_.Target -match '^media/image\d+\.png$' }).Count -ge 2) -Message 'Inserted docx is missing expected image relationships.'
+  Assert-True -Condition (@($imageContentTypesXml.Types.Default | Where-Object { $_.Extension -eq 'png' -and $_.ContentType -eq 'image/png' }).Count -ge 1) -Message 'Inserted docx is missing the png content type registration.'
+  $results.Add('docx image insertion OK') | Out-Null
+
+  $rowImageSpecsPath = Join-Path $tempRoot 'row-image-specs.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "section": "实验结果",
+      "caption": "图1 主机 A 的 ping 测试结果",
+      "widthCm": 6.6,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    },
+    {
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "section": "实验结果",
+      "caption": "图2 主机 B 的 ping 测试结果",
+      "widthCm": 6.6,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    },
+    {
+      "path": "$($sampleImageThree.Replace('\', '\\'))",
+      "section": "实验结果",
+      "caption": "图3 主机 A 的 arp -a 邻居缓存结果",
+      "widthCm": 6.6,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    },
+    {
+      "path": "$($sampleImageFour.Replace('\', '\\'))",
+      "section": "实验结果",
+      "caption": "图4 主机 B 的 arp -a 邻居缓存结果",
+      "widthCm": 6.6,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "results-grid"
+      }
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $rowImageSpecsPath -Encoding UTF8
+
+  $rowImageMapPath = Join-Path $tempRoot 'generated-row-image-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $generatedFilledDocx -ImageSpecsPath $rowImageSpecsPath -Format json -OutFile $rowImageMapPath | Out-Null
+  $rowImageMapRoot = (Get-Content -LiteralPath $rowImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (@($rowImageMapRoot.images).Count -eq 4) -Message 'Row image-map generator produced an unexpected number of images.'
+  Assert-True -Condition ([string]$rowImageMapRoot.images[0].layout.mode -eq 'row') -Message 'Row image-map generator did not preserve the row layout mode.'
+  Assert-True -Condition ([int]$rowImageMapRoot.images[0].layout.columns -eq 2) -Message 'Row image-map generator did not preserve the row layout column count.'
+  $results.Add('docx image-map row layout generation OK') | Out-Null
+
+  $rowImageFilledDocx = Join-Path $tempRoot 'sample-template.row-images.docx'
+  $rowImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $rowImageMapPath -OutPath $rowImageFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $rowImageFilledDocx) -Message 'Row-layout image insertion did not create the filled docx.'
+  Assert-True -Condition ($rowImageInsertResult.insertedImageCount -eq 4) -Message 'Row-layout image insertion inserted an unexpected number of images.'
+  Assert-True -Condition ($rowImageInsertResult.insertedCaptionCount -eq 4) -Message 'Row-layout image insertion inserted an unexpected number of captions.'
+
+  $rowImageTemp = Join-Path $tempRoot 'row-image-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($rowImageFilledDocx, $rowImageTemp)
+  [xml]$rowImageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $rowImageTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $rowNamespaceManager = New-Object System.Xml.XmlNamespaceManager($rowImageDocumentXml.NameTable)
+  $rowNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
+  $rowNamespaceManager.AddNamespace('wp', 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing')
+  Assert-True -Condition (@($rowImageDocumentXml.SelectNodes('//w:tbl[.//wp:inline]', $rowNamespaceManager)).Count -ge 1) -Message 'Row-layout image insertion is missing the expected image table.'
+  Assert-True -Condition (@($rowImageDocumentXml.SelectNodes('//wp:inline', $rowNamespaceManager)).Count -ge 4) -Message 'Row-layout image insertion is missing expected drawing nodes.'
+  Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图1 主机 A 的 ping 测试结果') -Message 'Row-layout image insertion is missing the first row caption.'
+  Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图4 主机 B 的 arp -a 邻居缓存结果') -Message 'Row-layout image insertion is missing the final row caption.'
+  Remove-Item -LiteralPath $rowImageTemp -Recurse -Force
+  $results.Add('docx image insertion row layout OK') | Out-Null
+
+  $styledDocx = Join-Path $tempRoot 'sample-template.row-images.styled.docx'
+  $styleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $styledDocx -Overwrite
+  Assert-True -Condition (Test-Path -LiteralPath $styledDocx) -Message 'Docx style formatter did not create the styled docx.'
+  Assert-True -Condition ([string]$styleResult.styleProfile -eq 'default') -Message 'Docx style formatter should default to the default style profile.'
+  Assert-True -Condition ($styleResult.styledTitleCount -ge 1) -Message 'Docx style formatter did not detect the report title.'
+  Assert-True -Condition ($styleResult.styledHeadingCount -ge 3) -Message 'Docx style formatter did not detect enough section headings.'
+  Assert-True -Condition ($styleResult.styledBodyCount -ge 5) -Message 'Docx style formatter did not detect enough body paragraphs.'
+  Assert-True -Condition ($styleResult.styledCaptionCount -ge 4) -Message 'Docx style formatter did not detect enough figure captions.'
+  Assert-True -Condition ($styleResult.styledImageCount -ge 4) -Message 'Docx style formatter did not detect enough image paragraphs.'
+  Assert-True -Condition ($styleResult.styledMetadataCount -ge 3) -Message 'Docx style formatter did not detect enough metadata paragraphs.'
+  Assert-True -Condition ([int]$styleResult.appliedSettings.BodyLineTwips -eq 360) -Message 'Default style profile should keep the baseline body line spacing.'
+
+  $styledDocxTemp = Join-Path $tempRoot 'styled-docx-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($styledDocx, $styledDocxTemp)
+  [xml]$styledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $styledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:jc w:val="center"') -Message 'Styled docx is missing centered paragraph formatting.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:ind w:firstLine="420"') -Message 'Styled docx is missing the expected first-line indent.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:b/?') -Message 'Styled docx is missing bold heading formatting.'
+  Remove-Item -LiteralPath $styledDocxTemp -Recurse -Force
+
+  $compactStyledDocx = Join-Path $tempRoot 'sample-template.row-images.compact-styled.docx'
+  $compactStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $compactStyledDocx -Overwrite -Profile compact
+  Assert-True -Condition (Test-Path -LiteralPath $compactStyledDocx) -Message 'Compact style profile did not create the styled docx.'
+  Assert-True -Condition ([string]$compactStyleResult.styleProfile -eq 'compact') -Message 'Compact style profile result is missing the selected profile name.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Compact style profile did not apply the expected tighter body line spacing.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.HeadingBeforeTwips -eq 80) -Message 'Compact style profile did not apply the expected heading spacing.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.TitleAfterTwips -eq 80) -Message 'Compact style profile did not apply the expected title spacing.'
+  $compactStyledDocxTemp = Join-Path $tempRoot 'compact-styled-docx-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($compactStyledDocx, $compactStyledDocxTemp)
+  [xml]$compactStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $compactStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="320"') -Message 'Compact styled docx is missing the expected compact line spacing.'
+  Remove-Item -LiteralPath $compactStyledDocxTemp -Recurse -Force
+
+  $customStyleProfilePath = Join-Path $tempRoot 'custom-style-profile.json'
+  $customStyleProfile = [ordered]@{
+    baseProfile = 'compact'
+    settings = [ordered]@{
+      BodyLineTwips = 300
+      HeadingBeforeTwips = 60
+      TitleAfterTwips = 50
+    }
+  }
+  [System.IO.File]::WriteAllText($customStyleProfilePath, ($customStyleProfile | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding($true)))
+  $customStyledDocx = Join-Path $tempRoot 'sample-template.row-images.custom-styled.docx'
+  $customStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $customStyledDocx -Overwrite -ProfilePath $customStyleProfilePath -HeadingBeforeTwips 70
+  Assert-True -Condition (Test-Path -LiteralPath $customStyledDocx) -Message 'Custom style profile file did not create the styled docx.'
+  Assert-True -Condition ([string]$customStyleResult.requestedProfile -eq 'compact') -Message 'Custom style profile file did not supply the expected base profile.'
+  Assert-True -Condition ([string]$customStyleResult.styleProfile -eq 'compact') -Message 'Custom style profile file did not resolve to the expected base profile.'
+  Assert-True -Condition ([string]$customStyleResult.profilePath -eq $customStyleProfilePath) -Message 'Custom style profile result is missing the applied profile file path.'
+  Assert-True -Condition ([int]$customStyleResult.appliedSettings.BodyLineTwips -eq 300) -Message 'Custom style profile file did not override body line spacing.'
+  Assert-True -Condition ([int]$customStyleResult.appliedSettings.TitleAfterTwips -eq 50) -Message 'Custom style profile file did not override title spacing.'
+  Assert-True -Condition ([int]$customStyleResult.appliedSettings.HeadingBeforeTwips -eq 70) -Message 'Explicit command-line style settings should override the custom style profile file.'
+  $customStyledDocxTemp = Join-Path $tempRoot 'custom-styled-docx-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($customStyledDocx, $customStyledDocxTemp)
+  [xml]$customStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $customStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($customStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="300"') -Message 'Custom styled docx is missing the expected profile-file line spacing.'
+  Remove-Item -LiteralPath $customStyledDocxTemp -Recurse -Force
+
+  $autoCompactStyledDocx = Join-Path $tempRoot 'cover-body-template.auto-compact-styled.docx'
+  $autoCompactStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $coverBodyFilledDocx -OutPath $autoCompactStyledDocx -Overwrite -Profile auto
+  Assert-True -Condition (Test-Path -LiteralPath $autoCompactStyledDocx) -Message 'Auto style profile did not create the compact-styled cover-body docx.'
+  Assert-True -Condition ([string]$autoCompactStyleResult.requestedProfile -eq 'auto') -Message 'Auto compact style result is missing the requested profile.'
+  Assert-True -Condition ([string]$autoCompactStyleResult.styleProfile -eq 'compact') -Message 'Auto style profile should resolve the cover-body template to compact.'
+  Assert-True -Condition ([string]$autoCompactStyleResult.profileReason -match 'cover-style metadata table') -Message 'Auto compact style result is missing the expected decision reason.'
+  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Auto compact style result did not apply compact body spacing.'
+
+  $paragraphCoverDocx = Join-Path $tempRoot 'paragraph-cover-template.docx'
+  New-ParagraphCoverTemplateDocx -Path $paragraphCoverDocx
+  Assert-True -Condition (Test-Path -LiteralPath $paragraphCoverDocx) -Message 'Failed to create the paragraph-cover template fixture.'
+  $autoSchoolStyledDocx = Join-Path $tempRoot 'paragraph-cover-template.auto-school-styled.docx'
+  $autoSchoolStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $paragraphCoverDocx -OutPath $autoSchoolStyledDocx -Overwrite -Profile auto
+  Assert-True -Condition (Test-Path -LiteralPath $autoSchoolStyledDocx) -Message 'Auto style profile did not create the school-styled paragraph-cover docx.'
+  Assert-True -Condition ([string]$autoSchoolStyleResult.styleProfile -eq 'school') -Message 'Auto style profile should resolve the paragraph-cover template to school.'
+  Assert-True -Condition ([string]$autoSchoolStyleResult.profileReason -match 'paragraph-based cover area') -Message 'Auto school style result is missing the expected decision reason.'
+  Assert-True -Condition ([int]$autoSchoolStyleResult.appliedSettings.BodyLineTwips -eq 400) -Message 'Auto school style result did not apply school body spacing.'
+  $autoSchoolStyledDocxTemp = Join-Path $tempRoot 'auto-school-styled-docx-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($autoSchoolStyledDocx, $autoSchoolStyledDocxTemp)
+  [xml]$autoSchoolStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $autoSchoolStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($autoSchoolStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="400"') -Message 'Auto school styled docx is missing the expected school line spacing.'
+  Remove-Item -LiteralPath $autoSchoolStyledDocxTemp -Recurse -Force
+  $results.Add('docx report style formatting OK') | Out-Null
+
+  $buildReportOutputDir = Join-Path $tempRoot 'build-report-output'
+  $buildStyleProfilePath = Join-Path $tempRoot 'build-style-profile.json'
+  $buildStyleProfile = [ordered]@{
+    baseProfile = 'auto'
+    settings = [ordered]@{
+      BodyLineTwips = 310
+      CaptionAfterTwips = 30
+    }
+  }
+  [System.IO.File]::WriteAllText($buildStyleProfilePath, ($buildStyleProfile | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding($true)))
+  $buildReportResult = & (Join-Path $repoRoot 'scripts\build-report.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -ImageSpecsPath $rowImageSpecsPath `
+    -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') `
+    -OutputDir $buildReportOutputDir `
+    -StyleFinalDocx `
+    -StyleProfile auto `
+    -StyleProfilePath $buildStyleProfilePath
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'generated-field-map.json')) -Message 'build-report did not create the generated field map.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.docx')) -Message 'build-report did not create the filled docx.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.docx')) -Message 'build-report did not create the image-filled docx.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.styled.docx')) -Message 'build-report did not create the styled docx.'
+  $buildReportSummary = (Get-Content -LiteralPath (Join-Path $buildReportOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$buildReportSummary.validationPassed) -Message 'build-report summary reported a failed validation result.'
+  Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report summary did not preserve the requested auto style profile.'
+  Assert-True -Condition ([string]$buildReportSummary.styleProfilePath -eq $buildStyleProfilePath) -Message 'build-report summary is missing the custom style profile path.'
+  Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'default') -Message 'build-report summary should resolve the sample template to the default style profile.'
+  Assert-True -Condition ([string]$buildReportSummary.styleProfileReason -match 'default profile') -Message 'build-report summary is missing the resolved auto-style reason.'
+  Assert-True -Condition ([int]$buildReportSummary.appliedStyleSettings.BodyLineTwips -eq 310) -Message 'build-report summary is missing the overridden style settings from the custom profile file.'
+  Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
+  $results.Add('build-report pipeline OK') | Out-Null
+
+  $feishuBuildOutputDir = Join-Path $tempRoot 'feishu-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -ImageSpecsPath $rowImageSpecsPath `
+    -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') `
+    -OutputDir $feishuBuildOutputDir `
+    -StyleProfile auto `
+    -StyleProfilePath $buildStyleProfilePath | Out-Null
+  $feishuBuildSummaryPath = Join-Path $feishuBuildOutputDir 'feishu-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummaryPath) -Message 'Feishu wrapper did not create the wrapper summary.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $feishuBuildOutputDir 'report.txt')) -Message 'Feishu wrapper did not copy the report body to the output root.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $feishuBuildOutputDir 'artifacts\summary.json')) -Message 'Feishu wrapper did not keep the inner build summary under artifacts.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $feishuBuildOutputDir 'artifacts\generated-field-map.json')) -Message 'Feishu wrapper did not keep generated artifacts under artifacts.'
+  $feishuBuildSummary = (Get-Content -LiteralPath $feishuBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$feishuBuildSummary.mode -eq 'local-report') -Message 'Feishu wrapper summary did not record the local-report mode.'
+  Assert-True -Condition ([string]$feishuBuildSummary.detailLevel -eq 'full') -Message 'Feishu wrapper summary did not preserve the default full detail level.'
+  Assert-True -Condition ((Split-Path -Parent $feishuBuildSummary.finalDocxPath) -eq $feishuBuildOutputDir) -Message 'Feishu wrapper should copy the final docx to the output root.'
+  Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
+  Assert-True -Condition ([string]$feishuBuildSummary.artifactsDir -eq (Join-Path $feishuBuildOutputDir 'artifacts')) -Message 'Feishu wrapper summary is missing the expected artifacts directory.'
+  $results.Add('Feishu wrapper pipeline OK') | Out-Null
+
+  $installRoot = Join-Path $tempRoot 'install-root'
+  $installTarget = Join-Path $installRoot 'skill-install'
+  & (Join-Path $repoRoot 'scripts\install-skill.ps1') -TargetDir $installTarget | Out-Null
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'SKILL.md')) -Message 'Install script did not copy SKILL.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'CODE_OF_CONDUCT.md')) -Message 'Install script did not copy CODE_OF_CONDUCT.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'CONTRIBUTING.md')) -Message 'Install script did not copy CONTRIBUTING.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'CHANGELOG.md')) -Message 'Install script did not copy CHANGELOG.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'SECURITY.md')) -Message 'Install script did not copy SECURITY.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'SUPPORT.md')) -Message 'Install script did not copy SUPPORT.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'ROADMAP.md')) -Message 'Install script did not copy ROADMAP.md.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\extract-docx-template.ps1')) -Message 'Install script did not copy extractor script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report.ps1')) -Message 'Install script did not copy build-report script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-feishu.ps1')) -Message 'Install script did not copy Feishu wrapper script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-url.ps1')) -Message 'Install script did not copy build-report-from-url script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\fetch-web-article.ps1')) -Message 'Install script did not copy web fetch script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\format-docx-report-style.ps1')) -Message 'Install script did not copy style formatter script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-field-map.ps1')) -Message 'Install script did not copy field-map generator script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-image-map.ps1')) -Message 'Install script did not copy image-map generator script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-defaults.ps1')) -Message 'Install script did not copy the report-defaults helper script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\apply-docx-field-map.ps1')) -Message 'Install script did not copy fill script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-one-shot-script-prompt.md')) -Message 'Install script did not copy the Feishu one-shot prompt example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-hybrid-images-prompt.md')) -Message 'Install script did not copy the Feishu hybrid prompt example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'
+  $results.Add('install script first install OK') | Out-Null
+
+  & (Join-Path $repoRoot 'scripts\install-skill.ps1') -TargetDir $installTarget -Force | Out-Null
+  $backupCount = @(Get-ChildItem -LiteralPath $installRoot -Filter 'skill-install.bak-*' -Force).Count
+  Assert-True -Condition ($backupCount -ge 1) -Message 'Install script -Force did not create a backup directory.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'README.md')) -Message 'Install script -Force did not reinstall README.md.'
+  $results.Add('install script force reinstall OK') | Out-Null
+
+  $agentsHome = Join-Path $tempRoot 'agents-home'
+  $defaultInstallTarget = Join-Path $agentsHome 'skills\experiment-report'
+  $defaultBackupRoot = Join-Path $agentsHome 'skill-backups'
+  & (Join-Path $repoRoot 'scripts\install-skill.ps1') -AgentsHome $agentsHome | Out-Null
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $defaultInstallTarget 'SKILL.md')) -Message 'Default install layout did not create the personal skill directory.'
+  & (Join-Path $repoRoot 'scripts\install-skill.ps1') -AgentsHome $agentsHome -Force | Out-Null
+  Assert-True -Condition (@(Get-ChildItem -LiteralPath $defaultBackupRoot -Filter 'experiment-report.bak-*' -Force).Count -ge 1) -Message 'Default install layout did not move backups into skill-backups.'
+  Assert-True -Condition (@(Get-ChildItem -LiteralPath (Join-Path $agentsHome 'skills') -Filter 'experiment-report.bak-*' -Force).Count -eq 0) -Message 'Default install layout left backup skill directories inside the scanned skills root.'
+  $results.Add('install script backup isolation OK') | Out-Null
+
+  $resolvedOpenClaw = $null
+  if (-not [string]::IsNullOrWhiteSpace($OpenClawCmd)) {
+    $resolvedOpenClaw = (Resolve-Path -LiteralPath $OpenClawCmd).Path
+  } else {
+    foreach ($name in @('openclaw.cmd', 'openclaw')) {
+      $cmd = Get-Command $name -ErrorAction SilentlyContinue
+      if ($null -ne $cmd -and $cmd.Source) {
+        $resolvedOpenClaw = $cmd.Source
+        break
+      }
+    }
+  }
+
+  if ($null -ne $resolvedOpenClaw) {
+    $originalOpenClawCmd = $env:OPENCLAW_CMD
+    try {
+      $env:OPENCLAW_CMD = $resolvedOpenClaw
+      $selfCheckOutput = & (Join-Path $repoRoot 'scripts\self-check.ps1') | Out-String
+      Assert-True -Condition ($selfCheckOutput -match 'OpenClaw CLI:') -Message 'self-check output missing CLI line.'
+      Assert-True -Condition ($selfCheckOutput -match 'browser status:') -Message 'self-check output missing browser status section.'
+      $results.Add('self-check with local OpenClaw OK') | Out-Null
+    } finally {
+      $env:OPENCLAW_CMD = $originalOpenClawCmd
+    }
+  } else {
+    $results.Add('self-check skipped: OpenClaw CLI not found') | Out-Null
+  }
+
+  Write-Output 'Smoke tests passed:'
+  foreach ($result in $results) {
+    Write-Output ('- ' + $result)
+  }
+} finally {
+  if (Test-Path -LiteralPath $tempRoot) {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force
+  }
+}
+

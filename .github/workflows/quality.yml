@@ -1,0 +1,26 @@
+name: Quality Checks
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  smoke-matrix:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell_name:
+          - powershell
+          - pwsh
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run smoke tests
+        shell: ${{ matrix.shell_name }}
+        run: .\scripts\run-smoke-tests.ps1

@@ -1,0 +1,14 @@
+{
+  "baseProfile": "compact",
+  "settings": {
+    "BodyFirstLineTwips": 420,
+    "BodyLineTwips": 300,
+    "BodyAfterTwips": 0,
+    "HeadingBeforeTwips": 70,
+    "HeadingAfterTwips": 40,
+    "CaptionAfterTwips": 30,
+    "TitleAfterTwips": 50,
+    "ImageBeforeTwips": 40,
+    "ImageAfterTwips": 40
+  }
+}

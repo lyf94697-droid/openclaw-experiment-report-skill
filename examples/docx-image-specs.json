@@ -1,0 +1,14 @@
+{
+  "images": [
+    {
+      "path": "E:\\reports\\images\\step-1.png",
+      "section": "实验步骤"
+    },
+    {
+      "path": "E:\\reports\\images\\result-1.png",
+      "section": "实验结果",
+      "caption": "图2 ping 连通性测试结果",
+      "widthCm": 10.5
+    }
+  ]
+}
