@@ -1,136 +1,113 @@
 ﻿# OpenClaw Experiment Report Skill
+> Generate Chinese lab reports with OpenClaw: drafting, docx template filling, screenshot insertion, and final formatting.
 
 [![Quality Checks](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml)
 [![Smoke Tests](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Portable OpenClaw skill for writing Chinese university experiment reports from experiment topics, requirements, code, screenshots, data, tutorial pages, and blank WPS/Word/docx templates.
+## 项目简介
 
-See [`demo/README.md`](demo/README.md) for GitHub-friendly preview assets and a ready-made 2x2 image layout example.
-See [`docs/GITHUB_LAUNCH.md`](docs/GITHUB_LAUNCH.md) for the recommended GitHub description, topics, release notes, and social-preview setup.
+这是一个基于 OpenClaw 的实验报告 skill 和 PowerShell 文档流水线。
 
-## At A Glance
+它的目标不是只生成一段“实验报告正文”，而是把实验主题、要求、教程链接、代码、截图、数据、空白 `docx`/WPS/Word 模板这些材料串成一条更完整的本地工作流：先生成结构化中文实验报告，再填充模板、插入截图、生成图注，最后做一轮提交风格的排版优化，输出更接近可直接提交的 `docx` 成品。
 
-This repository is for people who want to go from:
+当前仓库优先解决“中文大学实验报告”这个具体场景，并保持技术路径务实可落地：以 OpenClaw 为生成入口，以本地脚本做模板处理、插图和最终排版。
 
-- an experiment topic or tutorial URL
-- local screenshots
-- a blank `docx` template
+## 解决什么问题
 
-to:
+实验报告最耗时间的部分，通常不是单纯“写字”，而是材料整理和成品收尾：
 
-- a generated Chinese lab report body
-- a deterministically filled `docx`
-- grouped screenshots with captions
-- a cleaner final submission-style document
+- 实验主题、教程网页、代码、截图、数据分散在不同地方
+- 正文结构要手动整理成“实验目的、步骤、结果、总结”这类固定章节
+- 学校模板往往是空白 `docx`，填字段和填正文都很麻烦
+- 截图要决定插在哪里、图题怎么写、几张图怎么排
+- 最后标题、正文、图注、封面间距这些排版细节很耗时间
 
-## Preview
+这个仓库就是把这些步骤收拢成一条尽量稳定、可重复的本地流程。
 
-| Step Screenshot | Result Screenshot |
+## 主要功能
+
+- 根据实验主题、要求、教程链接、代码、截图、数据等材料生成结构化中文实验报告正文
+- 对空白 `docx` / WPS / Word 模板做字段映射和正文填充
+- 插入实验截图并生成图注，支持按章节或稳定锚点落位
+- 支持图片分组布局，例如两图一行、2x2 图片块这类常见报告排版
+- 对标题、章节标题、正文、图注、图片块做最终提交风格排版优化
+- 支持通过 OpenClaw skill 或本地 PowerShell 入口脚本调用
+- 支持基于教程页或参考材料生成内容，但目标是改写和整理，不是长篇照抄
+
+## 工作流程
+
+1. 提供实验主题、要求、教程链接、截图、模板或已有正文
+2. 生成结构化中文实验报告正文
+3. 填充 `docx` 模板中的字段和章节内容
+4. 插入截图并生成图注，必要时做分组布局
+5. 对最终文档做排版优化，输出更完整的提交版 `docx`
+
+## 演示效果
+
+下面保留一个简化预览；完整的 2x2 图片块示例和 GitHub 友好的演示素材见 [demo/README.md](demo/README.md)。
+
+| 步骤截图预览 | 结果截图预览 |
 | --- | --- |
 | ![Network config preview](demo/assets/step-network-config.png) | ![Ping result preview](demo/assets/result-ping.png) |
 
-For a full 2x2 preview block, see [`demo/README.md`](demo/README.md).
+如果你想看完整四图联排效果，直接打开 [demo/README.md](demo/README.md)。
 
-## Typical Workflow
+## 当前范围
 
-1. Provide a topic, tutorial URL, screenshots, or an existing report body.
-2. Generate a complete Chinese experiment report body through OpenClaw.
-3. Fill a blank `docx` template with deterministic field and body mapping.
-4. Insert grouped screenshots with captions and apply final submission-style formatting.
+- 当前版本聚焦中文大学实验报告场景
+- 当前仓库主要面向 OpenClaw 用户，不是独立桌面应用
+- 仓库已经包含 `SKILL.md`、`references/`、`scripts/`、`examples/`、`demo/` 和 GitHub 协作治理文件
+- 当前稳定路径是“OpenClaw 生成 + 本地脚本处理模板、图片和排版”
+- 常见空白模板、章节正文、截图插入和最终样式处理已经可以跑通
+- 当前暂时不保证 Word/WPS GUI 自动化填写，也不承诺任意复杂模板都能无人工确认处理
 
-## What It Does
+## 快速开始
 
-- Writes the full report before touching template formatting.
-- Extracts local `docx` template structure deterministically before field mapping.
-- Generates a deterministic `docx` field map from the finished report body plus template structure.
-- Generates a deterministic image map from a filled `docx` copy plus local screenshots or photos.
-- Fills common `docx` report templates deterministically from a field map.
-- Fills both short fields and common section-body paragraphs in `docx` templates.
-- Detects option rows such as `实验性质： ①综合性实验 ②设计性实验 ③验证性实验` and marks the selected item with `√`.
-- Inserts local screenshots or experiment photos into a filled `docx` copy with captions.
-- Supports both stacked screenshots and grouped row layouts such as two images per row.
-- Supports shared row-group anchors, so one 2x2 or 2x3 image block can stay together under a single section or explicit anchor.
-- Applies a final report-style pass to `docx` titles, headings, metadata lines, body paragraphs, captions, and image blocks.
-- Supports both direct anchors such as `P8` / `T1R6C1` and stable section anchors such as `实验步骤` / `实验结果`.
-- Fits content into blank templates through field-by-field mapping.
-- Uses screenshots as factual evidence and generates figure captions plus insertion guidance.
-- Supports tutorial or CSDN article driven workflows without copying long passages verbatim.
-- Can fetch public tutorial pages and append them as structured reference material before report generation.
-- Includes a chat-friendly one-shot wrapper so Feishu or other direct-chat runtimes can call one stable local script instead of improvising the whole pipeline step by step.
-- Includes PowerShell helpers for installation, docx template analysis, article extraction, and smoke tests.
+### 1. 安装 skill
 
-## Current Scope
-
-This repository is designed for OpenClaw users. It is not a standalone desktop app.
-
-Included:
-
-- OpenClaw skill instructions in `SKILL.md`
-- reusable reference files in `references/`
-- practical helpers in `scripts/`
-- example prompts in `examples/`
-- repository governance files for GitHub collaboration
-
-Not included yet:
-
-- guaranteed WPS or Word GUI auto-fill
-- fully automatic binary template editing without user review
-- non-OpenClaw standalone application packaging
-
-## Repository Health
-
-This repository now includes the basic files expected from a maintainable open-source project:
-
-- `README.md`
-- `LICENSE`
-- `CONTRIBUTING.md`
-- `CHANGELOG.md`
-- `CODE_OF_CONDUCT.md`
-- `SECURITY.md`
-- `SUPPORT.md`
-- issue templates and a PR template under `.github/`
-- Windows CI workflows under `.github/workflows/`
-
-That does not magically make the project finished, but it does make the repo reviewable, clonable, and easier for outside contributors to use without guessing the workflow.
-
-## Future Direction
-
-The current implementation is intentionally focused on experiment reports, but the core pipeline is broader than that:
-
-- reference gathering
-- body generation
-- validation
-- template filling
-- image mapping
-- final styling
-
-That means the project can grow into a more general document-generation toolkit, as long as future document types are added as reusable profiles instead of one-off hardcoded branches.
-
-See [`ROADMAP.md`](ROADMAP.md) for the planned path from an experiment-report skill to a profile-driven document workflow.
-
-## Install
-
-Option 1: clone into the personal Agent Skills directory that OpenClaw actually loads.
+方式一：直接 clone 到 OpenClaw 实际加载的 skills 目录。
 
 ```powershell
 git clone <your-repo-url> "$env:USERPROFILE\.agents\skills\experiment-report"
 ```
 
-Option 2: run the bundled installer from a checked-out repo.
+方式二：在已检出的仓库里运行安装脚本。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-skill.ps1
 ```
 
-Then run `openclaw skills list` and confirm `experiment-report` appears. Restart OpenClaw or reload skills only if your runtime caches the skill list.
+安装后可以运行：
 
-The skill is intended to trigger when prompts mention words such as `实验报告`, `实验模板`, `WPS模板`, `Word模板`, `docx模板`, or `lab report`.
-For the most deterministic behavior, especially on busy long-lived sessions, start your request with `/experiment-report`.
+```powershell
+openclaw skills list
+```
 
-## Quick Start
+确认 `experiment-report` 已出现。  
+如果你的运行时会缓存 skill 列表，再重启 OpenClaw 或刷新 skills。
 
-If you want the most stable chat-friendly local entry point, use the Feishu wrapper:
+这个 skill 的常见触发词包括：`实验报告`、`实验模板`、`WPS模板`、`Word模板`、`docx模板`、`lab report`。  
+如果想要更稳定地触发，建议直接以 `/experiment-report` 开头。
+
+### 2. 常用入口脚本
+
+最常用的本地入口有 3 个：
+
+- `scripts/build-report-from-feishu.ps1`
+  适合飞书或直接聊天场景，负责把生成、模板填充、插图和最终输出串起来
+- `scripts/build-report-from-url.ps1`
+  适合“教程链接 -> 报告正文 -> 模板填充 -> 最终 docx”这类流程
+- `scripts/build-report.ps1`
+  适合你已经有正文和模板，只想走确定性的本地 `docx` 打包流程
+
+如果你需要拆开流水线逐步处理，仓库里也已经提供模板抽取、字段映射生成、图片映射生成、插图、样式优化、网页抓取、提示词准备和端到端验证脚本，入口都在 [scripts](scripts) 目录。
+
+其中 `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 在需要自动生成正文时默认使用 `-DetailLevel full`，也就是默认要求输出更完整、不是提纲式的正文。
+
+### 3. 一条常见用法
+
+如果你想走聊天友好的本地封装入口，可以直接用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
@@ -145,11 +122,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 
   -OutputDir "E:\reports\final-output"
 ```
 
-After the first generated run, `build-report-from-feishu.ps1` remembers the last `CourseName` and `ExperimentName`, so later runs can omit one or both if they stay the same.
-
-That wrapper keeps the final deliverables in the chosen output directory and stores intermediate files under `artifacts\`, which makes direct-chat runs much easier to inspect and much less cluttered.
-
-If you want to go directly from a tutorial URL to a final `docx` without the extra wrapper layer, use the URL build entry point:
+如果你想从教程链接直接走到最终 `docx`，可以用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
@@ -162,11 +135,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
   -ClassName "计科 2201"
 ```
 
-The same remembered-default behavior also applies to `build-report-from-url.ps1`: the first generated run sets the defaults, and later runs can omit `-ExperimentName` when the experiment stays the same.
-
-That one command can fetch the public tutorial page, generate a report body through OpenClaw, clean the saved report text, auto-generate metadata and baseline validation rules, fill the template, and emit a final style-formatted `docx`.
-
-If you already have a finished report body plus a blank template, use the local build entry point:
+如果你已经有整理好的正文和模板，直接走本地 `docx` 流程：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
@@ -179,622 +148,68 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
   -StyleProfile auto
 ```
 
-That one command can validate the report text, generate a field map, fill the template, insert grouped screenshots, and optionally emit a final style-formatted `docx`.
+补充说明：
 
-## Practical Scripts
+- `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 会记住最近一次使用过的 `CourseName` 和 `ExperimentName`，同类任务重复运行时可以少写参数
+- 在实验名称不变时，后续运行 can omit `-ExperimentName`
+- `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
+- 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
 
-### `scripts\install-skill.ps1`
+### 4. 飞书或直聊场景补充
 
-- Copies this repo into `$HOME\.agents\skills\experiment-report` by default, which is the personal skills directory OpenClaw loads.
-- Supports `-Force` to back up an existing install and reinstall cleanly.
-- Stores force-reinstall backups outside the scanned `skills/` directory so OpenClaw does not accidentally load backup copies as duplicate skills.
+如果你走 Feishu 或其他直接聊天场景，有几条经验是稳定有效的：
 
-### `scripts\build-report.ps1`
+- 最稳的方式不是让模型临场拼很多中间 JSON，而是直接调用 `scripts/build-report-from-feishu.ps1`
+- 如果你 uploaded images and you also provide local image paths，建议把上传图片当作语义参考，把本地路径当作最终 `docx` 插图文件来源
+- 如果运行时把附件提示注入成类似 `media/inbound/example.png` 这样的相对路径，这些路径也可以继续作为 `-ImagePaths` 传给插图流程
+- 如果聊天运行时根本没有暴露真实附件路径，就应该明确说不能直接插图，而不是假装已经写进 `docx`
 
-- Provides a single local entry point for the deterministic `docx` build pipeline.
-- Starts from a finished report body plus a blank template.
-- Optionally validates the report against explicit requirements before packaging outputs.
-- Generates the field map, filled template, image map, image-embedded `docx`, and optional final style-formatted `docx`.
-- Writes a machine-readable `summary.json` so CI jobs or wrapper scripts can consume the output paths.
-- When `-StyleFinalDocx` is enabled, supports `-StyleProfile auto|default|compact|school`.
-- Also supports `-StyleProfilePath` to load a custom JSON style profile file.
-- `auto` chooses `compact` for cover-table templates, `school` for paragraph-cover templates, and otherwise falls back to `default`.
+### 5. 本地验证
 
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
-  -TemplatePath "E:\reports\template.docx" `
-  -ReportPath "E:\reports\report.txt" `
-  -MetadataPath ".\examples\docx-report-metadata.json" `
-  -ImageSpecsPath ".\examples\docx-image-specs-row.json" `
-  -StyleFinalDocx `
-  -StyleProfile auto `
-  -StyleProfilePath ".\examples\style-profile-custom.json"
-```
-
-### `scripts\build-report-from-url.ps1`
-
-- Provides a higher-level local entry point for the URL-driven workflow.
-- Fetches one or more public tutorial pages and appends them as reference material before report generation.
-- Generates a report body through OpenClaw gateway chat, saves both the raw and cleaned report text, and trims a known mojibake tail pattern when it appears in the local runtime output.
-- Can auto-generate a baseline `metadata.auto.json` and `requirements.auto.json` so users do not need to prepare those files for common runs.
-- Supports `-DetailLevel standard|full`; `full` is the default and asks OpenClaw for a more substantial, less terse report body.
-- When `-TemplatePath` is provided, continues into the deterministic `docx` build pipeline and writes a friendly final filename such as `学号-姓名-实验名-最终版.docx`.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
-  -ReferenceUrls "https://blog.csdn.net/..." `
-  -CourseName "Windows 网络管理 / 网络操作系统 / 服务器配置与管理" `
-  -ExperimentName "Windows Server 2022/2025 搭建 Web 服务器" `
-  -TemplatePath "E:\reports\template.docx" `
-  -StudentName "张三" `
-  -StudentId "20260001" `
-  -ClassName "计科 2201" `
-  -TeacherName "李老师" `
-  -DetailLevel full
-```
-
-### `scripts\build-report-from-feishu.ps1`
-
-- Provides a direct-chat-oriented one-shot local wrapper around the stable report pipeline.
-- Accepts either `-ReportPath` for an existing finished body, or generation inputs such as `-ReferenceUrls`, `-ReferenceTextPaths`, `-PromptPath`, or `-PromptText`.
-- Keeps the output root tidy by copying the final `docx` and `report.txt` to the selected output directory while storing intermediate files under `artifacts\`.
-- Reuses the same metadata, image, validation, and final-style options as the lower-level scripts.
-- Defaults to `-DetailLevel full` when it needs to generate the report body.
-- Remembers the last generated `CourseName` and `ExperimentName` under the local agents home, so repeated runs do not have to keep retyping them.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
-  -ReferenceUrls "https://blog.csdn.net/..." `
-  -CourseName "Windows 网络管理 / 网络操作系统 / 服务器配置与管理" `
-  -ExperimentName "Windows Server 2022/2025 搭建 Web 服务器" `
-  -TemplatePath "E:\reports\template.docx" `
-  -StudentName "张三" `
-  -StudentId "20260001" `
-  -ClassName "计科 2201" `
-  -TeacherName "李老师" `
-  -ImagePaths "E:\reports\step-1.png","E:\reports\step-2.png","E:\reports\result-1.png","E:\reports\result-2.png" `
-  -OutputDir "E:\reports\final-output"
-```
-
-### `scripts\extract-docx-template.ps1`
-
-- Reads a local `.docx` template and outputs a markdown or JSON outline.
-- Captures paragraph order, table cells, and likely fillable fields.
-- Reduces template guesswork before OpenClaw writes a field mapping.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\extract-docx-template.ps1 -Path "E:\reports\template.docx"
-```
-
-JSON output:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\extract-docx-template.ps1 -Path "E:\reports\template.docx" -Format json
-```
-
-### `scripts\apply-docx-field-map.ps1`
-
-- Fills common report templates from a JSON field map.
-- Supports two input styles:
-  - label keys such as `课程名称`, `姓名`, `学号`
-  - location keys such as `P2`, `T1R1C2`
-- Supports scalar values, paragraph arrays, and objects such as `{ "mode": "after", "paragraphs": [...] }`.
-- Label keys are conservative by default: they only fill blank or placeholder-shaped targets.
-- Location keys are explicit: they can overwrite an existing paragraph or cell.
-- Common section headings such as `实验目的` or `实验步骤` can keep the heading paragraph and fill the blank paragraph after it.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\apply-docx-field-map.ps1 `
-  -TemplatePath "E:\reports\template.docx" `
-  -MappingPath ".\examples\docx-field-map.json" `
-  -OutPath "E:\reports\template.filled.docx"
-```
-
-See [`examples/docx-field-map.json`](examples/docx-field-map.json) for the expected JSON shape.
-
-Block example:
-
-```json
-{
-  "实验目的": {
-    "mode": "after",
-    "paragraphs": [
-      "掌握网络拓扑搭建流程。",
-      "理解常用 DOS 命令的作用。"
-    ]
-  },
-  "实验步骤": [
-    "配置虚拟机网络参数。",
-    "执行 ipconfig 与 ping 验证连通性。"
-  ]
-}
-```
-
-Recommended workflow:
-
-1. Run `extract-docx-template.ps1` on the blank template.
-2. Let OpenClaw generate the full report body first.
-3. Run `generate-docx-field-map.ps1` from the blank template plus the finished report body.
-4. For section-body paragraphs, prefer `paragraphs` arrays and use `mode: "after"` when the template has a fixed heading followed by a blank paragraph.
-5. Review the generated JSON and adjust only when the template is unusual.
-6. Run `apply-docx-field-map.ps1` to produce a filled copy.
-7. If screenshots should be embedded into the final `docx`, run `generate-docx-image-map.ps1` from the filled copy plus your local image list.
-8. Run `insert-docx-images.ps1` on the filled copy.
-9. If the final copy needs cleaner report typography, run `format-docx-report-style.ps1` on the filled or image-embedded docx.
-
-### `scripts\generate-docx-field-map.ps1`
-
-- Reads a `.docx` template outline, a finished report, and optional metadata JSON.
-- Generates a deterministic field map wrapper with `summary`, `fieldMap`, and `notes`.
-- Emits section-body mappings in the shape that `apply-docx-field-map.ps1` already accepts.
-- Preserves fixed section headings by generating `mode: "after"` when the template uses heading-plus-blank-paragraph layout.
-- The generated JSON can be passed directly to `apply-docx-field-map.ps1`; the fill script accepts the wrapper and automatically uses its `fieldMap` property.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\generate-docx-field-map.ps1 `
-  -TemplatePath "E:\reports\template.docx" `
-  -ReportPath ".\tests-output\report.txt" `
-  -MetadataPath ".\examples\docx-report-metadata.json" `
-  -OutFile ".\tests-output\generated-field-map.json"
-```
-
-The repository example metadata file is [`examples/docx-report-metadata.json`](examples/docx-report-metadata.json).
-
-### `scripts\generate-docx-image-map.ps1`
-
-- Reads a filled `.docx` plus either image specs JSON or plain image paths.
-- Generates a deterministic image-map wrapper with `summary`, `images`, and `notes`.
-- Prefers stable section anchors such as `实验步骤` or `实验结果`, so image placement does not drift when paragraph counts change after template filling.
-- Can infer a section and caption from the file name when you only provide image paths.
-- Preserves optional image `layout` objects such as `{ "mode": "row", "columns": 2, "group": "results-grid" }`.
-- When one grouped row block spans multiple sections, it auto-emits a shared `layout.groupAnchor` so the whole block stays together.
-- The generated JSON can be passed directly to `insert-docx-images.ps1`.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\generate-docx-image-map.ps1 `
-  -DocxPath "E:\reports\template.filled.docx" `
-  -ImageSpecsPath ".\examples\docx-image-specs.json" `
-  -OutFile ".\tests-output\generated-image-map.json"
-```
-
-Plain image-path example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\generate-docx-image-map.ps1 `
-  -DocxPath "E:\reports\template.filled.docx" `
-  -ImagePaths "E:\reports\images\step-1.png","E:\reports\images\result-1.png"
-```
-
-The repository example image specs file is [`examples/docx-image-specs.json`](examples/docx-image-specs.json).
-For grouped row layout, see [`examples/docx-image-specs-row.json`](examples/docx-image-specs-row.json).
-
-### `scripts\insert-docx-images.ps1`
-
-- Inserts local `png/jpg/jpeg/gif/bmp` images into an existing `.docx`.
-- Supports direct anchors:
-  - paragraph anchors such as `P8`
-  - table-cell anchors such as `T1R6C1`
-- Supports stable section anchors such as `实验步骤` or `实验结果`; the script resolves them against the current filled `docx` and inserts after the matching section heading paragraph, even inside table cells.
-- Adds centered image paragraphs plus optional centered captions.
-- Supports grouped row layouts via `layout.mode = "row"` and `layout.columns = 2`, producing a borderless image table for side-by-side screenshots.
-- Supports `layout.groupAnchor` for grouped row layouts, so one shared 2x2 or 2x3 block can be pinned under a single section or explicit anchor even when the member images have different section tags.
-- Keeps image insertion deterministic by writing standard OpenXML media entries and relationships directly.
-- Works well as the last step after `apply-docx-field-map.ps1`.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\insert-docx-images.ps1 `
-  -DocxPath "E:\reports\template.filled.docx" `
-  -MappingPath ".\examples\docx-image-map.json" `
-  -OutPath "E:\reports\template.filled.images.docx"
-```
-
-See [`examples/docx-image-map.json`](examples/docx-image-map.json) for the expected JSON shape.
-For grouped row layout, see [`examples/docx-image-map-row.json`](examples/docx-image-map-row.json).
-
-### `scripts\format-docx-report-style.ps1`
-
-- Applies a simple report-style formatting pass to an existing `.docx`.
-- Centers report titles, figure captions, and image paragraphs.
-- Adds bold spacing rules for common report section headings.
-- Keeps metadata paragraphs left-aligned without first-line indentation.
-- Applies a configurable first-line indent and line spacing to normal body paragraphs.
-- Supports built-in style profiles:
-  - `auto`: picks a built-in profile from the current document structure
-  - `default`: balanced report spacing
-  - `compact`: tighter title, heading, body, caption, and image spacing
-  - `school`: looser submission-style spacing
-- Also supports `-ProfilePath` for a custom JSON profile file.
-- Merge order is: resolved built-in profile -> custom profile file -> explicit command-line `*Twips` overrides.
-- Works well as the last step after template filling and optional image insertion.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\format-docx-report-style.ps1 `
-  -DocxPath "E:\reports\template.filled.images.docx" `
-  -OutPath "E:\reports\template.filled.images.styled.docx" `
-  -Profile auto `
-  -Overwrite
-```
-
-Custom profile example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\format-docx-report-style.ps1 `
-  -DocxPath "E:\reports\template.filled.images.docx" `
-  -OutPath "E:\reports\template.filled.images.custom.docx" `
-  -ProfilePath ".\examples\style-profile-custom.json" `
-  -Overwrite
-```
-
-See [`examples/style-profile-custom.json`](examples/style-profile-custom.json) for the supported shape:
-
-- `baseProfile`: optional `auto|default|compact|school`
-- `settings`: optional overrides for `BodyFirstLineTwips`, `BodyLineTwips`, `BodyAfterTwips`, `HeadingBeforeTwips`, `HeadingAfterTwips`, `CaptionAfterTwips`, `TitleAfterTwips`, `ImageBeforeTwips`, and `ImageAfterTwips`
-
-### `scripts\prepare-report-prompt.ps1`
-
-- Builds a final report-generation prompt from a base prompt plus optional local reference text files or public tutorial URLs.
-- Appends extracted reference material with explicit anti-copying and fact-priority guidance.
-- Lets the same prompt flow be reused by `run-e2e-sample.ps1` and `generate-report-chat.ps1`.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\prepare-report-prompt.ps1 `
-  -PromptPath ".\examples\e2e-sample-prompt.txt" `
-  -ReferenceTextPaths ".\local-inputs\tutorial-reference.txt" `
-  -ReferenceUrls "https://blog.csdn.net/..." `
-  -OutFile ".\tests-output\prepared-prompt.txt"
-```
-
-### `scripts\fetch-web-article.ps1`
-
-- Uses the local OpenClaw browser to extract article text from a public webpage.
-- Prefers article or main-content selectors and falls back to `document.body.innerText`.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\fetch-web-article.ps1 -Url "https://example.com/tutorial"
-```
-
-### `scripts\fetch-csdn-article.ps1`
-
-- Compatibility wrapper around `fetch-web-article.ps1` for existing CSDN-focused workflows.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\fetch-csdn-article.ps1 -Url "https://blog.csdn.net/..."
-```
-
-Supported environment variables:
-
-- `OPENCLAW_CMD`: absolute path to `openclaw.cmd` if it is not on `PATH`
-- `OPENCLAW_BROWSER_PROFILE`: browser profile name, default is `openclaw`
-
-### `scripts\self-check.ps1`
-
-- Verifies the OpenClaw CLI path and browser profile status.
-
-### `scripts\run-smoke-tests.ps1`
-
-- Runs repeatable local smoke tests against syntax, docx extraction, installation, and optional OpenClaw self-check.
-- Also verifies deterministic docx field-map generation, image-map generation, image insertion, final docx style formatting, and docx fill behavior.
-
-Example:
+在提交修改或排查问题前，建议先跑一遍烟测：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 ```
 
-### `scripts\validate-report-draft.ps1`
+## 项目现状
 
-- Validates a generated report against explicit requirements.
-- Checks required sections, minimum length, required keywords, forbidden phrases, and optional figure references.
-- Works with either a report file or inline text.
+当前版本已经可以跑通一条完整的实验报告工作流：生成正文、填模板、插图片、补图注、做最终排版。  
+仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把“实验报告”这条链路做得更稳、更好用、更容易复现。  
+后续扩展会基于现有文档流水线逐步推进，而不是把新类型文档硬塞进现有逻辑里。
 
-Example:
+## Roadmap
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\validate-report-draft.ps1 `
-  -Path ".\tests-output\report.txt" `
-  -RequirementsPath ".\examples\e2e-sample-requirements.json" `
-  -Format json
-```
+当前方向很明确：先把实验报告场景做实用，再逐步抽象成更通用的文档生成工具。
 
-### `scripts\run-e2e-sample.ps1`
+- 继续补常见实验报告模板和模板适配策略
+- 强化教程链接、截图、正文、模板之间的自动串联能力
+- 增强图片插入、图注和多图布局的配置能力
+- 支持更多课程作业类文档
+- 逐步扩展到周报、月报、项目文档等可配置文档类型
+- 继续完善样式 profile，让不同学校/模板的排版策略更容易切换
 
-- Installs the skill, asks OpenClaw to generate a full sample report, and validates the output end to end.
-- Records raw agent output, extracted report text, validation JSON, and a summary JSON under `tests-output/`.
-- When `-TemplatePath` is provided, it also generates a `docx` field map, fills the template, and saves an extracted outline of the filled result for review.
-- When you also provide `-ImageSpecsPath`, `-ImageSpecsJson`, or `-ImagePaths`, it automatically generates an image map from the filled copy and writes a final docx with embedded images.
-- Supports `-ReferenceTextPaths` and `-ReferenceUrls`, so local tutorial notes or public webpages can be appended to the generated request before report generation.
-- When you add `-StyleFinalDocx`, it runs `format-docx-report-style.ps1` on the final filled copy, or on the image-embedded copy when images were included.
-- When style formatting is enabled, `-StyleProfile auto|default|compact|school` and optional `-StyleProfilePath` are forwarded to the formatter.
-- Defaults to `guided-chat` mode, which sends the prompt through the local OpenClaw gateway chat API together with the skill policy. This is the most stable path on Windows because it avoids `openclaw.cmd --message` newline and encoding issues.
-- Still supports `native-agent` mode when you want to diagnose native slash-command behavior.
-- Resets the target OpenClaw session before the run by default so previous chat history does not contaminate the sample.
+更完整的路线可以看 [ROADMAP.md](ROADMAP.md)。
 
-Example:
+## 仓库说明 / 协作
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-e2e-sample.ps1 `
-  -Agent gpt `
-  -Mode guided-chat `
-  -ReferenceUrls "https://blog.csdn.net/..." `
-  -TimeoutSeconds 300
-```
+这个仓库已经包含开源协作所需的基础文件和流程，包括：
 
-Template fill example:
+- [README.md](README.md)
+- [LICENSE](LICENSE)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CHANGELOG.md](CHANGELOG.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md)
+- [SUPPORT.md](SUPPORT.md)
+- `.github/` 下的 issue / PR 模板
+- `.github/workflows/` 下的 CI 工作流
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-e2e-sample.ps1 `
-  -Agent gpt `
-  -Mode guided-chat `
-  -TemplatePath "E:\reports\template.docx" `
-  -MetadataPath ".\examples\docx-report-metadata.json" `
-  -TimeoutSeconds 300
-```
+如果从 GitHub 公开项目的角度看，这一组文件基本已经构成了仓库当前的 `Repository Health` 基础面。
 
-Template + images example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-e2e-sample.ps1 `
-  -Agent gpt `
-  -Mode guided-chat `
-  -TemplatePath "E:\reports\template.docx" `
-  -MetadataPath ".\examples\docx-report-metadata.json" `
-  -ImagePaths "E:\reports\images\step-1.png","E:\reports\images\result-1.png" `
-  -StyleFinalDocx `
-  -StyleProfile auto `
-  -StyleProfilePath ".\examples\style-profile-custom.json" `
-  -TimeoutSeconds 300
-```
-
-### `scripts\generate-report-chat.ps1`
-
-- Sends a report-generation request directly through the local OpenClaw gateway chat API.
-- Injects the repository `SKILL.md` policy into the message so report generation remains usable even when native skill slash commands are unreliable in the local CLI path.
-- Supports `-ReferenceTextPaths` and `-ReferenceUrls` so tutorial material can be appended to the final request automatically.
-- Writes the final report body to a target file and can reset the session before the run.
-
-### `scripts\reset-openclaw-session.ps1`
-
-- Resets a specific OpenClaw session key through the local gateway using the configured gateway token.
-- Useful when repeated tests would otherwise inherit old slash-command instructions or stale chat history.
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\reset-openclaw-session.ps1 -SessionKey "agent:gpt:main"
-```
-
-Example:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-e2e-sample.ps1 `
-  -Agent gpt `
-  -Thinking medium `
-  -TimeoutSeconds 300
-```
-
-## Feishu Direct Chat
-
-Feishu direct chat can be made reliable, but it is still less deterministic than the local script entry points. The safe position is:
-
-- Do not assume the chat runtime can read local Windows paths unless it actually proves it.
-- Put path access checking into the prompt itself.
-- Ask it to either finish the local workflow or explicitly say which path was inaccessible.
-- Give explicit image grouping such as `图1、图2属于实验步骤；图3、图4属于实验结果` instead of relying on pure guessing.
-- If it needs temporary JSON with Chinese captions, paths, or section names, make it use explicit UTF-8 output instead of generic ad-hoc file writes.
-- If it needs multiple PowerShell actions, prefer separate commands or `;` instead of `&&`.
-
-The most stable direct-chat pattern is now: ask Feishu to run `scripts\build-report-from-feishu.ps1` with explicit arguments, instead of asking it to improvise every intermediate JSON and shell step on its own.
-
-If Feishu direct chat can see uploaded images and you also provide local image paths, use them together:
-
-- Let the uploaded images serve as the semantic reference, so the model can describe what each screenshot actually shows.
-- Let the local image paths serve as the file source for the final `docx`, so the wrapper script can still embed the images deterministically.
-- If the attachment view and the local file disagree, trust the uploaded image content first and then fix the local file selection.
-- If Feishu direct chat exposes prompt-injected attachment note lines such as `[media attached 1/4: media/inbound/example.png (image/png)]`, those injected paths can also be reused as `-ImagePaths` for the final `docx`.
-
-Recommended Feishu prompt:
-
-```text
-请在仓库根目录直接运行本地脚本 .\scripts\build-report-from-feishu.ps1，不要自己临时拼接一长串中间 JSON。
-
-如果你已经在之前的生成任务里设置过课程名和实验名，而且这次不变，那么 `-CourseName` 和 `-ExperimentName` 可以省略。
-
-如果你当前工作目录不是仓库根目录，请先切换到：
-E:\游戏\openclaw-experiment-report-skill
-
-先确认下面这些路径或网址能访问；如果有任何一个不能访问，请明确说出“无法访问哪个路径或网址”，不要假装已经读取成功。
-
-然后直接运行：
-
-powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
-  -ReferenceUrls "https://blog.csdn.net/你的文章链接" `
-  -CourseName "计算机网络" `
-  -ExperimentName "局域网搭建与常用 DOS 命令使用" `
-  -TemplatePath "E:\实验报告\实验报告模版1.docx" `
-  -StudentName "李亦非" `
-  -StudentId "244100198" `
-  -ClassName "24c" `
-  -TeacherName "李老师" `
-  -ExperimentProperty "③验证性实验" `
-  -ExperimentDate "2026年4月2日" `
-  -ExperimentLocation "睿智楼四栋212" `
-  -ImagePaths "E:\实验报告\step-1.png","E:\实验报告\step-2.png","E:\实验报告\result-1.png","E:\实验报告\result-2.png" `
-  -OutputDir "E:\实验报告\新建文件夹" `
-  -StyleProfile auto `
-  -DetailLevel full
-
-要求：
-- 图1、图2属于实验步骤
-- 图3、图4属于实验结果
-- 四张图按 2x2 连续图片块排版
-- 实验性质这一项要表现为勾选 ③验证性实验
-- 结果部分以我的截图和已知事实为准
-- 正文要比简略版更充实，但不要编造不存在的数据、截图细节或报错
-```
-
-The same prompt is also saved in [`examples/feishu-one-shot-script-prompt.md`](examples/feishu-one-shot-script-prompt.md). A lower-level direct-file prompt remains available in [`examples/feishu-local-files-prompt.md`](examples/feishu-local-files-prompt.md).
-
-Hybrid attachment + local-path prompt:
-
-```text
-我会在飞书里直接上传实验截图，同时也会给你这些图片在我电脑上的本地路径。
-
-请这样处理：
-- 先以我上传的图片附件为准，识别每张图到底展示了什么内容
-- 再使用本地路径作为最终 docx 插图文件来源
-- 如果你看到了附件，但本地路径无法访问，请明确说出哪个路径不能访问
-- 如果本地路径可访问，就直接运行本地脚本生成最终 docx
-
-工作目录：
-E:\游戏\openclaw-experiment-report-skill
-
-请运行：
-
-powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
-  -ReferenceUrls "https://blog.csdn.net/你的文章链接" `
-  -CourseName "计算机网络" `
-  -ExperimentName "局域网搭建与常用 DOS 命令使用" `
-  -TemplatePath "E:\实验报告\实验报告模版1.docx" `
-  -StudentName "李亦非" `
-  -StudentId "244100198" `
-  -ClassName "24c" `
-  -TeacherName "李老师" `
-  -ExperimentProperty "③验证性实验" `
-  -ExperimentDate "2026年4月2日" `
-  -ExperimentLocation "睿智楼四栋212" `
-  -ImagePaths "E:\实验报告\step-1.png","E:\实验报告\step-2.png","E:\实验报告\result-1.png","E:\实验报告\result-2.png" `
-  -OutputDir "E:\实验报告\新建文件夹" `
-  -StyleProfile auto `
-  -DetailLevel full
-
-额外要求：
-- 图1、图2属于实验步骤
-- 图3、图4属于实验结果
-- 四张图按 2x2 连续图片块排版
-- 结果部分优先根据我上传的图片附件来写
-- 最终插图仍使用我给出的本地路径文件
-```
-
-Uploaded attachments only, but still insert them into the final `docx`:
-
-- If the runtime injects attachment note lines such as `[media attached ...]` into the prompt, extract the paths from those lines and pass them into `-ImagePaths`.
-- The image scripts now resolve OpenClaw-staged relative attachment paths such as `media/inbound/example.png` against the session workspace and the repo parent directory, so the final insertion flow does not require you to handwrite absolute paths every time.
-- If the runtime does not expose any actual attachment file path, say that clearly instead of pretending the attachment was embedded.
-
-The uploaded-image prompt is saved in [`examples/feishu-uploaded-images-docx-prompt.md`](examples/feishu-uploaded-images-docx-prompt.md).
-
-## Recommended Prompt Patterns
-
-Basic report:
-
-```text
-写一份完整的实验报告。
-课程名：计算机网络
-实验名：局域网搭建与常用 DOS 命令使用
-要求：正式、真实、适合大学课程提交。
-先输出完整正文，不要先做模板映射。
-```
-
-Template mode:
-
-```text
-根据这个空白模板完成实验报告：
-E:\实验报告\实验报告模板.docx
-
-课程名：计算机网络
-实验名：局域网搭建与常用 DOS 命令使用
-姓名：张三
-学号：20260001
-班级：计科 2201
-
-请先用模板解析结果识别字段顺序，再写完整实验报告，最后输出字段映射。
-```
-
-Tutorial plus screenshots:
-
-```text
-根据这个教程页面和我的实验截图写实验报告，不要照抄原文：
-https://blog.csdn.net/...
-
-课程名：计算机网络
-实验名：局域网搭建与常用 DOS 命令使用
-截图路径：
-- E:\实验报告\截图1.png
-- E:\实验报告\截图2.png
-- E:\实验报告\截图3.png
-
-结果部分请以截图为准，并为每张图给出图号、图题和插入位置建议。
-```
-
-## Repository Layout
-
-```text
-openclaw-experiment-report-skill/
-├─ .gitattributes
-├─ SKILL.md
-├─ .gitignore
-├─ CHANGELOG.md
-├─ CONTRIBUTING.md
-├─ agents/openai.yaml
-├─ demo/
-├─ references/
-├─ scripts/
-├─ examples/
-├─ README.md
-└─ LICENSE
-```
-
-## Development
-
-Run the repository smoke tests before publishing changes:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
-```
-
-Contributor workflow and review expectations are documented in [`CONTRIBUTING.md`](CONTRIBUTING.md). Ongoing repository history is tracked in [`CHANGELOG.md`](CHANGELOG.md).
-
-## Stability Notes
-
-- `docx` template structure is handled deterministically by `extract-docx-template.ps1`.
-- `docx` field-map generation is handled deterministically by `generate-docx-field-map.ps1`.
-- Common `docx` template filling is handled deterministically by `apply-docx-field-map.ps1`.
-- Common section-heading plus blank-paragraph templates are handled deterministically by `apply-docx-field-map.ps1`.
-- Installation is handled deterministically by `install-skill.ps1`.
-- Repeated local verification is handled by `run-smoke-tests.ps1`.
-- The stable auto-fill path is intentionally scoped to common paragraph, section-heading, and table-field templates. For unusual layouts, the reliable fallback remains: full report body plus field mapping.
-- Screenshot insertion is intentionally scoped to standard inline image paragraphs plus captions. It does not attempt floating images, text wrapping, or arbitrary WPS desktop automation.
-
-## Privacy Notes
-
-- Do not commit real student identity data, screenshots, or private templates.
-- Put local materials under `local-inputs/` or `outputs/`; both are ignored by `.gitignore`.
-- If a report must be factual and key data is missing, the skill should ask for it or label the result as a sample draft.
+如果你想继续协作开发，先看 [CONTRIBUTING.md](CONTRIBUTING.md)；如果你只是想快速理解仓库目录和演示素材，可以先看 [demo/README.md](demo/README.md) 和 [examples](examples)。
 
 ## License
 
 MIT
+
