@@ -29,9 +29,10 @@ university
 
 Recommended options:
 
-1. Use a screenshot of the top section of `README.md` after badges and preview images load.
-2. Use a cropped screenshot from `demo/README.md` that shows the 2x2 layout preview.
-3. Use a manually composed image built from:
+1. Use the prepared repository asset: `docs/assets/social-preview.png`
+2. Use a screenshot of the top section of `README.md` after badges and preview images load.
+3. Use a cropped screenshot from `demo/README.md` that shows the 2x2 layout preview.
+4. Use a manually composed image built from:
    - `demo/assets/step-network-config.png`
    - `demo/assets/step-ipconfig.png`
    - `demo/assets/result-ping.png`
