@@ -39,6 +39,91 @@ $sectionRules = @(
 $sectionInputAliasLookup = @{}
 $script:ImagePathProbeRoots = @()
 
+function Get-WordIntAttribute {
+  param(
+    [AllowNull()]
+    [System.Xml.XmlNode]$Node,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+
+    [int]$DefaultValue = 0
+  )
+
+  if ($null -eq $Node -or $null -eq $Node.Attributes) {
+    return $DefaultValue
+  }
+
+  $attribute = $Node.Attributes.GetNamedItem($Name, $wordNamespace)
+  if ($null -eq $attribute) {
+    $attribute = $Node.Attributes.GetNamedItem($Name)
+  }
+
+  if ($null -eq $attribute -or [string]::IsNullOrWhiteSpace($attribute.Value) -or $attribute.Value -notmatch '^-?\d+$') {
+    return $DefaultValue
+  }
+
+  return [int]$attribute.Value
+}
+
+function Get-DocumentBodyWidthCm {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$DocumentXml,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $defaultBodyWidthCm = 15.8
+  $sectionProperties = @($DocumentXml.SelectNodes("//w:sectPr", $NamespaceManager))
+  if ($sectionProperties.Count -eq 0) {
+    return $defaultBodyWidthCm
+  }
+
+  $sectionProperty = $sectionProperties[$sectionProperties.Count - 1]
+  $pageSize = $sectionProperty.SelectSingleNode("./w:pgSz", $NamespaceManager)
+  $pageMargin = $sectionProperty.SelectSingleNode("./w:pgMar", $NamespaceManager)
+  if ($null -eq $pageSize) {
+    return $defaultBodyWidthCm
+  }
+
+  $pageWidthTwips = Get-WordIntAttribute -Node $pageSize -Name "w" -DefaultValue 0
+  if ($pageWidthTwips -le 0) {
+    return $defaultBodyWidthCm
+  }
+
+  $leftMarginTwips = Get-WordIntAttribute -Node $pageMargin -Name "left" -DefaultValue 1440
+  $rightMarginTwips = Get-WordIntAttribute -Node $pageMargin -Name "right" -DefaultValue 1440
+  $bodyWidthTwips = $pageWidthTwips - $leftMarginTwips - $rightMarginTwips
+  if ($bodyWidthTwips -le 0) {
+    return $defaultBodyWidthCm
+  }
+
+  return [Math]::Round(($bodyWidthTwips / 567.0), 2)
+}
+
+function Get-EffectiveRowImageWidthCm {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$ImageSpec,
+
+    [Parameter(Mandatory = $true)]
+    [int]$Columns,
+
+    [Parameter(Mandatory = $true)]
+    [double]$BodyWidthCm
+  )
+
+  if ($Columns -lt 2) {
+    return [double]$ImageSpec.WidthCm
+  }
+
+  $cellMarginCm = 0.35
+  $maxWidthCm = [Math]::Max(1.0, (($BodyWidthCm / $Columns) - $cellMarginCm))
+  return [Math]::Round([Math]::Min([double]$ImageSpec.WidthCm, $maxWidthCm), 2)
+}
+
 function Add-UniqueProbeRoot {
   param(
     [AllowEmptyCollection()]
@@ -1133,12 +1218,15 @@ function New-PreparedImageBlock {
     [ref]$NextRelationshipId,
 
     [Parameter(Mandatory = $true)]
-    [ref]$NextDocPrId
+    [ref]$NextDocPrId,
+
+    [double]$WidthCmOverride = 0
   )
 
   $contentType = Get-ImageContentType -Path $ImageSpec.ImagePath
   $extension = [System.IO.Path]::GetExtension($ImageSpec.ImagePath).TrimStart('.').ToLowerInvariant()
-  $dimensions = Get-ImageSizeEmu -Path $ImageSpec.ImagePath -WidthCm $ImageSpec.WidthCm
+  $effectiveWidthCm = if ($WidthCmOverride -gt 0) { $WidthCmOverride } else { [double]$ImageSpec.WidthCm }
+  $dimensions = Get-ImageSizeEmu -Path $ImageSpec.ImagePath -WidthCm $effectiveWidthCm
 
   $mediaFileName = "image{0}.{1}" -f $NextMediaIndex.Value, $extension
   Copy-Item -LiteralPath $ImageSpec.ImagePath -Destination (Join-Path $MediaDirectory $mediaFileName) -Force
@@ -1261,6 +1349,7 @@ try {
   if ($null -eq $body) {
     throw "Could not locate /w:document/w:body in $resolvedDocxPath"
   }
+  $bodyWidthCm = Get-DocumentBodyWidthCm -DocumentXml $documentXml -NamespaceManager $namespaceManager
 
   $anchorLookup = Build-AnchorLookup -Body $body -NamespaceManager $namespaceManager
   $sectionLookup = Build-SectionLookup -Body $body -NamespaceManager $namespaceManager
@@ -1325,7 +1414,8 @@ try {
       if ($groupEntries.Count -ge 2) {
         $cellEntries = New-Object System.Collections.Generic.List[object]
         foreach ($groupEntry in $groupEntries) {
-          $preparedImage = New-PreparedImageBlock -DocumentXml $documentXml -RelationshipsXml $relationshipsXml -ContentTypesXml $contentTypesXml -MediaDirectory $mediaDirectory -ImageSpec $groupEntry.ImageSpec -NextMediaIndex ([ref]$nextMediaIndex) -NextRelationshipId ([ref]$nextRelationshipId) -NextDocPrId ([ref]$nextDocPrId)
+          $rowImageWidthCm = Get-EffectiveRowImageWidthCm -ImageSpec $groupEntry.ImageSpec -Columns $groupColumns -BodyWidthCm $bodyWidthCm
+          $preparedImage = New-PreparedImageBlock -DocumentXml $documentXml -RelationshipsXml $relationshipsXml -ContentTypesXml $contentTypesXml -MediaDirectory $mediaDirectory -ImageSpec $groupEntry.ImageSpec -NextMediaIndex ([ref]$nextMediaIndex) -NextRelationshipId ([ref]$nextRelationshipId) -NextDocPrId ([ref]$nextDocPrId) -WidthCmOverride $rowImageWidthCm
           $cellEntries.Add($preparedImage) | Out-Null
           $insertedImageCount++
           if ($null -ne $preparedImage.CaptionParagraph) {

@@ -983,7 +983,7 @@ URL: https://example.com/network-lab
       "path": "$($sampleImageOne.Replace('\', '\\'))",
       "section": "实验结果",
       "caption": "图1 主机 A 的 ping 测试结果",
-      "widthCm": 6.6,
+      "widthCm": 10.2,
       "layout": {
         "mode": "row",
         "columns": 2,
@@ -994,7 +994,7 @@ URL: https://example.com/network-lab
       "path": "$($sampleImageTwo.Replace('\', '\\'))",
       "section": "实验结果",
       "caption": "图2 主机 B 的 ping 测试结果",
-      "widthCm": 6.6,
+      "widthCm": 10.2,
       "layout": {
         "mode": "row",
         "columns": 2,
@@ -1005,7 +1005,7 @@ URL: https://example.com/network-lab
       "path": "$($sampleImageThree.Replace('\', '\\'))",
       "section": "实验结果",
       "caption": "图3 主机 A 的 arp -a 邻居缓存结果",
-      "widthCm": 6.6,
+      "widthCm": 10.2,
       "layout": {
         "mode": "row",
         "columns": 2,
@@ -1016,7 +1016,7 @@ URL: https://example.com/network-lab
       "path": "$($sampleImageFour.Replace('\', '\\'))",
       "section": "实验结果",
       "caption": "图4 主机 B 的 arp -a 邻居缓存结果",
-      "widthCm": 6.6,
+      "widthCm": 10.2,
       "layout": {
         "mode": "row",
         "columns": 2,
@@ -1049,6 +1049,9 @@ URL: https://example.com/network-lab
   $rowNamespaceManager.AddNamespace('wp', 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing')
   Assert-True -Condition (@($rowImageDocumentXml.SelectNodes('//w:tbl[.//wp:inline]', $rowNamespaceManager)).Count -ge 1) -Message 'Row-layout image insertion is missing the expected image table.'
   Assert-True -Condition (@($rowImageDocumentXml.SelectNodes('//wp:inline', $rowNamespaceManager)).Count -ge 4) -Message 'Row-layout image insertion is missing expected drawing nodes.'
+  $rowImageWidthsCm = @($rowImageDocumentXml.SelectNodes('//wp:inline/wp:extent', $rowNamespaceManager) | ForEach-Object { [Math]::Round(([int64]$_.cx) / 360000.0, 2) })
+  Assert-True -Condition (@($rowImageWidthsCm | Where-Object { $_ -gt 8.0 }).Count -eq 0) -Message 'Row-layout image insertion should cap over-wide images to the available column width.'
+  Assert-True -Condition (@($rowImageWidthsCm | Where-Object { $_ -ge 10.2 }).Count -eq 0) -Message 'Row-layout image insertion did not shrink images that were too wide for two columns.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图1 主机 A 的 ping 测试结果') -Message 'Row-layout image insertion is missing the first row caption.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图4 主机 B 的 arp -a 邻居缓存结果') -Message 'Row-layout image insertion is missing the final row caption.'
   Remove-Item -LiteralPath $rowImageTemp -Recurse -Force
