@@ -198,7 +198,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.ImageSpecsPath = $resolvedImageSpecsPath
   } elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
     $buildParams.ImageSpecsJson = $ImageSpecsJson
-  } elseif ($null -ne $ImagePaths -and $ImagePaths.Count -gt 0) {
+  } elseif ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) {
     $buildParams.ImagePaths = $ImagePaths
   }
 
@@ -231,10 +231,10 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.PromptText = $PromptText
   }
 
-  if ($referenceUrlList.Count -gt 0) {
+  if (@($referenceUrlList).Count -gt 0) {
     $buildParams.ReferenceUrls = $referenceUrlList
   }
-  if ($referenceTextPathList.Count -gt 0) {
+  if (@($referenceTextPathList).Count -gt 0) {
     $buildParams.ReferenceTextPaths = $referenceTextPathList
   }
 
@@ -257,7 +257,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   } elseif (-not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
     $buildParams.RequirementsJson = $RequirementsJson
   }
-  if ($null -ne $RequiredKeywords -and $RequiredKeywords.Count -gt 0) {
+  if ($null -ne $RequiredKeywords -and @($RequiredKeywords).Count -gt 0) {
     $buildParams.RequiredKeywords = $RequiredKeywords
   }
 
@@ -265,7 +265,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.ImageSpecsPath = $resolvedImageSpecsPath
   } elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
     $buildParams.ImageSpecsJson = $ImageSpecsJson
-  } elseif ($null -ne $ImagePaths -and $ImagePaths.Count -gt 0) {
+  } elseif ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) {
     $buildParams.ImagePaths = $ImagePaths
   }
 

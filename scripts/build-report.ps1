@@ -60,7 +60,7 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath)) {
 $imageInputModes = 0
 if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) { $imageInputModes++ }
 if (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) { $imageInputModes++ }
-if ($null -ne $ImagePaths -and $ImagePaths.Count -gt 0) { $imageInputModes++ }
+if ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) { $imageInputModes++ }
 $imageInputsProvided = ($imageInputModes -gt 0)
 if ($imageInputModes -gt 1) {
   throw "Provide zero or one of -ImageSpecsPath, -ImageSpecsJson, or -ImagePaths."

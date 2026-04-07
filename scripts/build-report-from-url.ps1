@@ -547,7 +547,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
     $buildParams.ImageSpecsPath = $ImageSpecsPath
   } elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
     $buildParams.ImageSpecsJson = $ImageSpecsJson
-  } elseif ($null -ne $ImagePaths -and $ImagePaths.Count -gt 0) {
+  } elseif ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) {
     $buildParams.ImagePaths = $ImagePaths
   }
 

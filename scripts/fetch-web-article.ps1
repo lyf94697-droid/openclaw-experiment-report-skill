@@ -84,25 +84,9 @@ try {
   Start-Sleep -Seconds 3
 }
 
-$tabsRaw = (& $cli browser --browser-profile $BrowserProfile tabs --json 2>&1 | Out-String).Trim()
-$tabs = Parse-JsonFromOutput -Text $tabsRaw
-
-$matchedTab = $tabs.tabs | Where-Object {
-  $tabUri = $null
-  try {
-    $tabUri = [Uri]$_.url
-  } catch {
-    $tabUri = $null
-  }
-
-  $null -ne $tabUri -and
-  $tabUri.Host -eq $uri.Host -and
-  $tabUri.AbsolutePath -eq $uri.AbsolutePath
-} | Select-Object -Last 1
-
-if ($null -ne $matchedTab -and $matchedTab.targetId) {
-  $targetId = $matchedTab.targetId
-}
+# Keep using the target id returned by browser open/focus.
+# Avoid reparsing the global tabs list here because page titles from unrelated
+# tabs can contain unescaped quotes and break ConvertFrom-Json in legacy shells.
 
 $titleFn = "() => document.title || ''"
 $contentFn = "() => { const selectors = ['article','main article','[role=""main""] article','main','[role=""main""]','.article-content','.article-content-box','.blog-content-box','.markdown-body','.post-content','.entry-content','#content','.content','.article','.post']; let text = ''; for (const selector of selectors) { const node = document.querySelector(selector); if (node && node.innerText && node.innerText.trim().length > 200) { text = node.innerText; break; } } if (!text) { text = document.body ? document.body.innerText : ''; } return text.replace(/\u00a0/g, ' ').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, $MaxChars); }"
