@@ -167,6 +167,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 最稳的方式不是让模型临场拼很多中间 JSON，而是直接调用 `scripts/build-report-from-feishu.ps1`
 - 飞书里手机直接上传截图时，可以参考 `examples/feishu-uploaded-images-docx-prompt.md`
 - 电脑本地直接上传截图时，可以参考 `examples/local-uploaded-images-docx-prompt.md`
+- 想一次生成、不等待图片分配确认时，可以参考 `examples/one-shot-uploaded-images-docx-prompt.md`
 - 如果你 uploaded images and you also provide local image paths，建议把上传图片当作语义参考，把本地路径当作最终 `docx` 插图文件来源
 - 如果运行时把附件提示注入成类似 `media/inbound/example.png` 这样的相对路径，这些路径也可以继续作为 `-ImagePaths` 传给插图流程
 - 对于未标注章节的多张截图，脚本会按上传顺序优先把前半归入实验步骤、后半归入实验结果，再对同章节连续图片应用 2 列布局
