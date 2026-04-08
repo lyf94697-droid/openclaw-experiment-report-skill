@@ -908,6 +908,27 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$generatedImageMapRoot.images[1].caption -match '^图2 ') -Message 'Image-map generator did not create the second caption.'
   $results.Add('docx image-map generation OK') | Out-Null
 
+  $imagePlanMarkdown = & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
+    -DocxPath $generatedFilledDocx `
+    -ImagePaths $sampleImageOne,$sampleImageTwo `
+    -Format markdown `
+    -PlanOnly | Out-String
+  Assert-True -Condition ($imagePlanMarkdown -match 'DOCX Image Plan') -Message 'Image-map planner markdown output missing header.'
+  Assert-True -Condition ($imagePlanMarkdown -match 'Proposed Image Placement') -Message 'Image-map planner markdown output missing placement table.'
+  Assert-True -Condition ($imagePlanMarkdown -match 'fallback-order') -Message 'Image-map planner should explain fallback-order section assignments for generic file names.'
+
+  $imagePlanJson = (& (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
+      -DocxPath $generatedFilledDocx `
+      -ImagePaths $sampleImageOne,$sampleImageTwo `
+      -Format json `
+      -PlanOnly | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$imagePlanJson.summary.planOnly) -Message 'Image-map planner JSON should mark planOnly output.'
+  Assert-True -Condition (@($imagePlanJson.plan).Count -eq 2) -Message 'Image-map planner JSON produced an unexpected number of plan rows.'
+  Assert-True -Condition ([string]$imagePlanJson.plan[0].proposedSection -eq '实验步骤') -Message 'Image-map planner should place the first fallback image in the procedure section.'
+  Assert-True -Condition ([string]$imagePlanJson.plan[1].proposedSection -eq '实验结果') -Message 'Image-map planner should place the second fallback image in the result section.'
+  Assert-True -Condition (-not ($imagePlanJson.PSObject.Properties.Name -contains 'images')) -Message 'Plan-only JSON should not expose an insertion-ready images array.'
+  $results.Add('docx image placement planning OK') | Out-Null
+
   $workspaceMediaDir = Join-Path (Split-Path -Parent $repoRoot) 'media\inbound'
   New-Item -ItemType Directory -Path $workspaceMediaDir -Force | Out-Null
   $uploadedImageSuffix = [System.Guid]::NewGuid().ToString('N')
