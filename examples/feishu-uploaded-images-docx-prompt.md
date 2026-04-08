@@ -43,6 +43,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 
 - 图片按上传顺序编号为图1、图2、图3……
 - 如果我没有额外说明图片归属，请根据图片内容判断属于实验步骤还是实验结果
 - 如果图片数量适合分组，优先使用每行 2 张的分组布局
+- ipconfig、ping、arp -a 等 DOS/终端命令必须单独成段，不要和说明文字写在同一段，方便最终 docx 自动套用命令块排版
 - 正文根据教程和我上传的图片来写
 - 最终 docx 必须真正插入图片文件
 ```

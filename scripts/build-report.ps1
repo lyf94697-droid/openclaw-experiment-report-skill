@@ -242,6 +242,7 @@ $summary = [pscustomobject]@{
   styledOutlinePath = $styledOutlinePath
   layoutCheckPath = $layoutCheckPath
   layoutCheckPassed = $(if ($null -ne $layoutCheckResult) { [bool]$layoutCheckResult.passed } else { $null })
+  layoutCheckMessage = $(if ($null -ne $layoutCheckResult -and $layoutCheckResult.PSObject.Properties.Name -contains "message") { [string]$layoutCheckResult.message } else { $null })
   layoutCheckErrorCount = $(if ($null -ne $layoutCheckResult) { [int]$layoutCheckResult.summary.errorCount } else { $null })
   layoutCheckWarningCount = $(if ($null -ne $layoutCheckResult) { [int]$layoutCheckResult.summary.warningCount } else { $null })
   expectedLayoutImageCount = $(if ($expectedLayoutImageCount -ge 0) { $expectedLayoutImageCount } else { $null })

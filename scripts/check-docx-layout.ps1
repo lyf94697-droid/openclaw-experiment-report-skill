@@ -100,6 +100,73 @@ function Add-Finding {
     })
 }
 
+function ConvertTo-IntegerFromDigitString {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $null
+  }
+
+  $value = 0
+  foreach ($character in $Text.ToCharArray()) {
+    $digit = [System.Globalization.CharUnicodeInfo]::GetDigitValue($character)
+    if ($digit -lt 0) {
+      return $null
+    }
+    $value = ($value * 10) + $digit
+  }
+
+  return $value
+}
+
+function New-LayoutCheckMessage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [bool]$Passed,
+
+    [Parameter(Mandatory = $true)]
+    [int]$ActualImageCount,
+
+    [AllowNull()]
+    [int]$ExpectedImageCount,
+
+    [Parameter(Mandatory = $true)]
+    [int]$ActualCaptionCount,
+
+    [AllowNull()]
+    [int]$ExpectedCaptionCount,
+
+    [Parameter(Mandatory = $true)]
+    [int]$PlaceholderCount,
+
+    [Parameter(Mandatory = $true)]
+    [int]$MissingSectionCount,
+
+    [Parameter(Mandatory = $true)]
+    [int]$ErrorCount,
+
+    [Parameter(Mandatory = $true)]
+    [int]$WarningCount
+  )
+
+  $imageSummary = if ($ExpectedImageCount -ge 0) {
+    "images {0}/{1}" -f $ActualImageCount, $ExpectedImageCount
+  } else {
+    "images {0}" -f $ActualImageCount
+  }
+
+  $captionSummary = if ($ExpectedCaptionCount -ge 0) {
+    "captions {0}/{1}" -f $ActualCaptionCount, $ExpectedCaptionCount
+  } else {
+    "captions {0}" -f $ActualCaptionCount
+  }
+
+  return "Layout check {0}: {1}, {2}, placeholders {3}, missing sections {4}, errors {5}, warnings {6}." -f $(if ($Passed) { "passed" } else { "failed" }), $imageSummary, $captionSummary, $PlaceholderCount, $MissingSectionCount, $ErrorCount, $WarningCount
+}
+
 $resolvedDocxPath = (Resolve-Path -LiteralPath $DocxPath).Path
 if ([System.IO.Path]::GetExtension($resolvedDocxPath).ToLowerInvariant() -ne ".docx") {
   throw "Only .docx files are supported: $resolvedDocxPath"
@@ -132,6 +199,18 @@ try {
   }
 
   $captionTexts = @($paragraphTexts | Where-Object { $_ -match '^\s*\u56fe\s*\p{Nd}+' })
+  $captionNumberMatches = New-Object System.Collections.Generic.List[object]
+  foreach ($captionText in $captionTexts) {
+    if ($captionText -match '^\s*\u56fe\s*(\p{Nd}+)') {
+      $captionNumber = ConvertTo-IntegerFromDigitString -Text $matches[1]
+      if ($null -ne $captionNumber) {
+        [void]$captionNumberMatches.Add([pscustomobject]@{
+            number = [int]$captionNumber
+            text = $captionText
+          })
+      }
+    }
+  }
 
   if ($ExpectedImageCount -ge 0 -and $imageDrawingCount -ne $ExpectedImageCount) {
     Add-Finding -Findings $errors -Code "image-count-mismatch" -Message ("Expected {0} image drawing nodes, found {1}." -f $ExpectedImageCount, $imageDrawingCount)
@@ -142,6 +221,24 @@ try {
   }
   if ($ExpectedCaptionCount -ge 0 -and @($captionTexts).Count -ne $ExpectedCaptionCount) {
     Add-Finding -Findings $errors -Code "caption-count-mismatch" -Message ("Expected {0} figure captions, found {1}." -f $ExpectedCaptionCount, @($captionTexts).Count)
+  }
+
+  $captionNumbers = @($captionNumberMatches | ForEach-Object { [int]$_.number })
+  $duplicateCaptionNumbers = @()
+  $missingCaptionNumbers = @()
+  $maxCaptionNumber = $null
+  if ($captionNumbers.Count -gt 0) {
+    $maxCaptionNumber = ($captionNumbers | Measure-Object -Maximum).Maximum
+    $duplicateCaptionNumbers = @($captionNumbers | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { [int]$_.Name })
+    $expectedCaptionNumbers = if ($ExpectedCaptionCount -ge 0) { 1..$ExpectedCaptionCount } else { 1..$maxCaptionNumber }
+    $captionNumberSet = @{}
+    foreach ($number in $captionNumbers) {
+      $captionNumberSet[[int]$number] = $true
+    }
+    $missingCaptionNumbers = @($expectedCaptionNumbers | Where-Object { -not $captionNumberSet.ContainsKey([int]$_) })
+  }
+  if ($duplicateCaptionNumbers.Count -gt 0 -or $missingCaptionNumbers.Count -gt 0) {
+    Add-Finding -Findings $errors -Code "caption-number-sequence" -Message ("Figure captions should be numbered continuously. Missing: {0}; duplicate: {1}." -f ($(if ($missingCaptionNumbers.Count -gt 0) { $missingCaptionNumbers -join ", " } else { "none" })), ($(if ($duplicateCaptionNumbers.Count -gt 0) { $duplicateCaptionNumbers -join ", " } else { "none" })))
   }
 
   if ($imageRelationshipCount -gt 0 -and $imageDrawingCount -ne $imageRelationshipCount) {
@@ -212,9 +309,22 @@ try {
     Add-Finding -Findings $errors -Code "remaining-placeholders" -Message ("Found {0} possible unfilled placeholders." -f $placeholderMatches.Count)
   }
 
+  $checkPassed = ($errors.Count -eq 0)
+  $layoutMessage = New-LayoutCheckMessage `
+    -Passed $checkPassed `
+    -ActualImageCount $imageDrawingCount `
+    -ExpectedImageCount $ExpectedImageCount `
+    -ActualCaptionCount @($captionTexts).Count `
+    -ExpectedCaptionCount $ExpectedCaptionCount `
+    -PlaceholderCount $placeholderMatches.Count `
+    -MissingSectionCount $missingSections.Count `
+    -ErrorCount $errors.Count `
+    -WarningCount $warnings.Count
+
   $result = [pscustomobject]@{
     docxPath = $resolvedDocxPath
-    passed = ($errors.Count -eq 0)
+    passed = $checkPassed
+    message = $layoutMessage
     summary = [pscustomobject]@{
       errorCount = $errors.Count
       warningCount = $warnings.Count
@@ -228,7 +338,14 @@ try {
       imageRelationshipCount = $imageRelationshipCount
       captionCount = @($captionTexts).Count
       captions = $captionTexts
+      captionNumbers = $captionNumbers
       paragraphCount = $paragraphTexts.Count
+    }
+    captionNumberCheck = [pscustomobject]@{
+      maxNumber = $maxCaptionNumber
+      missingNumbers = $missingCaptionNumbers
+      duplicateNumbers = $duplicateCaptionNumbers
+      continuous = ($duplicateCaptionNumbers.Count -eq 0 -and $missingCaptionNumbers.Count -eq 0)
     }
     sectionChecks = $sectionMatches
     missingSections = $missingSections
@@ -245,6 +362,7 @@ try {
     [void]$lines.Add("")
     [void]$lines.Add("- Docx: $resolvedDocxPath")
     [void]$lines.Add("- Passed: $($result.passed)")
+    [void]$lines.Add("- Message: $layoutMessage")
     [void]$lines.Add("- Images: $imageDrawingCount")
     [void]$lines.Add("- Captions: $(@($captionTexts).Count)")
     [void]$lines.Add("- Errors: $($errors.Count)")

@@ -1002,6 +1002,7 @@ URL: https://example.com/network-lab
   $layoutCheck = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([int]$layoutCheck.actual.imageDrawingCount -eq 2) -Message 'Layout check did not count the expected inserted images.'
   Assert-True -Condition ([int]$layoutCheck.actual.captionCount -eq 2) -Message 'Layout check did not count the expected figure captions.'
+  Assert-True -Condition ([string]$layoutCheck.message -match 'Layout check failed') -Message 'Layout check did not include a readable failure message.'
   Assert-True -Condition (-not [bool]$layoutCheck.passed) -Message 'Layout check should fail when the image fixture still has template placeholders.'
   Assert-True -Condition (@($layoutCheck.errors | Where-Object { $_.code -eq 'remaining-placeholders' }).Count -eq 1) -Message 'Layout check did not report remaining placeholders in the image fixture.'
   $placeholderLayoutCheck = (& (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $sampleDocx -Format json | Out-String) | ConvertFrom-Json
@@ -1091,8 +1092,39 @@ URL: https://example.com/network-lab
   Remove-Item -LiteralPath $rowImageTemp -Recurse -Force
   $rowLayoutCheck = (& (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $rowImageFilledDocx -ExpectedImageCount 4 -ExpectedCaptionCount 4 -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$rowLayoutCheck.passed) -Message 'Layout check should pass for the filled row-image fixture.'
+  Assert-True -Condition ([string]$rowLayoutCheck.message -match 'Layout check passed') -Message 'Layout check did not include a readable pass message.'
   Assert-True -Condition ([int]$rowLayoutCheck.actual.imageDrawingCount -eq 4) -Message 'Layout check did not count the expected row-layout images.'
   Assert-True -Condition ([int]$rowLayoutCheck.actual.captionCount -eq 4) -Message 'Layout check did not count the expected row-layout captions.'
+  Assert-True -Condition ([bool]$rowLayoutCheck.captionNumberCheck.continuous) -Message 'Layout check should report continuous row-layout captions.'
+
+  $badCaptionDocx = Join-Path $tempRoot 'sample-template.bad-caption-number.docx'
+  Copy-Item -LiteralPath $rowImageFilledDocx -Destination $badCaptionDocx -Force
+  $badCaptionArchive = [System.IO.Compression.ZipFile]::Open($badCaptionDocx, [System.IO.Compression.ZipArchiveMode]::Update)
+  try {
+    $badCaptionDocumentEntry = $badCaptionArchive.GetEntry('word/document.xml')
+    Assert-True -Condition ($null -ne $badCaptionDocumentEntry) -Message 'Bad-caption fixture is missing word/document.xml before mutation.'
+    $badCaptionReader = New-Object System.IO.StreamReader($badCaptionDocumentEntry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+    try {
+      $badCaptionDocumentText = $badCaptionReader.ReadToEnd()
+    } finally {
+      $badCaptionReader.Dispose()
+    }
+    $badCaptionDocumentEntry.Delete()
+    $badCaptionDocumentText = $badCaptionDocumentText -replace '图2 主机 B 的 ping 测试结果', '图3 主机 B 的 ping 测试结果'
+    $badCaptionDocumentEntry = $badCaptionArchive.CreateEntry('word/document.xml')
+    $badCaptionWriter = New-Object System.IO.StreamWriter($badCaptionDocumentEntry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+    try {
+      $badCaptionWriter.Write($badCaptionDocumentText)
+    } finally {
+      $badCaptionWriter.Dispose()
+    }
+  } finally {
+    $badCaptionArchive.Dispose()
+  }
+  $badCaptionLayoutCheck = (& (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $badCaptionDocx -ExpectedImageCount 4 -ExpectedCaptionCount 4 -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition (-not [bool]$badCaptionLayoutCheck.passed) -Message 'Layout check should fail when figure caption numbers are duplicated.'
+  Assert-True -Condition (-not [bool]$badCaptionLayoutCheck.captionNumberCheck.continuous) -Message 'Layout check should report non-continuous caption numbers.'
+  Assert-True -Condition (@($badCaptionLayoutCheck.errors | Where-Object { $_.code -eq 'caption-number-sequence' }).Count -eq 1) -Message 'Layout check did not report a caption-number sequence error.'
   $results.Add('docx image insertion row layout OK') | Out-Null
 
   $styledDocx = Join-Path $tempRoot 'sample-template.row-images.styled.docx'
@@ -1210,6 +1242,7 @@ URL: https://example.com/network-lab
   $buildReportSummary = (Get-Content -LiteralPath (Join-Path $buildReportOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([bool]$buildReportSummary.validationPassed) -Message 'build-report summary reported a failed validation result.'
   Assert-True -Condition ([bool]$buildReportSummary.layoutCheckPassed) -Message 'build-report summary reported a failed layout check.'
+  Assert-True -Condition ([string]$buildReportSummary.layoutCheckMessage -match 'Layout check passed') -Message 'build-report summary is missing the readable layout-check message.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
   Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report summary did not preserve the requested auto style profile.'
@@ -1242,6 +1275,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
   Assert-True -Condition ([string]$feishuBuildSummary.artifactsDir -eq (Join-Path $feishuBuildOutputDir 'artifacts')) -Message 'Feishu wrapper summary is missing the expected artifacts directory.'
   Assert-True -Condition ([bool]$feishuBuildSummary.layoutCheckPassed) -Message 'Feishu wrapper summary reported a failed layout check.'
+  Assert-True -Condition ([string]$feishuBuildSummary.layoutCheckMessage -match 'Layout check passed') -Message 'Feishu wrapper summary is missing the readable layout-check message.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.layoutCheckPath)) -Message 'Feishu wrapper summary layout check path does not exist.'
   $results.Add('Feishu wrapper pipeline OK') | Out-Null
 

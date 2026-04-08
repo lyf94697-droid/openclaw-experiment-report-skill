@@ -436,6 +436,7 @@ $wrapperSummary = [pscustomobject]@{
   innerSummaryPath = $innerSummaryPath
   layoutCheckPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$innerSummary.layoutCheckPath } else { $null })
   layoutCheckPassed = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $innerSummary.layoutCheckPassed } else { $null })
+  layoutCheckMessage = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckMessage") { [string]$innerSummary.layoutCheckMessage } else { $null })
   layoutCheckErrorCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckErrorCount") { $innerSummary.layoutCheckErrorCount } else { $null })
   layoutCheckWarningCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckWarningCount") { $innerSummary.layoutCheckWarningCount } else { $null })
   referenceUrls = $referenceUrlList

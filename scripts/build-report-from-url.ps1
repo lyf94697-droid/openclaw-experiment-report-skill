@@ -655,6 +655,7 @@ $wrapperSummary = [pscustomobject]@{
   buildSummaryPath = $buildSummaryPath
   layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
   layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
+  layoutCheckMessage = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckMessage") { [string]$buildSummary.layoutCheckMessage } else { $null })
   layoutCheckErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckErrorCount") { $buildSummary.layoutCheckErrorCount } else { $null })
   layoutCheckWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckWarningCount") { $buildSummary.layoutCheckWarningCount } else { $null })
   finalDocxPath = $finalDocxPath
