@@ -12,6 +12,8 @@ param(
   [ValidateSet("json", "markdown")]
   [string]$Format = "json",
 
+  [switch]$PlanOnly,
+
   [string]$OutFile
 )
 
@@ -950,6 +952,9 @@ $notes = New-Object System.Collections.Generic.List[string]
 for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
   $spec = $imageSpecs[$index]
   $resolvedSectionId = $null
+  $sectionSource = $null
+  $sectionReason = $null
+  $sectionConfidence = $null
 
   if ($spec.SectionProvided) {
     $resolvedSectionId = Resolve-SectionId -SectionName $spec.SectionName
@@ -959,10 +964,20 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
     if ($availableSectionIds -notcontains $resolvedSectionId) {
       throw "Image section is not available in the target docx: $($spec.SectionName)"
     }
+    $sectionSource = "explicit"
+    $sectionReason = "Section was provided in the image spec."
+    $sectionConfidence = "high"
   } else {
     $resolvedSectionId = Infer-SectionIdFromBaseName -BaseName $spec.BaseName
-    if ([string]::IsNullOrWhiteSpace($resolvedSectionId) -or ($availableSectionIds -notcontains $resolvedSectionId)) {
+    if (-not [string]::IsNullOrWhiteSpace($resolvedSectionId) -and ($availableSectionIds -contains $resolvedSectionId)) {
+      $sectionSource = "filename"
+      $sectionReason = "Section was inferred from the image file name."
+      $sectionConfidence = "medium"
+    } else {
       $resolvedSectionId = Get-FallbackSectionId -Index ($index + 1) -Total $imageSpecs.Count -AvailableSectionIds $availableSectionIds
+      $sectionSource = "fallback-order"
+      $sectionReason = "Section was assigned from image order because no file-name hint matched."
+      $sectionConfidence = "low"
     }
     $notes.Add(("Image {0} section inferred as {1} from file name or fallback order." -f ($index + 1), $resolvedSectionId)) | Out-Null
   }
@@ -993,6 +1008,9 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
       Layout = $layoutOutput
       Anchor = $spec.Anchor
       ResolvedSectionId = $resolvedSectionId
+      SectionSource = $sectionSource
+      SectionReason = $sectionReason
+      SectionConfidence = $sectionConfidence
     }) | Out-Null
 }
 
@@ -1004,43 +1022,112 @@ foreach ($resolvedEntry in $resolvedImageEntries) {
   $resultImages.Add([pscustomobject]$resolvedEntry.OutputEntry) | Out-Null
 }
 
+$planEntries = New-Object System.Collections.Generic.List[object]
+for ($planIndex = 0; $planIndex -lt $resolvedImageEntries.Count; $planIndex++) {
+  $resolvedEntry = $resolvedImageEntries[$planIndex]
+  $item = [pscustomobject]$resolvedEntry.OutputEntry
+  $layoutText = "none"
+  if ($item.PSObject.Properties.Name -contains 'layout' -and $null -ne $item.layout) {
+    $layoutTable = ConvertTo-PlainHashtable -InputObject $item.layout
+    $layoutParts = New-Object System.Collections.Generic.List[string]
+    [void]$layoutParts.Add([string]$layoutTable["mode"])
+    if ($layoutTable.ContainsKey("columns") -and $null -ne $layoutTable["columns"]) {
+      [void]$layoutParts.Add(("columns={0}" -f $layoutTable["columns"]))
+    }
+    if ($layoutTable.ContainsKey("group") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["group"])) {
+      [void]$layoutParts.Add(("group={0}" -f $layoutTable["group"]))
+    }
+    if ($layoutTable.ContainsKey("groupAnchor") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["groupAnchor"])) {
+      [void]$layoutParts.Add(("groupAnchor={0}" -f $layoutTable["groupAnchor"]))
+    }
+    $layoutText = $layoutParts -join ", "
+  }
+
+  $planEntries.Add([pscustomobject]@{
+      index = $planIndex + 1
+      fileName = [System.IO.Path]::GetFileName([string]$item.path)
+      path = [string]$item.path
+      proposedSection = [string]$item.section
+      resolvedHeading = [string]$item.resolvedHeading
+      proposedCaption = [string]$item.caption
+      widthCm = $item.widthCm
+      layout = $layoutText
+      sectionSource = [string]$resolvedEntry.SectionSource
+      confidence = [string]$resolvedEntry.SectionConfidence
+      reason = [string]$resolvedEntry.SectionReason
+    }) | Out-Null
+}
+
 $result = [pscustomobject]@{
   summary = [pscustomobject]@{
     docxPath = $resolvedDocxPath
     imageCount = $resultImages.Count
     availableSections = @($discoveredSections | ForEach-Object { $_.headingText } | Select-Object -Unique)
+    planOnly = [bool]$PlanOnly
   }
   images = $resultImages
+  plan = $planEntries
   notes = $notes
 }
 
 if ($Format -eq "json") {
-  $output = $result | ConvertTo-Json -Depth 6
+  if ($PlanOnly) {
+    $output = ([pscustomobject]@{
+        summary = $result.summary
+        plan = $planEntries
+        notes = $notes
+      }) | ConvertTo-Json -Depth 6
+  } else {
+    $output = $result | ConvertTo-Json -Depth 6
+  }
 } else {
   $lines = New-Object System.Collections.Generic.List[string]
-  [void]$lines.Add("# DOCX Image Map")
+  [void]$lines.Add($(if ($PlanOnly) { "# DOCX Image Plan" } else { "# DOCX Image Map" }))
   [void]$lines.Add("")
   [void]$lines.Add("- Docx: $resolvedDocxPath")
   [void]$lines.Add("- Image count: $($resultImages.Count)")
   [void]$lines.Add("- Available sections: $((@($result.summary.availableSections) -join ', '))")
   [void]$lines.Add("")
-  [void]$lines.Add("## Images")
-  foreach ($item in $resultImages) {
-    $layoutSuffix = ""
-    if ($item.PSObject.Properties.Name -contains 'layout' -and $null -ne $item.layout) {
-      $layoutSuffix = " [layout: {0}" -f $item.layout.mode
-      if ($null -ne $item.layout.columns) {
-        $layoutSuffix += ", columns=$($item.layout.columns)"
-      }
-      if (-not [string]::IsNullOrWhiteSpace([string]$item.layout.group)) {
-        $layoutSuffix += ", group=$($item.layout.group)"
-      }
-      if (-not [string]::IsNullOrWhiteSpace([string]$item.layout.groupAnchor)) {
-        $layoutSuffix += ", groupAnchor=$($item.layout.groupAnchor)"
-      }
-      $layoutSuffix += "]"
+  if ($PlanOnly) {
+    [void]$lines.Add("## Proposed Image Placement")
+    [void]$lines.Add("")
+    [void]$lines.Add("| # | File | Proposed section | Caption | Layout | Source | Confidence | Reason |")
+    [void]$lines.Add("|---|---|---|---|---|---|---|---|")
+    foreach ($item in $planEntries) {
+      $rowValues = @(
+        [string]$item.index,
+        [string]$item.fileName,
+        [string]$item.proposedSection,
+        [string]$item.proposedCaption,
+        [string]$item.layout,
+        [string]$item.sectionSource,
+        [string]$item.confidence,
+        [string]$item.reason
+      ) | ForEach-Object { ($_ -replace '\|', '\|') }
+      [void]$lines.Add(("| {0} |" -f ($rowValues -join " | ")))
     }
-    [void]$lines.Add("- $([System.IO.Path]::GetFileName($item.path)) -> $($item.section) -> $($item.caption)$layoutSuffix")
+    [void]$lines.Add("")
+    [void]$lines.Add("> Review this plan before inserting images. Low-confidence rows came from fallback order and should be checked manually.")
+  } else {
+    [void]$lines.Add("## Images")
+    foreach ($item in $resultImages) {
+      $layoutSuffix = ""
+      if ($item.PSObject.Properties.Name -contains 'layout' -and $null -ne $item.layout) {
+        $layoutTable = ConvertTo-PlainHashtable -InputObject $item.layout
+        $layoutSuffix = " [layout: {0}" -f $layoutTable["mode"]
+        if ($layoutTable.ContainsKey("columns") -and $null -ne $layoutTable["columns"]) {
+          $layoutSuffix += ", columns=$($layoutTable["columns"])"
+        }
+        if ($layoutTable.ContainsKey("group") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["group"])) {
+          $layoutSuffix += ", group=$($layoutTable["group"])"
+        }
+        if ($layoutTable.ContainsKey("groupAnchor") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["groupAnchor"])) {
+          $layoutSuffix += ", groupAnchor=$($layoutTable["groupAnchor"])"
+        }
+        $layoutSuffix += "]"
+      }
+      [void]$lines.Add("- $([System.IO.Path]::GetFileName($item.path)) -> $($item.section) -> $($item.caption)$layoutSuffix")
+    }
   }
   if ($notes.Count -gt 0) {
     [void]$lines.Add("")
@@ -1056,7 +1143,11 @@ if ([string]::IsNullOrWhiteSpace($OutFile)) {
   Write-Output $output
 } else {
   [System.IO.File]::WriteAllText($OutFile, $output, (New-Object System.Text.UTF8Encoding($true)))
-  Write-Output "Wrote image map to $OutFile"
+  if ($PlanOnly) {
+    Write-Output "Wrote image plan to $OutFile"
+  } else {
+    Write-Output "Wrote image map to $OutFile"
+  }
 }
 
 
