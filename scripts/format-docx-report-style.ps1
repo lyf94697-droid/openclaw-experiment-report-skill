@@ -132,7 +132,7 @@ function Get-StyleProfileSettings {
     "compact" {
       return [ordered]@{
         BodyFirstLineTwips = 420
-        BodyLineTwips = 320
+        BodyLineTwips = 300
         BodyAfterTwips = 0
         HeadingBeforeTwips = 80
         HeadingAfterTwips = 40
@@ -140,12 +140,12 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 80
         ImageBeforeTwips = 40
         ImageAfterTwips = 40
-        TitleFontHalfPoints = 32
-        HeadingFontHalfPoints = 28
-        BodyFontHalfPoints = 24
-        CaptionFontHalfPoints = 21
-        MetadataFontHalfPoints = 24
-        ListFontHalfPoints = 24
+        TitleFontHalfPoints = 30
+        HeadingFontHalfPoints = 24
+        BodyFontHalfPoints = 21
+        CaptionFontHalfPoints = 20
+        MetadataFontHalfPoints = 21
+        ListFontHalfPoints = 21
         ListAfterTwips = 0
         CommandBeforeTwips = 20
         CommandAfterTwips = 20

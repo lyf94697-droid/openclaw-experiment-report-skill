@@ -1165,20 +1165,23 @@ URL: https://example.com/network-lab
   $compactStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $compactStyledDocx -Overwrite -Profile compact
   Assert-True -Condition (Test-Path -LiteralPath $compactStyledDocx) -Message 'Compact style profile did not create the styled docx.'
   Assert-True -Condition ([string]$compactStyleResult.styleProfile -eq 'compact') -Message 'Compact style profile result is missing the selected profile name.'
-  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Compact style profile did not apply the expected tighter body line spacing.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyLineTwips -eq 300) -Message 'Compact style profile did not apply the expected tighter body line spacing.'
   Assert-True -Condition ([int]$compactStyleResult.appliedSettings.HeadingBeforeTwips -eq 80) -Message 'Compact style profile did not apply the expected heading spacing.'
   Assert-True -Condition ([int]$compactStyleResult.appliedSettings.TitleAfterTwips -eq 80) -Message 'Compact style profile did not apply the expected title spacing.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyFontHalfPoints -eq 21) -Message 'Compact style profile did not apply the expected smaller body font size.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.HeadingFontHalfPoints -eq 24) -Message 'Compact style profile did not apply the expected smaller heading font size.'
   $compactStyledDocxTemp = Join-Path $tempRoot 'compact-styled-docx-inspect'
   [System.IO.Compression.ZipFile]::ExtractToDirectory($compactStyledDocx, $compactStyledDocxTemp)
   [xml]$compactStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $compactStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
-  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="320"') -Message 'Compact styled docx is missing the expected compact line spacing.'
+  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="300"') -Message 'Compact styled docx is missing the expected compact line spacing.'
+  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="21"') -Message 'Compact styled docx is missing the expected 10.5pt body font sizing.'
   Remove-Item -LiteralPath $compactStyledDocxTemp -Recurse -Force
 
   $customStyleProfilePath = Join-Path $tempRoot 'custom-style-profile.json'
   $customStyleProfile = [ordered]@{
     baseProfile = 'compact'
     settings = [ordered]@{
-      BodyLineTwips = 300
+      BodyLineTwips = 290
       HeadingBeforeTwips = 60
       TitleAfterTwips = 50
     }
@@ -1190,13 +1193,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$customStyleResult.requestedProfile -eq 'compact') -Message 'Custom style profile file did not supply the expected base profile.'
   Assert-True -Condition ([string]$customStyleResult.styleProfile -eq 'compact') -Message 'Custom style profile file did not resolve to the expected base profile.'
   Assert-True -Condition ([string]$customStyleResult.profilePath -eq $customStyleProfilePath) -Message 'Custom style profile result is missing the applied profile file path.'
-  Assert-True -Condition ([int]$customStyleResult.appliedSettings.BodyLineTwips -eq 300) -Message 'Custom style profile file did not override body line spacing.'
+  Assert-True -Condition ([int]$customStyleResult.appliedSettings.BodyLineTwips -eq 290) -Message 'Custom style profile file did not override body line spacing.'
   Assert-True -Condition ([int]$customStyleResult.appliedSettings.TitleAfterTwips -eq 50) -Message 'Custom style profile file did not override title spacing.'
   Assert-True -Condition ([int]$customStyleResult.appliedSettings.HeadingBeforeTwips -eq 70) -Message 'Explicit command-line style settings should override the custom style profile file.'
   $customStyledDocxTemp = Join-Path $tempRoot 'custom-styled-docx-inspect'
   [System.IO.Compression.ZipFile]::ExtractToDirectory($customStyledDocx, $customStyledDocxTemp)
   [xml]$customStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $customStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
-  Assert-True -Condition ($customStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="300"') -Message 'Custom styled docx is missing the expected profile-file line spacing.'
+  Assert-True -Condition ($customStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="290"') -Message 'Custom styled docx is missing the expected profile-file line spacing.'
   Remove-Item -LiteralPath $customStyledDocxTemp -Recurse -Force
 
   $autoCompactStyledDocx = Join-Path $tempRoot 'cover-body-template.auto-compact-styled.docx'
@@ -1205,7 +1208,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$autoCompactStyleResult.requestedProfile -eq 'auto') -Message 'Auto compact style result is missing the requested profile.'
   Assert-True -Condition ([string]$autoCompactStyleResult.styleProfile -eq 'compact') -Message 'Auto style profile should resolve the cover-body template to compact.'
   Assert-True -Condition ([string]$autoCompactStyleResult.profileReason -match 'cover-style metadata table') -Message 'Auto compact style result is missing the expected decision reason.'
-  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Auto compact style result did not apply compact body spacing.'
+  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyLineTwips -eq 300) -Message 'Auto compact style result did not apply compact body spacing.'
+  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyFontHalfPoints -eq 21) -Message 'Auto compact style result did not apply compact body font size.'
 
   $paragraphCoverDocx = Join-Path $tempRoot 'paragraph-cover-template.docx'
   New-ParagraphCoverTemplateDocx -Path $paragraphCoverDocx
