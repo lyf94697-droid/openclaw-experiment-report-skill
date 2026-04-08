@@ -20,10 +20,20 @@ $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+$script:CanReadImageDimensions = $false
+try {
+  Add-Type -AssemblyName System.Drawing
+  $script:CanReadImageDimensions = $true
+} catch {
+  $script:CanReadImageDimensions = $false
+}
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 $defaultImageWidthCm = 10.5
+$defaultWideImageWidthCm = 13.0
+$autoRowWideScreenshotMinWidthPx = 900
+$autoRowWideScreenshotAspectRatio = 1.45
 $sectionRules = @(
   [pscustomobject]@{ id = "purpose"; canonicalLabel = "实验目的"; headingAliases = @("实验目的"); inputAliases = @("purpose", "实验目的") },
   [pscustomobject]@{ id = "environment"; canonicalLabel = "实验环境"; headingAliases = @("实验环境", "实验设备与环境"); inputAliases = @("environment", "实验环境", "实验设备与环境") },
@@ -151,6 +161,49 @@ function Resolve-ExistingImagePath {
 
   $triedText = if ($triedCandidates.Count -gt 0) { $triedCandidates -join "; " } else { "<none>" }
   throw "Image path was not found: $Path. Tried: $triedText"
+}
+
+function Get-ImagePixelInfo {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  if (-not $script:CanReadImageDimensions) {
+    return $null
+  }
+
+  $image = $null
+  try {
+    $image = [System.Drawing.Image]::FromFile($Path)
+    $width = [int]$image.Width
+    $height = [int]$image.Height
+    $aspectRatio = if ($height -gt 0) { [double]$width / [double]$height } else { 0.0 }
+    return [pscustomobject]@{
+      width = $width
+      height = $height
+      aspectRatio = $aspectRatio
+    }
+  } catch {
+    return $null
+  } finally {
+    if ($null -ne $image) {
+      $image.Dispose()
+    }
+  }
+}
+
+function Test-IsWideScreenshotForAutoRow {
+  param(
+    [AllowNull()]
+    [object]$PixelInfo
+  )
+
+  if ($null -eq $PixelInfo) {
+    return $false
+  }
+
+  return ([int]$PixelInfo.width -ge $autoRowWideScreenshotMinWidthPx -and [double]$PixelInfo.aspectRatio -ge $autoRowWideScreenshotAspectRatio)
 }
 
 function Normalize-OpenXmlText {
@@ -569,6 +622,8 @@ function Resolve-ImageInputSpec {
   }
 
   $layout = Resolve-ImageLayoutSpec -LayoutValue $(if ($itemTable.ContainsKey("layout")) { $itemTable["layout"] } else { $null }) -ItemTable $itemTable
+  $pixelInfo = Get-ImagePixelInfo -Path $imagePath
+  $autoRowEligible = -not (Test-IsWideScreenshotForAutoRow -PixelInfo $pixelInfo)
 
   return [pscustomobject]@{
     ImagePath = $imagePath
@@ -581,6 +636,10 @@ function Resolve-ImageInputSpec {
     Anchor = $anchor
     AnchorProvided = (-not [string]::IsNullOrWhiteSpace($anchor))
     Layout = $layout
+    PixelWidth = $(if ($null -ne $pixelInfo) { [int]$pixelInfo.width } else { $null })
+    PixelHeight = $(if ($null -ne $pixelInfo) { [int]$pixelInfo.height } else { $null })
+    AspectRatio = $(if ($null -ne $pixelInfo) { [double]$pixelInfo.aspectRatio } else { $null })
+    AutoRowEligible = [bool]$autoRowEligible
   }
 }
 
@@ -706,7 +765,7 @@ function Apply-AutoRowLayouts {
   $groupIndex = 0
   while ($index -lt $Entries.Count) {
     $entry = $Entries[$index]
-    if ($null -ne $entry.Layout -or -not [string]::IsNullOrWhiteSpace([string]$entry.Anchor)) {
+    if ($null -ne $entry.Layout -or -not [string]::IsNullOrWhiteSpace([string]$entry.Anchor) -or -not [bool]$entry.AutoRowEligible) {
       $index++
       continue
     }
@@ -718,6 +777,7 @@ function Apply-AutoRowLayouts {
       if (
         $null -ne $candidate.Layout -or
         -not [string]::IsNullOrWhiteSpace([string]$candidate.Anchor) -or
+        -not [bool]$candidate.AutoRowEligible -or
         [string]$candidate.ResolvedSectionId -ne $sectionId
       ) {
         break
@@ -969,7 +1029,16 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
 
   $resolvedRule = $sectionRuleLookup[$resolvedSectionId]
   $caption = if ($spec.CaptionProvided) { $spec.Caption } else { Get-DefaultCaption -Index ($index + 1) -SectionId $resolvedSectionId -BaseName $spec.BaseName }
-  $widthCm = if ($null -ne $spec.WidthCm) { $spec.WidthCm } else { $defaultImageWidthCm }
+  $widthCm = if ($null -ne $spec.WidthCm) {
+    $spec.WidthCm
+  } elseif (-not [bool]$spec.AutoRowEligible) {
+    $defaultWideImageWidthCm
+  } else {
+    $defaultImageWidthCm
+  }
+  if (-not [bool]$spec.AutoRowEligible -and $null -eq $spec.Layout) {
+    $notes.Add(("Image {0} detected as a wide screenshot ({1}x{2}) and will not be auto-grouped into a two-column row layout." -f ($index + 1), $spec.PixelWidth, $spec.PixelHeight)) | Out-Null
+  }
 
   $sectionHeading = ($discoveredSections | Where-Object { $_.id -eq $resolvedSectionId } | Select-Object -First 1 -ExpandProperty headingText)
 
@@ -993,6 +1062,7 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
       Layout = $layoutOutput
       Anchor = $spec.Anchor
       ResolvedSectionId = $resolvedSectionId
+      AutoRowEligible = [bool]$spec.AutoRowEligible
     }) | Out-Null
 }
 

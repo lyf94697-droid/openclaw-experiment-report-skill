@@ -281,10 +281,14 @@ function New-SamplePngImage {
     [Parameter(Mandatory = $true)]
     [string]$Text,
 
-    [string]$BackgroundHex = "#E8F1FB"
+    [string]$BackgroundHex = "#E8F1FB",
+
+    [int]$Width = 360,
+
+    [int]$Height = 200
   )
 
-  $bitmap = New-Object System.Drawing.Bitmap 360, 200
+  $bitmap = New-Object System.Drawing.Bitmap $Width, $Height
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
   try {
     $graphics.Clear([System.Drawing.ColorTranslator]::FromHtml($BackgroundHex))
@@ -938,6 +942,35 @@ URL: https://example.com/network-lab
   $results.Add('docx image-map uploaded relative-path generation OK') | Out-Null
   $results.Add('docx image insertion uploaded relative-path OK') | Out-Null
 
+  $wideScreenshotOne = Join-Path $tempRoot 'wide-screenshot-1.png'
+  $wideScreenshotTwo = Join-Path $tempRoot 'wide-screenshot-2.png'
+  New-SamplePngImage -Path $wideScreenshotOne -Text 'Wide 1' -Width 1280 -Height 720
+  New-SamplePngImage -Path $wideScreenshotTwo -Text 'Wide 2' -Width 1280 -Height 720 -BackgroundHex '#FCEFD8'
+  $wideScreenshotSpecsPath = Join-Path $tempRoot 'wide-screenshot-specs.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($wideScreenshotOne.Replace('\', '\\'))",
+      "section": "实验结果"
+    },
+    {
+      "path": "$($wideScreenshotTwo.Replace('\', '\\'))",
+      "section": "实验结果"
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $wideScreenshotSpecsPath -Encoding UTF8
+  $wideScreenshotImageMapPath = Join-Path $tempRoot 'generated-wide-screenshot-image-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $generatedFilledDocx -ImageSpecsPath $wideScreenshotSpecsPath -Format json -OutFile $wideScreenshotImageMapPath | Out-Null
+  $wideScreenshotMapRoot = (Get-Content -LiteralPath $wideScreenshotImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (@($wideScreenshotMapRoot.images).Count -eq 2) -Message 'Wide screenshot image-map generator produced an unexpected number of images.'
+  Assert-True -Condition ($wideScreenshotMapRoot.images[0].PSObject.Properties.Name -notcontains 'layout') -Message 'Wide screenshot image-map generator should not auto-row the first wide screenshot.'
+  Assert-True -Condition ($wideScreenshotMapRoot.images[1].PSObject.Properties.Name -notcontains 'layout') -Message 'Wide screenshot image-map generator should not auto-row the second wide screenshot.'
+  Assert-True -Condition ([double]$wideScreenshotMapRoot.images[0].widthCm -eq 13.0) -Message 'Wide screenshot image-map generator did not use the wider single-image default width.'
+  Assert-True -Condition (@($wideScreenshotMapRoot.notes | Where-Object { $_ -match 'wide screenshot' }).Count -eq 2) -Message 'Wide screenshot image-map generator should explain skipped auto row layout.'
+  $results.Add('docx image-map wide screenshot auto-layout OK') | Out-Null
+
   $sectionImageFilledDocx = Join-Path $tempRoot 'sample-template.section-images.docx'
   $sectionImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $generatedImageMapPath -OutPath $sectionImageFilledDocx
   Assert-True -Condition (Test-Path -LiteralPath $sectionImageFilledDocx) -Message 'Section-based image insertion did not create the filled docx.'
@@ -1165,16 +1198,16 @@ URL: https://example.com/network-lab
   $compactStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $compactStyledDocx -Overwrite -Profile compact
   Assert-True -Condition (Test-Path -LiteralPath $compactStyledDocx) -Message 'Compact style profile did not create the styled docx.'
   Assert-True -Condition ([string]$compactStyleResult.styleProfile -eq 'compact') -Message 'Compact style profile result is missing the selected profile name.'
-  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyLineTwips -eq 300) -Message 'Compact style profile did not apply the expected tighter body line spacing.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Compact style profile did not apply the expected tighter body line spacing.'
   Assert-True -Condition ([int]$compactStyleResult.appliedSettings.HeadingBeforeTwips -eq 80) -Message 'Compact style profile did not apply the expected heading spacing.'
   Assert-True -Condition ([int]$compactStyleResult.appliedSettings.TitleAfterTwips -eq 80) -Message 'Compact style profile did not apply the expected title spacing.'
-  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyFontHalfPoints -eq 21) -Message 'Compact style profile did not apply the expected smaller body font size.'
-  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.HeadingFontHalfPoints -eq 24) -Message 'Compact style profile did not apply the expected smaller heading font size.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.BodyFontHalfPoints -eq 24) -Message 'Compact style profile did not apply the expected template-like body font size.'
+  Assert-True -Condition ([int]$compactStyleResult.appliedSettings.HeadingFontHalfPoints -eq 30) -Message 'Compact style profile did not apply the expected template-like heading font size.'
   $compactStyledDocxTemp = Join-Path $tempRoot 'compact-styled-docx-inspect'
   [System.IO.Compression.ZipFile]::ExtractToDirectory($compactStyledDocx, $compactStyledDocxTemp)
   [xml]$compactStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $compactStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
-  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="300"') -Message 'Compact styled docx is missing the expected compact line spacing.'
-  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="21"') -Message 'Compact styled docx is missing the expected 10.5pt body font sizing.'
+  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="320"') -Message 'Compact styled docx is missing the expected compact line spacing.'
+  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="24"') -Message 'Compact styled docx is missing the expected 12pt body font sizing.'
   Remove-Item -LiteralPath $compactStyledDocxTemp -Recurse -Force
 
   $customStyleProfilePath = Join-Path $tempRoot 'custom-style-profile.json'
@@ -1208,8 +1241,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$autoCompactStyleResult.requestedProfile -eq 'auto') -Message 'Auto compact style result is missing the requested profile.'
   Assert-True -Condition ([string]$autoCompactStyleResult.styleProfile -eq 'compact') -Message 'Auto style profile should resolve the cover-body template to compact.'
   Assert-True -Condition ([string]$autoCompactStyleResult.profileReason -match 'cover-style metadata table') -Message 'Auto compact style result is missing the expected decision reason.'
-  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyLineTwips -eq 300) -Message 'Auto compact style result did not apply compact body spacing.'
-  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyFontHalfPoints -eq 21) -Message 'Auto compact style result did not apply compact body font size.'
+  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Auto compact style result did not apply compact body spacing.'
+  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyFontHalfPoints -eq 24) -Message 'Auto compact style result did not apply compact body font size.'
 
   $paragraphCoverDocx = Join-Path $tempRoot 'paragraph-cover-template.docx'
   New-ParagraphCoverTemplateDocx -Path $paragraphCoverDocx

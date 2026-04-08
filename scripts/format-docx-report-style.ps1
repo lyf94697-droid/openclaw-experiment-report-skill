@@ -132,7 +132,7 @@ function Get-StyleProfileSettings {
     "compact" {
       return [ordered]@{
         BodyFirstLineTwips = 420
-        BodyLineTwips = 300
+        BodyLineTwips = 320
         BodyAfterTwips = 0
         HeadingBeforeTwips = 80
         HeadingAfterTwips = 40
@@ -141,11 +141,11 @@ function Get-StyleProfileSettings {
         ImageBeforeTwips = 40
         ImageAfterTwips = 40
         TitleFontHalfPoints = 30
-        HeadingFontHalfPoints = 24
-        BodyFontHalfPoints = 21
-        CaptionFontHalfPoints = 20
-        MetadataFontHalfPoints = 21
-        ListFontHalfPoints = 21
+        HeadingFontHalfPoints = 30
+        BodyFontHalfPoints = 24
+        CaptionFontHalfPoints = 24
+        MetadataFontHalfPoints = 24
+        ListFontHalfPoints = 24
         ListAfterTwips = 0
         CommandBeforeTwips = 20
         CommandAfterTwips = 20
@@ -1078,7 +1078,7 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $styleSettings.BodyLineTwips
       Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints
-      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCaptionCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1112,7 +1112,7 @@ try {
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
       Set-RunFont -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
       Set-ParagraphShading -Paragraph $paragraph -Fill "F2F2F2"
-      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCommandCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1133,7 +1133,7 @@ try {
     Set-ParagraphIndent -Paragraph $paragraph -FirstLine $(if ($isInTable) { 0 } else { $styleSettings.BodyFirstLineTwips })
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
     Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints
-    Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
+    Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
     $styledBodyCount++
     if ($isInTable) { $styledTableParagraphCount++ }
   }
