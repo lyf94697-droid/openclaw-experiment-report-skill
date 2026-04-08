@@ -1,13 +1,18 @@
 # Feishu Uploaded Images To Docx Prompt
 
 ```text
-我会在当前飞书消息里直接上传实验截图，不再单独给本地图片路径。
+我会在飞书里直接上传实验截图，不再单独给本地图片路径。
 
-如果你已经在之前的生成任务里设置过课程名和实验名，而且这次不变，那么 `-CourseName` 和 `-ExperimentName` 可以省略。
+请先检查当前对话或最近几条图片消息里是否包含类似 `[media attached ...]` 的附件路径提示。
 
-如果当前对话提示中已经包含类似 `[media attached ...]` 的附件路径提示，请直接从这些提示里提取图片路径，并把这些路径作为 `-ImagePaths` 传给本地脚本。不要只看图写正文，最终 docx 也要把这些附件图片真正插进去。
+如果能拿到真实附件路径：
+- 请把这些路径按上传顺序逐个列在 `-ImagePaths` 后面，用逗号分隔，按实际数量增删
+- 运行本地脚本时保留默认图片归档行为，让脚本先把图片复制到输出目录的 `images\` 子目录
+- 最终 docx 插图使用归档后的图片文件，不要只看图写正文
 
-如果你没有拿到任何可读的附件路径，请明确说“当前运行时没有暴露附件文件路径，无法稳定把附件直接插入 docx”，不要假装已经插入成功。
+如果没有拿到任何可读的附件路径，请明确说：
+“当前运行时没有暴露附件文件路径，无法稳定把手机/飞书上传图片直接插入 docx。”
+不要假装已经插入成功。
 
 工作目录：
 E:\游戏\openclaw-experiment-report-skill
@@ -26,15 +31,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 
   -ExperimentProperty "③验证性实验" `
   -ExperimentDate "2026年4月2日" `
   -ExperimentLocation "睿智楼四栋212" `
-  -ImagePaths "从当前提示里的 [media attached ...] 行提取出的图片路径" `
+  -ImagePaths `
+    "从 [media attached ...] 行提取出的第 1 个真实图片路径", `
+    "从 [media attached ...] 行提取出的第 2 个真实图片路径" `
   -OutputDir "E:\实验报告\新建文件夹" `
   -StyleProfile auto `
   -DetailLevel full
 
 要求：
-- 图1、图2属于实验步骤
-- 图3、图4属于实验结果
-- 四张图按 2x2 连续图片块排版
+- 图片按上传顺序编号为图1、图2、图3……
+- 如果我没有额外说明图片归属，请根据图片内容判断属于实验步骤还是实验结果
+- 如果图片数量适合分组，优先使用每行 2 张的分组布局
 - 正文根据教程和我上传的图片来写
-- 最终 docx 插图使用当前消息附件对应的图片文件
+- 最终 docx 必须真正插入图片文件
 ```

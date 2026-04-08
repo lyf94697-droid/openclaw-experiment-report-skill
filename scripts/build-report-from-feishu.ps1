@@ -43,6 +43,8 @@ param(
 
   [string[]]$ImagePaths,
 
+  [string]$ImageArchiveDir,
+
   [string]$ImageSpecsPath,
 
   [string]$ImageSpecsJson,
@@ -115,6 +117,68 @@ function Get-NonEmptyList {
   return @($Values | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
+function Get-SafeFileName {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  $safeName = $Name
+  foreach ($invalidChar in [System.IO.Path]::GetInvalidFileNameChars()) {
+    $safeName = $safeName.Replace([string]$invalidChar, "_")
+  }
+
+  if ([string]::IsNullOrWhiteSpace($safeName)) {
+    return "image"
+  }
+
+  return $safeName
+}
+
+function Copy-InputImagesToArchive {
+  param(
+    [AllowNull()]
+    [string[]]$Paths,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ArchiveDir
+  )
+
+  $imagePathList = Get-NonEmptyList -Values $Paths
+  if ($imagePathList.Count -eq 0) {
+    return @()
+  }
+
+  New-Item -ItemType Directory -Path $ArchiveDir -Force | Out-Null
+
+  $archivedPaths = New-Object System.Collections.Generic.List[string]
+  $index = 0
+  foreach ($imagePath in $imagePathList) {
+    $index++
+    try {
+      $resolvedImagePath = (Resolve-Path -LiteralPath $imagePath -ErrorAction Stop).Path
+    } catch {
+      throw "Image path '$imagePath' could not be resolved. Pass a readable local file path from the [media attached ...] attachment hint."
+    }
+    if (-not (Test-Path -LiteralPath $resolvedImagePath -PathType Leaf)) {
+      throw "Image path '$imagePath' resolved to '$resolvedImagePath', but it is not a file."
+    }
+
+    $extension = [System.IO.Path]::GetExtension($resolvedImagePath)
+    if ([string]::IsNullOrWhiteSpace($extension)) {
+      $extension = ".png"
+    }
+
+    $baseName = Get-SafeFileName -Name ([System.IO.Path]::GetFileNameWithoutExtension($resolvedImagePath))
+    $destinationName = ("{0:D2}-{1}{2}" -f $index, $baseName, $extension)
+    $destinationPath = Join-Path $ArchiveDir $destinationName
+    Copy-Item -LiteralPath $resolvedImagePath -Destination $destinationPath -Force
+    $archivedPaths.Add((Resolve-Path -LiteralPath $destinationPath).Path) | Out-Null
+  }
+
+  return @($archivedPaths.ToArray())
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $resolvedReportPath = Resolve-AbsolutePathIfProvided -Path $ReportPath
@@ -165,6 +229,16 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedFinalDocxPath)) {
   Ensure-ParentDirectory -Path $resolvedFinalDocxPath
 }
 
+$resolvedImageArchiveDir = if ([string]::IsNullOrWhiteSpace($ImageArchiveDir)) {
+  Join-Path $resolvedOutputDir "images"
+} else {
+  [System.IO.Path]::GetFullPath($ImageArchiveDir)
+}
+$archivedImagePaths = @()
+if ([string]::IsNullOrWhiteSpace($resolvedImageSpecsPath) -and [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
+  $archivedImagePaths = @(Copy-InputImagesToArchive -Paths $ImagePaths -ArchiveDir $resolvedImageArchiveDir)
+}
+
 $referenceUrlList = Get-NonEmptyList -Values $ReferenceUrls
 $referenceTextPathList = Get-NonEmptyList -Values $ReferenceTextPaths
 $wrapperMode = $null
@@ -198,6 +272,8 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.ImageSpecsPath = $resolvedImageSpecsPath
   } elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
     $buildParams.ImageSpecsJson = $ImageSpecsJson
+  } elseif ($archivedImagePaths.Count -gt 0) {
+    $buildParams.ImagePaths = $archivedImagePaths
   } elseif ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) {
     $buildParams.ImagePaths = $ImagePaths
   }
@@ -265,6 +341,8 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.ImageSpecsPath = $resolvedImageSpecsPath
   } elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
     $buildParams.ImageSpecsJson = $ImageSpecsJson
+  } elseif ($archivedImagePaths.Count -gt 0) {
+    $buildParams.ImagePaths = $archivedImagePaths
   } elseif ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) {
     $buildParams.ImagePaths = $ImagePaths
   }
@@ -328,6 +406,8 @@ $wrapperSummary = [pscustomobject]@{
   referenceMaxChars = $ReferenceMaxChars
   reportPath = $resolvedCopiedReportPath
   finalDocxPath = $resolvedFinalDocxDestination
+  imageArchiveDir = $(if ($archivedImagePaths.Count -gt 0) { $resolvedImageArchiveDir } else { $null })
+  archivedImagePaths = $archivedImagePaths
   summaryPath = $resolvedSummaryPath
   innerSummaryPath = $innerSummaryPath
   referenceUrls = $referenceUrlList
