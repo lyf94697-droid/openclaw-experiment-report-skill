@@ -691,6 +691,61 @@ function Set-RunFont {
   }
 }
 
+function Set-RunFontSize {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [int]$SizeHalfPoints
+  )
+
+  $runProperties = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  [void]$runProperties.Add((Get-OrCreateChildElement -Parent $pPr -LocalName "rPr"))
+
+  foreach ($run in @($Paragraph.SelectNodes("./w:r", $script:namespaceManager))) {
+    $runRPr = $run.SelectSingleNode("./w:rPr", $script:namespaceManager)
+    if ($null -eq $runRPr) {
+      $runRPr = $Paragraph.OwnerDocument.CreateElement("w", "rPr", $wordNamespace)
+      if ($run.HasChildNodes) {
+        $run.InsertBefore($runRPr, $run.FirstChild) | Out-Null
+      } else {
+        $run.AppendChild($runRPr) | Out-Null
+      }
+    }
+    [void]$runProperties.Add($runRPr)
+  }
+
+  foreach ($rPr in $runProperties) {
+    $sz = Get-OrCreateChildElement -Parent $rPr -LocalName "sz"
+    Set-WordAttribute -Element $sz -LocalName "val" -Value ([string]$SizeHalfPoints)
+    $szCs = Get-OrCreateChildElement -Parent $rPr -LocalName "szCs"
+    Set-WordAttribute -Element $szCs -LocalName "val" -Value ([string]$SizeHalfPoints)
+  }
+}
+
+function Set-RunTypography {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [string]$FontName,
+
+    [Parameter(Mandatory = $true)]
+    [int]$SizeHalfPoints,
+
+    [bool]$PreserveFontFamily = $false
+  )
+
+  if ($PreserveFontFamily) {
+    Set-RunFontSize -Paragraph $Paragraph -SizeHalfPoints $SizeHalfPoints
+  } else {
+    Set-RunFont -Paragraph $Paragraph -FontName $FontName -SizeHalfPoints $SizeHalfPoints
+  }
+}
+
 function Set-ParagraphShading {
   param(
     [Parameter(Mandatory = $true)]
@@ -802,7 +857,9 @@ function Test-IsBodyTableRow {
 function Normalize-TableRowLayout {
   param(
     [Parameter(Mandatory = $true)]
-    [System.Xml.XmlNode]$Row
+    [System.Xml.XmlNode]$Row,
+
+    [bool]$NormalizeCellMargins = $true
   )
 
   if (-not (Test-IsBodyTableRow -Row $Row)) {
@@ -820,7 +877,9 @@ function Normalize-TableRowLayout {
 
   foreach ($cell in @($Row.SelectNodes("./w:tc", $script:namespaceManager))) {
     Set-CellVerticalAlignmentTop -Cell $cell
-    Set-CellMargins -Cell $cell
+    if ($NormalizeCellMargins) {
+      Set-CellMargins -Cell $cell
+    }
   }
 
   return $true
@@ -1029,6 +1088,8 @@ try {
     }
   }
   $styleSettings = [pscustomobject]$effectiveStyleSettings
+  $useTemplateLikeCompactStyle = ([string]$profileDecision.ResolvedProfile -eq "compact")
+  $usePaginationHints = (-not $useTemplateLikeCompactStyle)
 
   $paragraphs = @($documentXml.SelectNodes("//w:p", $script:namespaceManager))
   $styledTitleCount = 0
@@ -1051,7 +1112,7 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.ImageBeforeTwips -After $styleSettings.ImageAfterTwips -Line $null
-      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $true -KeepLines $true
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledImageCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1066,8 +1127,8 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.TitleAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
-      Set-RunFont -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.TitleFontHalfPoints
-      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $true -KeepLines $true
+      Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.TitleFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledTitleCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1077,7 +1138,7 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $styleSettings.BodyLineTwips
-      Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCaptionCount++
       if ($isInTable) { $styledTableParagraphCount++ }
@@ -1089,8 +1150,8 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.HeadingBeforeTwips -After $styleSettings.HeadingAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
-      Set-RunFont -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
-      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $true -KeepLines $true
+      Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledHeadingCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1100,7 +1161,7 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.BodyLineTwips
-      Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.MetadataFontHalfPoints
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.MetadataFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
       $styledMetadataCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1110,7 +1171,7 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
-      Set-RunFont -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
+      Set-RunTypography -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
       Set-ParagraphShading -Paragraph $paragraph -Fill "F2F2F2"
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCommandCount++
@@ -1122,8 +1183,8 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.ListAfterTwips -Line $styleSettings.BodyLineTwips
-      Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.ListFontHalfPoints
-      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.ListFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledListCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1132,14 +1193,14 @@ try {
     Set-ParagraphJustification -Paragraph $paragraph -Value "left"
     Set-ParagraphIndent -Paragraph $paragraph -FirstLine $(if ($isInTable) { 0 } else { $styleSettings.BodyFirstLineTwips })
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
-    Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints
+    Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
     Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
     $styledBodyCount++
     if ($isInTable) { $styledTableParagraphCount++ }
   }
 
   foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
-    if (Normalize-TableRowLayout -Row $row) {
+    if (Normalize-TableRowLayout -Row $row -NormalizeCellMargins (-not $useTemplateLikeCompactStyle)) {
       $normalizedBodyRowCount++
     }
   }

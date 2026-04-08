@@ -965,11 +965,11 @@ URL: https://example.com/network-lab
   & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $generatedFilledDocx -ImageSpecsPath $wideScreenshotSpecsPath -Format json -OutFile $wideScreenshotImageMapPath | Out-Null
   $wideScreenshotMapRoot = (Get-Content -LiteralPath $wideScreenshotImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition (@($wideScreenshotMapRoot.images).Count -eq 2) -Message 'Wide screenshot image-map generator produced an unexpected number of images.'
-  Assert-True -Condition ($wideScreenshotMapRoot.images[0].PSObject.Properties.Name -notcontains 'layout') -Message 'Wide screenshot image-map generator should not auto-row the first wide screenshot.'
-  Assert-True -Condition ($wideScreenshotMapRoot.images[1].PSObject.Properties.Name -notcontains 'layout') -Message 'Wide screenshot image-map generator should not auto-row the second wide screenshot.'
-  Assert-True -Condition ([double]$wideScreenshotMapRoot.images[0].widthCm -eq 13.0) -Message 'Wide screenshot image-map generator did not use the wider single-image default width.'
-  Assert-True -Condition (@($wideScreenshotMapRoot.notes | Where-Object { $_ -match 'wide screenshot' }).Count -eq 2) -Message 'Wide screenshot image-map generator should explain skipped auto row layout.'
-  $results.Add('docx image-map wide screenshot auto-layout OK') | Out-Null
+  Assert-True -Condition ([string]$wideScreenshotMapRoot.images[0].layout.mode -eq 'row') -Message 'Wide screenshot image-map generator should still auto-row same-section screenshots.'
+  Assert-True -Condition ([int]$wideScreenshotMapRoot.images[0].layout.columns -eq 2) -Message 'Wide screenshot image-map generator should keep the two-column default.'
+  Assert-True -Condition ([double]$wideScreenshotMapRoot.images[0].widthCm -eq 10.5) -Message 'Wide screenshot image-map generator did not use the standard default image width.'
+  Assert-True -Condition ([string]$wideScreenshotMapRoot.images[0].layout.group -eq [string]$wideScreenshotMapRoot.images[1].layout.group) -Message 'Wide screenshot image-map generator should put same-section screenshots in one auto row group.'
+  $results.Add('docx image-map wide screenshot row layout OK') | Out-Null
 
   $sectionImageFilledDocx = Join-Path $tempRoot 'sample-template.section-images.docx'
   $sectionImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $generatedImageMapPath -OutPath $sectionImageFilledDocx
@@ -1208,6 +1208,9 @@ URL: https://example.com/network-lab
   [xml]$compactStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $compactStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
   Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="320"') -Message 'Compact styled docx is missing the expected compact line spacing.'
   Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="24"') -Message 'Compact styled docx is missing the expected 12pt body font sizing.'
+  Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:rFonts[^>]*(黑体|宋体|Consolas)')) -Message 'Compact styled docx should preserve template font families instead of forcing explicit fonts.'
+  Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:keepNext')) -Message 'Compact styled docx should not force keep-next pagination hints.'
+  Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:keepLines')) -Message 'Compact styled docx should not force keep-lines pagination hints.'
   Remove-Item -LiteralPath $compactStyledDocxTemp -Recurse -Force
 
   $customStyleProfilePath = Join-Path $tempRoot 'custom-style-profile.json'
