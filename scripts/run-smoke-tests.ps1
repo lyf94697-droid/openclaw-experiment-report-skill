@@ -358,13 +358,9 @@ try {
       (Join-Path $repoRoot 'examples\docx-image-specs.json'),
       (Join-Path $repoRoot 'examples\docx-image-specs-row.json'),
       (Join-Path $repoRoot 'examples\docx-report-metadata.json'),
-      (Join-Path $repoRoot 'examples\feishu-local-files-prompt.md'),
-      (Join-Path $repoRoot 'examples\feishu-hybrid-images-prompt.md'),
-      (Join-Path $repoRoot 'examples\feishu-one-shot-script-prompt.md'),
       (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\sample-report.txt'),
-      (Join-Path $repoRoot 'examples\e2e-sample-prompt.txt'),
       (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
@@ -438,23 +434,6 @@ try {
   Assert-True -Condition ([string]$exampleMetadata.课程名称 -eq '计算机网络') -Message 'Example docx metadata JSON is missing the expected course name.'
   Assert-True -Condition ([string]$exampleMetadata.实验性质 -eq '③验证性实验') -Message 'Example docx metadata JSON is missing the expected experiment property.'
   $results.Add('example docx metadata JSON OK') | Out-Null
-
-  $feishuPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-local-files-prompt.md') -Raw -Encoding UTF8
-  Assert-True -Condition ($feishuPromptExample -match '无法访问哪个路径') -Message 'Feishu local-files prompt example is missing the path-access guard wording.'
-  Assert-True -Condition ($feishuPromptExample -match '实验性质这一项要表现为勾选 ③验证性实验') -Message 'Feishu local-files prompt example is missing the experiment-property checkbox requirement.'
-  $results.Add('example Feishu prompt OK') | Out-Null
-
-  $feishuWrapperPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-one-shot-script-prompt.md') -Raw -Encoding UTF8
-  Assert-True -Condition ($feishuWrapperPromptExample -match 'build-report-from-feishu\.ps1') -Message 'Feishu one-shot prompt example is missing the wrapper script reference.'
-  Assert-True -Condition ($feishuWrapperPromptExample -match '-DetailLevel full') -Message 'Feishu one-shot prompt example is missing the full detail-level guidance.'
-  Assert-True -Condition ($feishuWrapperPromptExample -match '可以省略') -Message 'Feishu one-shot prompt example is missing the remembered-name guidance.'
-  $results.Add('example Feishu one-shot prompt OK') | Out-Null
-
-  $feishuHybridPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-hybrid-images-prompt.md') -Raw -Encoding UTF8
-  Assert-True -Condition ($feishuHybridPromptExample -match '上传的图片附件') -Message 'Feishu hybrid prompt example is missing the uploaded-image guidance.'
-  Assert-True -Condition ($feishuHybridPromptExample -match '最终插图仍使用我给出的本地路径文件') -Message 'Feishu hybrid prompt example is missing the local-path insertion guidance.'
-  Assert-True -Condition ($feishuHybridPromptExample -match '可以省略') -Message 'Feishu hybrid prompt example is missing the remembered-name guidance.'
-  $results.Add('example Feishu hybrid prompt OK') | Out-Null
 
   $feishuUploadedPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md') -Raw -Encoding UTF8
   Assert-True -Condition ($feishuUploadedPromptExample -match '\[media attached') -Message 'Feishu uploaded-images prompt example is missing the media-attached extraction guidance.'
@@ -1247,9 +1226,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\apply-docx-field-map.ps1')) -Message 'Install script did not copy fill script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
-  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-one-shot-script-prompt.md')) -Message 'Install script did not copy the Feishu one-shot prompt example.'
-  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-hybrid-images-prompt.md')) -Message 'Install script did not copy the Feishu hybrid prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'
