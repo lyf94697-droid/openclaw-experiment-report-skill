@@ -635,8 +635,23 @@ URL: https://example.com/network-lab
 
 四、实验步骤
 首先将两台虚拟机配置在 192.168.10.0/24 网段，其中主机 A 为 192.168.10.11，主机 B 为 192.168.10.12。
-随后在两台主机上使用 ipconfig 查看配置，确认子网掩码均为 255.255.255.0。
-最后使用 ping 验证连通性，并通过 arp -a 检查邻居缓存记录。
+1. 在主机 A 上查看地址并测试到主机 B 的连通性。
+
+ipconfig
+
+ping 192.168.10.12
+
+arp -a
+
+2. 在主机 B 上查看地址并测试到主机 A 的连通性。
+
+ipconfig
+
+ping 192.168.10.11
+
+arp -a
+
+最后对两台主机的命令输出进行核对，确认子网掩码均为 255.255.255.0。
 在实验过程中还需要反复核对网卡是否启用以及地址是否写入到正确的网络接口，避免由于配置位置错误导致测试结果失真。
 
 五、实验结果
@@ -1090,6 +1105,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($styleResult.styledCaptionCount -ge 4) -Message 'Docx style formatter did not detect enough figure captions.'
   Assert-True -Condition ($styleResult.styledImageCount -ge 4) -Message 'Docx style formatter did not detect enough image paragraphs.'
   Assert-True -Condition ($styleResult.styledMetadataCount -ge 3) -Message 'Docx style formatter did not detect enough metadata paragraphs.'
+  Assert-True -Condition ($styleResult.styledListCount -ge 2) -Message 'Docx style formatter did not detect enough numbered step paragraphs.'
+  Assert-True -Condition ($styleResult.styledCommandCount -ge 6) -Message 'Docx style formatter did not detect enough command paragraphs.'
   Assert-True -Condition ([int]$styleResult.appliedSettings.BodyLineTwips -eq 360) -Message 'Default style profile should keep the baseline body line spacing.'
 
   $styledDocxTemp = Join-Path $tempRoot 'styled-docx-inspect'
@@ -1098,6 +1115,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:jc w:val="center"') -Message 'Styled docx is missing centered paragraph formatting.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:ind w:firstLine="420"') -Message 'Styled docx is missing the expected first-line indent.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:b/?') -Message 'Styled docx is missing bold heading formatting.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:rFonts[^>]*Consolas') -Message 'Styled docx is missing Consolas command formatting.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:shd[^>]*w:fill="F2F2F2"') -Message 'Styled docx is missing shaded command paragraphs.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="240"') -Message 'Styled docx is missing single-spaced command paragraphs.'
   Remove-Item -LiteralPath $styledDocxTemp -Recurse -Force
 
   $compactStyledDocx = Join-Path $tempRoot 'sample-template.row-images.compact-styled.docx'

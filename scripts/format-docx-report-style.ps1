@@ -28,7 +28,17 @@ param(
 
   [int]$ImageBeforeTwips = 80,
 
-  [int]$ImageAfterTwips = 80
+  [int]$ImageAfterTwips = 80,
+
+  [int]$ListAfterTwips = 0,
+
+  [int]$CommandBeforeTwips = 40,
+
+  [int]$CommandAfterTwips = 40,
+
+  [int]$CommandLineTwips = 240,
+
+  [int]$CommandFontHalfPoints = 20
 )
 
 Set-StrictMode -Version Latest
@@ -58,7 +68,12 @@ $styleSettingNames = @(
   "CaptionAfterTwips",
   "TitleAfterTwips",
   "ImageBeforeTwips",
-  "ImageAfterTwips"
+  "ImageAfterTwips",
+  "ListAfterTwips",
+  "CommandBeforeTwips",
+  "CommandAfterTwips",
+  "CommandLineTwips",
+  "CommandFontHalfPoints"
 )
 
 function Get-StyleSettingNames {
@@ -83,6 +98,11 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 160
         ImageBeforeTwips = 80
         ImageAfterTwips = 80
+        ListAfterTwips = 0
+        CommandBeforeTwips = 40
+        CommandAfterTwips = 40
+        CommandLineTwips = 240
+        CommandFontHalfPoints = 20
       }
     }
     "compact" {
@@ -96,6 +116,11 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 80
         ImageBeforeTwips = 40
         ImageAfterTwips = 40
+        ListAfterTwips = 0
+        CommandBeforeTwips = 20
+        CommandAfterTwips = 20
+        CommandLineTwips = 240
+        CommandFontHalfPoints = 20
       }
     }
     "school" {
@@ -109,6 +134,11 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 220
         ImageBeforeTwips = 100
         ImageAfterTwips = 100
+        ListAfterTwips = 0
+        CommandBeforeTwips = 60
+        CommandAfterTwips = 60
+        CommandLineTwips = 240
+        CommandFontHalfPoints = 20
       }
     }
     default {
@@ -339,6 +369,45 @@ function Test-IsCaptionParagraph {
   return ($Text -match '^图\d+\s*')
 }
 
+function Test-IsStepListParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return (
+    $Text -match '^\s*[\(（]?[0-9一二三四五六七八九十]+[\)）\u3001]\s*\S+' -or
+    $Text -match '^\s*[0-9一二三四五六七八九十]+\.\s+\S+' -or
+    $Text -match '^\s*步骤\s*[一二三四五六七八九十0-9]*\s*[\.:：\u3001]?\s*\S+'
+  )
+}
+
+function Test-IsCommandParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 180) {
+    return $false
+  }
+
+  return (
+    $trimmed -match '^(?:PS\s+[^>]+>|[A-Za-z]:\\[^>]*>|>\s*)\s*\S+' -or
+    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b)(?:\s|$)' -or
+    $trimmed -match '(?i)^(?:reply from|pinging|packets:|minimum =|maximum =|ipv4 address|subnet mask|default gateway|physical address|ethernet adapter)\b'
+  )
+}
+
 function Get-OrCreateChildElement {
   param(
     [Parameter(Mandatory = $true)]
@@ -517,6 +586,65 @@ function Set-ParagraphBold {
     [void](Get-OrCreateChildElement -Parent $runRPr -LocalName "b")
     [void](Get-OrCreateChildElement -Parent $runRPr -LocalName "bCs")
   }
+}
+
+function Set-RunFont {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [string]$FontName,
+
+    [Parameter(Mandatory = $true)]
+    [int]$SizeHalfPoints
+  )
+
+  $runProperties = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  [void]$runProperties.Add((Get-OrCreateChildElement -Parent $pPr -LocalName "rPr"))
+
+  foreach ($run in @($Paragraph.SelectNodes("./w:r", $script:namespaceManager))) {
+    $runRPr = $run.SelectSingleNode("./w:rPr", $script:namespaceManager)
+    if ($null -eq $runRPr) {
+      $runRPr = $Paragraph.OwnerDocument.CreateElement("w", "rPr", $wordNamespace)
+      if ($run.HasChildNodes) {
+        $run.InsertBefore($runRPr, $run.FirstChild) | Out-Null
+      } else {
+        $run.AppendChild($runRPr) | Out-Null
+      }
+    }
+    [void]$runProperties.Add($runRPr)
+  }
+
+  foreach ($rPr in $runProperties) {
+    $rFonts = Get-OrCreateChildElement -Parent $rPr -LocalName "rFonts"
+    Set-WordAttribute -Element $rFonts -LocalName "ascii" -Value $FontName
+    Set-WordAttribute -Element $rFonts -LocalName "hAnsi" -Value $FontName
+    Set-WordAttribute -Element $rFonts -LocalName "eastAsia" -Value $FontName
+    Set-WordAttribute -Element $rFonts -LocalName "cs" -Value $FontName
+
+    $sz = Get-OrCreateChildElement -Parent $rPr -LocalName "sz"
+    Set-WordAttribute -Element $sz -LocalName "val" -Value ([string]$SizeHalfPoints)
+    $szCs = Get-OrCreateChildElement -Parent $rPr -LocalName "szCs"
+    Set-WordAttribute -Element $szCs -LocalName "val" -Value ([string]$SizeHalfPoints)
+  }
+}
+
+function Set-ParagraphShading {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Fill
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $shd = Get-OrCreateChildElement -Parent $pPr -LocalName "shd"
+  Set-WordAttribute -Element $shd -LocalName "val" -Value "clear"
+  Set-WordAttribute -Element $shd -LocalName "color" -Value "auto"
+  Set-WordAttribute -Element $shd -LocalName "fill" -Value $Fill
 }
 
 function Set-CellVerticalAlignmentTop {
@@ -811,6 +939,8 @@ try {
   $styledCaptionCount = 0
   $styledImageCount = 0
   $styledMetadataCount = 0
+  $styledListCount = 0
+  $styledCommandCount = 0
   $normalizedBodyRowCount = 0
 
   foreach ($paragraph in $paragraphs) {
@@ -863,6 +993,24 @@ try {
       continue
     }
 
+    if (Test-IsCommandParagraph -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
+      Set-RunFont -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
+      Set-ParagraphShading -Paragraph $paragraph -Fill "F2F2F2"
+      $styledCommandCount++
+      continue
+    }
+
+    if (Test-IsStepListParagraph -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.ListAfterTwips -Line $styleSettings.BodyLineTwips
+      $styledListCount++
+      continue
+    }
+
     Set-ParagraphJustification -Paragraph $paragraph -Value "left"
     Set-ParagraphIndent -Paragraph $paragraph -FirstLine $styleSettings.BodyFirstLineTwips
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
@@ -893,6 +1041,8 @@ try {
     styledCaptionCount = $styledCaptionCount
     styledImageCount = $styledImageCount
     styledMetadataCount = $styledMetadataCount
+    styledListCount = $styledListCount
+    styledCommandCount = $styledCommandCount
     normalizedBodyRowCount = $normalizedBodyRowCount
   }
 } finally {
