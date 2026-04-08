@@ -557,6 +557,7 @@ $cleanedReportText = Normalize-GeneratedReportText -Text $rawReportText -Labels 
 [System.IO.File]::WriteAllText($cleanedReportPath, $cleanedReportText, (New-Object System.Text.UTF8Encoding($true)))
 
 $buildSummaryPath = $null
+$buildSummary = $null
 $finalDocxPath = $null
 if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   $buildParams = @{
@@ -652,6 +653,10 @@ $wrapperSummary = [pscustomobject]@{
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
   buildSummaryPath = $buildSummaryPath
+  layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
+  layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
+  layoutCheckErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckErrorCount") { $buildSummary.layoutCheckErrorCount } else { $null })
+  layoutCheckWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckWarningCount") { $buildSummary.layoutCheckWarningCount } else { $null })
   finalDocxPath = $finalDocxPath
 }
 [System.IO.File]::WriteAllText($wrapperSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))

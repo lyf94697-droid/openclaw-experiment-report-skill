@@ -367,6 +367,7 @@ try {
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
       (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1'),
       (Join-Path $repoRoot 'scripts\build-report-from-url.ps1'),
+      (Join-Path $repoRoot 'scripts\check-docx-layout.ps1'),
       (Join-Path $repoRoot 'scripts\extract-docx-template.ps1'),
       (Join-Path $repoRoot 'scripts\fetch-csdn-article.ps1'),
       (Join-Path $repoRoot 'scripts\fetch-web-article.ps1'),
@@ -981,6 +982,18 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($imageContentTypesXml.Types.Default | Where-Object { $_.Extension -eq 'png' -and $_.ContentType -eq 'image/png' }).Count -ge 1) -Message 'Inserted docx is missing the png content type registration.'
   $results.Add('docx image insertion OK') | Out-Null
 
+  $layoutCheckPath = Join-Path $tempRoot 'sample-template.images.layout-check.json'
+  & (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $imageFilledDocx -ExpectedImageCount 2 -ExpectedCaptionCount 2 -OutFile $layoutCheckPath | Out-Null
+  $layoutCheck = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([int]$layoutCheck.actual.imageDrawingCount -eq 2) -Message 'Layout check did not count the expected inserted images.'
+  Assert-True -Condition ([int]$layoutCheck.actual.captionCount -eq 2) -Message 'Layout check did not count the expected figure captions.'
+  Assert-True -Condition (-not [bool]$layoutCheck.passed) -Message 'Layout check should fail when the image fixture still has template placeholders.'
+  Assert-True -Condition (@($layoutCheck.errors | Where-Object { $_.code -eq 'remaining-placeholders' }).Count -eq 1) -Message 'Layout check did not report remaining placeholders in the image fixture.'
+  $placeholderLayoutCheck = (& (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $sampleDocx -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition (-not [bool]$placeholderLayoutCheck.passed) -Message 'Layout check should fail when the template still has placeholders.'
+  Assert-True -Condition (@($placeholderLayoutCheck.errors | Where-Object { $_.code -eq 'remaining-placeholders' }).Count -eq 1) -Message 'Layout check did not report remaining placeholders.'
+  $results.Add('docx layout check OK') | Out-Null
+
   $rowImageSpecsPath = Join-Path $tempRoot 'row-image-specs.json'
   @"
 {
@@ -1061,6 +1074,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图1 主机 A 的 ping 测试结果') -Message 'Row-layout image insertion is missing the first row caption.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图4 主机 B 的 arp -a 邻居缓存结果') -Message 'Row-layout image insertion is missing the final row caption.'
   Remove-Item -LiteralPath $rowImageTemp -Recurse -Force
+  $rowLayoutCheck = (& (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $rowImageFilledDocx -ExpectedImageCount 4 -ExpectedCaptionCount 4 -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$rowLayoutCheck.passed) -Message 'Layout check should pass for the filled row-image fixture.'
+  Assert-True -Condition ([int]$rowLayoutCheck.actual.imageDrawingCount -eq 4) -Message 'Layout check did not count the expected row-layout images.'
+  Assert-True -Condition ([int]$rowLayoutCheck.actual.captionCount -eq 4) -Message 'Layout check did not count the expected row-layout captions.'
   $results.Add('docx image insertion row layout OK') | Out-Null
 
   $styledDocx = Join-Path $tempRoot 'sample-template.row-images.styled.docx'
@@ -1169,8 +1186,12 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.docx')) -Message 'build-report did not create the filled docx.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.docx')) -Message 'build-report did not create the image-filled docx.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.styled.docx')) -Message 'build-report did not create the styled docx.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'layout-check.json')) -Message 'build-report did not create the layout check JSON.'
   $buildReportSummary = (Get-Content -LiteralPath (Join-Path $buildReportOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([bool]$buildReportSummary.validationPassed) -Message 'build-report summary reported a failed validation result.'
+  Assert-True -Condition ([bool]$buildReportSummary.layoutCheckPassed) -Message 'build-report summary reported a failed layout check.'
+  Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
+  Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
   Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report summary did not preserve the requested auto style profile.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfilePath -eq $buildStyleProfilePath) -Message 'build-report summary is missing the custom style profile path.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'default') -Message 'build-report summary should resolve the sample template to the default style profile.'
@@ -1200,6 +1221,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Split-Path -Parent $feishuBuildSummary.finalDocxPath) -eq $feishuBuildOutputDir) -Message 'Feishu wrapper should copy the final docx to the output root.'
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
   Assert-True -Condition ([string]$feishuBuildSummary.artifactsDir -eq (Join-Path $feishuBuildOutputDir 'artifacts')) -Message 'Feishu wrapper summary is missing the expected artifacts directory.'
+  Assert-True -Condition ([bool]$feishuBuildSummary.layoutCheckPassed) -Message 'Feishu wrapper summary reported a failed layout check.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.layoutCheckPath)) -Message 'Feishu wrapper summary layout check path does not exist.'
   $results.Add('Feishu wrapper pipeline OK') | Out-Null
 
   $installRoot = Join-Path $tempRoot 'install-root'
@@ -1216,6 +1239,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report.ps1')) -Message 'Install script did not copy build-report script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-feishu.ps1')) -Message 'Install script did not copy Feishu wrapper script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-url.ps1')) -Message 'Install script did not copy build-report-from-url script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\check-docx-layout.ps1')) -Message 'Install script did not copy layout check script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\fetch-web-article.ps1')) -Message 'Install script did not copy web fetch script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\format-docx-report-style.ps1')) -Message 'Install script did not copy style formatter script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-field-map.ps1')) -Message 'Install script did not copy field-map generator script.'

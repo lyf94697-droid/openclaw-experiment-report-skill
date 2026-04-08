@@ -96,6 +96,10 @@ $filledWithImagesOutlinePath = $null
 $styledOutlinePath = $null
 $styleResult = $null
 $summaryPath = Join-Path $resolvedOutputDir "summary.json"
+$layoutCheckPath = Join-Path $resolvedOutputDir "layout-check.json"
+$layoutCheckResult = $null
+$expectedLayoutImageCount = -1
+$expectedLayoutCaptionCount = -1
 
 $validationResult = $null
 if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath) -or -not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
@@ -161,6 +165,14 @@ if ($imageInputsProvided) {
   }
 
   & (Join-Path $repoRoot "scripts\generate-docx-image-map.ps1") @imageMapParams | Out-Null
+  $generatedImageMap = (Get-Content -LiteralPath $resolvedImageMapOutPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  if ($null -ne $generatedImageMap -and $generatedImageMap.PSObject.Properties.Name -contains "images") {
+    $expectedLayoutImageCount = @($generatedImageMap.images).Count
+    $expectedLayoutCaptionCount = @($generatedImageMap.images | Where-Object {
+        $_.PSObject.Properties.Name -contains "caption" -and -not [string]::IsNullOrWhiteSpace([string]$_.caption)
+      }).Count
+  }
+
   & (Join-Path $repoRoot "scripts\insert-docx-images.ps1") -DocxPath $resolvedFilledDocxOutPath -MappingPath $resolvedImageMapOutPath -OutPath $resolvedFilledDocxWithImagesOutPath -Overwrite | Out-Null
 
   $filledWithImagesOutlinePath = Join-Path $resolvedOutputDir "filled-template-with-images-outline.md"
@@ -201,6 +213,20 @@ $finalDocxPath = if ($null -ne $resolvedStyledDocxOutPath) {
   $resolvedFilledDocxOutPath
 }
 
+$layoutCheckParams = @{
+  DocxPath = $finalDocxPath
+  Format = "json"
+  OutFile = $layoutCheckPath
+}
+if ($expectedLayoutImageCount -ge 0) {
+  $layoutCheckParams.ExpectedImageCount = $expectedLayoutImageCount
+}
+if ($expectedLayoutCaptionCount -ge 0) {
+  $layoutCheckParams.ExpectedCaptionCount = $expectedLayoutCaptionCount
+}
+& (Join-Path $repoRoot "scripts\check-docx-layout.ps1") @layoutCheckParams | Out-Null
+$layoutCheckResult = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
+
 $summary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
   templatePath = $resolvedTemplatePath
@@ -214,6 +240,12 @@ $summary = [pscustomobject]@{
   filledWithImagesOutlinePath = $filledWithImagesOutlinePath
   styledDocxPath = $resolvedStyledDocxOutPath
   styledOutlinePath = $styledOutlinePath
+  layoutCheckPath = $layoutCheckPath
+  layoutCheckPassed = $(if ($null -ne $layoutCheckResult) { [bool]$layoutCheckResult.passed } else { $null })
+  layoutCheckErrorCount = $(if ($null -ne $layoutCheckResult) { [int]$layoutCheckResult.summary.errorCount } else { $null })
+  layoutCheckWarningCount = $(if ($null -ne $layoutCheckResult) { [int]$layoutCheckResult.summary.warningCount } else { $null })
+  expectedLayoutImageCount = $(if ($expectedLayoutImageCount -ge 0) { $expectedLayoutImageCount } else { $null })
+  expectedLayoutCaptionCount = $(if ($expectedLayoutCaptionCount -ge 0) { $expectedLayoutCaptionCount } else { $null })
   requestedStyleProfile = $(if ($styleOutputRequested) { $StyleProfile } else { $null })
   styleProfilePath = $(if ($null -ne $styleResult) { [string]$styleResult.profilePath } elseif (-not [string]::IsNullOrWhiteSpace($StyleProfilePath)) { (Resolve-Path -LiteralPath $StyleProfilePath).Path } else { $null })
   styleProfile = $(if ($null -ne $styleResult) { [string]$styleResult.styleProfile } else { $null })
@@ -238,6 +270,7 @@ if ($null -ne $resolvedStyledDocxOutPath) {
   Write-Output ("Styled docx path: {0}" -f $resolvedStyledDocxOutPath)
 }
 Write-Output ("Final docx path: {0}" -f $finalDocxPath)
+Write-Output ("Layout check path: {0}" -f $layoutCheckPath)
 Write-Output ("Summary path: {0}" -f $summaryPath)
 
 if ($null -ne $validationResult -and -not $validationResult.passed) {
