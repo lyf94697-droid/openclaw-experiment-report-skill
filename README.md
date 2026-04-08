@@ -154,6 +154,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 在实验名称不变时，后续运行 can omit `-ExperimentName`
 - `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
+- 多张图片连续归入同一实验章节时，插图流程会默认使用每行 2 张的自动分组布局；显式 `ImageSpecs` 里的 `layout` 配置仍然优先生效
 
 ### 4. 飞书或直聊场景补充
 
@@ -162,6 +163,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 最稳的方式不是让模型临场拼很多中间 JSON，而是直接调用 `scripts/build-report-from-feishu.ps1`
 - 如果你 uploaded images and you also provide local image paths，建议把上传图片当作语义参考，把本地路径当作最终 `docx` 插图文件来源
 - 如果运行时把附件提示注入成类似 `media/inbound/example.png` 这样的相对路径，这些路径也可以继续作为 `-ImagePaths` 传给插图流程
+- 对于未标注章节的多张截图，脚本会按上传顺序优先把前半归入实验步骤、后半归入实验结果，再对同章节连续图片应用 2 列布局
 - 如果聊天运行时根本没有暴露真实附件路径，就应该明确说不能直接插图，而不是假装已经写进 `docx`
 
 ### 5. 本地验证

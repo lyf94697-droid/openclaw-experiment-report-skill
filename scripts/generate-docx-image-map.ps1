@@ -687,6 +687,71 @@ function Apply-RowGroupAnchors {
   }
 }
 
+function Apply-AutoRowLayouts {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object[]]$Entries,
+
+    [Parameter(Mandatory = $true)]
+    [object]$Notes,
+
+    [int]$Columns = 2
+  )
+
+  if ($Columns -lt 2) {
+    throw "Auto row layout must use at least 2 columns."
+  }
+
+  $index = 0
+  $groupIndex = 0
+  while ($index -lt $Entries.Count) {
+    $entry = $Entries[$index]
+    if ($null -ne $entry.Layout -or -not [string]::IsNullOrWhiteSpace([string]$entry.Anchor)) {
+      $index++
+      continue
+    }
+
+    $sectionId = [string]$entry.ResolvedSectionId
+    $runEntries = New-Object System.Collections.Generic.List[object]
+    while ($index -lt $Entries.Count) {
+      $candidate = $Entries[$index]
+      if (
+        $null -ne $candidate.Layout -or
+        -not [string]::IsNullOrWhiteSpace([string]$candidate.Anchor) -or
+        [string]$candidate.ResolvedSectionId -ne $sectionId
+      ) {
+        break
+      }
+
+      $runEntries.Add($candidate) | Out-Null
+      $index++
+    }
+
+    $layoutEntryCount = [int]([Math]::Floor($runEntries.Count / [double]$Columns) * $Columns)
+    if ($layoutEntryCount -lt $Columns) {
+      continue
+    }
+
+    $groupIndex++
+    $groupName = "auto-{0}-{1:D2}" -f $sectionId, $groupIndex
+    $groupAnchor = [string]$runEntries[0].OutputEntry["section"]
+    for ($runIndex = 0; $runIndex -lt $layoutEntryCount; $runIndex++) {
+      $layoutOutput = [ordered]@{
+        mode = "row"
+        columns = $Columns
+        group = $groupName
+        groupAnchor = $groupAnchor
+      }
+
+      $runEntry = $runEntries[$runIndex]
+      $runEntry.OutputEntry["layout"] = $layoutOutput
+      $runEntry.Layout = $layoutOutput
+    }
+
+    $Notes.Add(("Auto row layout grouped {0} image(s) for {1} with {2} columns." -f $layoutEntryCount, $groupAnchor, $Columns)) | Out-Null
+  }
+}
+
 function Add-DiscoveredSection {
   param(
     [Parameter(Mandatory = $true)]
@@ -800,10 +865,12 @@ function Get-FallbackSectionId {
     [string[]]$AvailableSectionIds
   )
 
+  $stepResultSplitIndex = [int][Math]::Ceiling($Total / 2.0)
+
   foreach ($preferred in @(
       $(if ($Total -eq 1) { "steps" } else { $null }),
-      $(if ($Index -eq 1) { "steps" } else { $null }),
-      $(if ($Index -eq $Total) { "result" } else { $null }),
+      $(if ($Total -gt 1 -and $Index -le $stepResultSplitIndex) { "steps" } else { $null }),
+      $(if ($Total -gt 1 -and $Index -gt $stepResultSplitIndex) { "result" } else { $null }),
       "steps",
       "result",
       "environment",
@@ -929,6 +996,7 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
     }) | Out-Null
 }
 
+Apply-AutoRowLayouts -Entries ($resolvedImageEntries.ToArray()) -Notes $notes -Columns 2
 Apply-RowGroupAnchors -Entries ($resolvedImageEntries.ToArray()) -Notes $notes
 
 $resultImages = New-Object System.Collections.Generic.List[object]

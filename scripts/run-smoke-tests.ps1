@@ -457,7 +457,7 @@ try {
 
   $feishuUploadedPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md') -Raw -Encoding UTF8
   Assert-True -Condition ($feishuUploadedPromptExample -match '\[media attached') -Message 'Feishu uploaded-images prompt example is missing the media-attached extraction guidance.'
-  Assert-True -Condition ($feishuUploadedPromptExample -match '最终 docx 也要把这些附件图片真正插进去') -Message 'Feishu uploaded-images prompt example is missing the final docx insertion requirement.'
+  Assert-True -Condition ($feishuUploadedPromptExample -match '最终 docx 必须真正插入图片文件') -Message 'Feishu uploaded-images prompt example is missing the final docx insertion requirement.'
   Assert-True -Condition ($feishuUploadedPromptExample -match '可以省略') -Message 'Feishu uploaded-images prompt example is missing the remembered-name guidance.'
   $results.Add('example Feishu uploaded-images prompt OK') | Out-Null
 
@@ -888,8 +888,8 @@ URL: https://example.com/network-lab
   $workspaceMediaDir = Join-Path (Split-Path -Parent $repoRoot) 'media\inbound'
   New-Item -ItemType Directory -Path $workspaceMediaDir -Force | Out-Null
   $uploadedImageSuffix = [System.Guid]::NewGuid().ToString('N')
-  $uploadedImageOneName = "smoke-uploaded-$uploadedImageSuffix-1.png"
-  $uploadedImageTwoName = "smoke-uploaded-$uploadedImageSuffix-2.png"
+  $uploadedImageOneName = "smoke-uploaded-result-$uploadedImageSuffix-1.png"
+  $uploadedImageTwoName = "smoke-uploaded-result-$uploadedImageSuffix-2.png"
   $uploadedImageOnePath = Join-Path $workspaceMediaDir $uploadedImageOneName
   $uploadedImageTwoPath = Join-Path $workspaceMediaDir $uploadedImageTwoName
   Copy-Item -LiteralPath $sampleImageOne -Destination $uploadedImageOnePath -Force
@@ -904,6 +904,9 @@ URL: https://example.com/network-lab
     $uploadedRelativeImageMapRoot = (Get-Content -LiteralPath $uploadedRelativeImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].path -eq $uploadedImageOnePath) -Message 'Image-map generator did not resolve the first uploaded relative media path against the workspace root.'
     Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[1].path -eq $uploadedImageTwoPath) -Message 'Image-map generator did not resolve the second uploaded relative media path against the workspace root.'
+    Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].layout.mode -eq 'row') -Message 'Image-map generator should add row layout for same-section uploaded image paths.'
+    Assert-True -Condition ([int]$uploadedRelativeImageMapRoot.images[0].layout.columns -eq 2) -Message 'Image-map generator should use 2 columns for auto row layout.'
+    Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].layout.group -eq [string]$uploadedRelativeImageMapRoot.images[1].layout.group) -Message 'Image-map generator should put same-section uploaded image paths in one auto row group.'
 
     $uploadedRelativeFilledDocx = Join-Path $tempRoot 'sample-template.uploaded-relative-images.docx'
     $uploadedRelativeInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $uploadedRelativeImageMapPath -OutPath $uploadedRelativeFilledDocx
