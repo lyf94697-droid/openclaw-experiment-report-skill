@@ -452,6 +452,12 @@ try {
   Assert-True -Condition ($localUploadedPromptExample -match '最终 docx 必须真正插入图片文件') -Message 'Local uploaded-images prompt example is missing the final docx insertion requirement.'
   $results.Add('example local uploaded-images prompt OK') | Out-Null
 
+  $oneShotUploadedPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\one-shot-uploaded-images-docx-prompt.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($oneShotUploadedPromptExample -match '不要中途让我确认') -Message 'One-shot uploaded-images prompt example is missing the no-confirmation guidance.'
+  Assert-True -Condition ($oneShotUploadedPromptExample -match '-PlanOnly') -Message 'One-shot uploaded-images prompt example is missing the image placement planning command.'
+  Assert-True -Condition ($oneShotUploadedPromptExample -match '低置信度') -Message 'One-shot uploaded-images prompt example is missing the low-confidence handling guidance.'
+  $results.Add('example one-shot uploaded-images prompt OK') | Out-Null
+
   $exampleRequirements = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ($null -ne $exampleRequirements) -Message 'Example e2e requirements JSON did not parse.'
   Assert-True -Condition ($exampleRequirements.sections.Count -ge 7) -Message 'Example e2e requirements JSON is missing required sections.'
