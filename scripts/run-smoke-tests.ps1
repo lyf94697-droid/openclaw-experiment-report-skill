@@ -362,6 +362,7 @@ try {
       (Join-Path $repoRoot 'examples\feishu-hybrid-images-prompt.md'),
       (Join-Path $repoRoot 'examples\feishu-one-shot-script-prompt.md'),
       (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md'),
+      (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\sample-report.txt'),
       (Join-Path $repoRoot 'examples\e2e-sample-prompt.txt'),
       (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
@@ -460,6 +461,12 @@ try {
   Assert-True -Condition ($feishuUploadedPromptExample -match '最终 docx 必须真正插入图片文件') -Message 'Feishu uploaded-images prompt example is missing the final docx insertion requirement.'
   Assert-True -Condition ($feishuUploadedPromptExample -match '可以省略') -Message 'Feishu uploaded-images prompt example is missing the remembered-name guidance.'
   $results.Add('example Feishu uploaded-images prompt OK') | Out-Null
+
+  $localUploadedPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($localUploadedPromptExample -match '\[media attached') -Message 'Local uploaded-images prompt example is missing the media-attached extraction guidance.'
+  Assert-True -Condition ($localUploadedPromptExample -match '本地上传图片直接插入 docx') -Message 'Local uploaded-images prompt example is missing the local-upload insertion guard.'
+  Assert-True -Condition ($localUploadedPromptExample -match '最终 docx 必须真正插入图片文件') -Message 'Local uploaded-images prompt example is missing the final docx insertion requirement.'
+  $results.Add('example local uploaded-images prompt OK') | Out-Null
 
   $exampleRequirements = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ($null -ne $exampleRequirements) -Message 'Example e2e requirements JSON did not parse.'
