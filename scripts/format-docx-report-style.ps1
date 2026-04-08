@@ -136,7 +136,7 @@ function Get-StyleProfileSettings {
         BodyAfterTwips = 0
         HeadingBeforeTwips = 80
         HeadingAfterTwips = 40
-        CaptionAfterTwips = 40
+        CaptionAfterTwips = 80
         TitleAfterTwips = 80
         ImageBeforeTwips = 40
         ImageAfterTwips = 40
@@ -1127,7 +1127,9 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.TitleAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
-      Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.TitleFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.TitleFontHalfPoints
+      }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledTitleCount++
       if ($isInTable) { $styledTableParagraphCount++ }
@@ -1137,8 +1139,10 @@ try {
     if (Test-IsCaptionParagraph -Text $text) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
-      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $styleSettings.BodyLineTwips
-      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $(if ($useTemplateLikeCompactStyle) { $null } else { $styleSettings.BodyLineTwips })
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints
+      }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCaptionCount++
       if ($isInTable) { $styledTableParagraphCount++ }
@@ -1150,7 +1154,9 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.HeadingBeforeTwips -After $styleSettings.HeadingAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
-      Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
+      }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledHeadingCount++
       if ($isInTable) { $styledTableParagraphCount++ }
@@ -1161,7 +1167,9 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.BodyLineTwips
-      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.MetadataFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.MetadataFontHalfPoints
+      }
       $styledMetadataCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
@@ -1171,7 +1179,9 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
-      Set-RunTypography -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
+      }
       Set-ParagraphShading -Paragraph $paragraph -Fill "F2F2F2"
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCommandCount++
@@ -1183,7 +1193,9 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.ListAfterTwips -Line $styleSettings.BodyLineTwips
-      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.ListFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.ListFontHalfPoints
+      }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledListCount++
       if ($isInTable) { $styledTableParagraphCount++ }
@@ -1193,7 +1205,9 @@ try {
     Set-ParagraphJustification -Paragraph $paragraph -Value "left"
     Set-ParagraphIndent -Paragraph $paragraph -FirstLine $(if ($isInTable) { 0 } else { $styleSettings.BodyFirstLineTwips })
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
-    Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints -PreserveFontFamily $useTemplateLikeCompactStyle
+    if (-not $useTemplateLikeCompactStyle) {
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints
+    }
     Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
     $styledBodyCount++
     if ($isInTable) { $styledTableParagraphCount++ }

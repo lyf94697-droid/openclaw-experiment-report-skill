@@ -1207,8 +1207,8 @@ URL: https://example.com/network-lab
   [System.IO.Compression.ZipFile]::ExtractToDirectory($compactStyledDocx, $compactStyledDocxTemp)
   [xml]$compactStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $compactStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
   Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="320"') -Message 'Compact styled docx is missing the expected compact line spacing.'
-  Assert-True -Condition ($compactStyledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="24"') -Message 'Compact styled docx is missing the expected 12pt body font sizing.'
   Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:rFonts[^>]*(黑体|宋体|Consolas)')) -Message 'Compact styled docx should preserve template font families instead of forcing explicit fonts.'
+  Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="24"')) -Message 'Compact styled docx should preserve template font sizes instead of forcing 12pt direct sizing.'
   Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:keepNext')) -Message 'Compact styled docx should not force keep-next pagination hints.'
   Assert-True -Condition (-not ($compactStyledDocumentXml.OuterXml -match 'w:keepLines')) -Message 'Compact styled docx should not force keep-lines pagination hints.'
   Remove-Item -LiteralPath $compactStyledDocxTemp -Recurse -Force
