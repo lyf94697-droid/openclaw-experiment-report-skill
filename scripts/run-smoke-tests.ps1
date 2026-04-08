@@ -1122,6 +1122,16 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($rowImageWidthsCm | Where-Object { $_ -ge 10.2 }).Count -eq 0) -Message 'Row-layout image insertion did not shrink images that were too wide for two columns.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图1 主机 A 的 ping 测试结果') -Message 'Row-layout image insertion is missing the first row caption.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图4 主机 B 的 arp -a 邻居缓存结果') -Message 'Row-layout image insertion is missing the final row caption.'
+  $rowImageDocumentText = $rowImageDocumentXml.OuterXml
+  $resultBodyIndex = $rowImageDocumentText.IndexOf('通过 arp -a 可以看到对端主机的缓存记录')
+  $firstRowCaptionIndex = $rowImageDocumentText.IndexOf('图1 主机 A 的 ping 测试结果')
+  $finalRowCaptionIndex = $rowImageDocumentText.IndexOf('图4 主机 B 的 arp -a 邻居缓存结果')
+  $sectionBoundaryIndex = $rowImageDocumentText.IndexOf('问题分析', $resultBodyIndex)
+  if ($sectionBoundaryIndex -lt 0) {
+    $sectionBoundaryIndex = $rowImageDocumentText.IndexOf('<w:sectPr', $resultBodyIndex)
+  }
+  Assert-True -Condition ($resultBodyIndex -ge 0 -and $firstRowCaptionIndex -gt $resultBodyIndex) -Message 'Row-layout image insertion should place section-targeted images after the section body, not immediately after the heading.'
+  Assert-True -Condition ($sectionBoundaryIndex -gt $finalRowCaptionIndex) -Message 'Row-layout image insertion should keep section-targeted images before the next section boundary.'
   Remove-Item -LiteralPath $rowImageTemp -Recurse -Force
   $rowLayoutCheck = (& (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $rowImageFilledDocx -ExpectedImageCount 4 -ExpectedCaptionCount 4 -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$rowLayoutCheck.passed) -Message 'Layout check should pass for the filled row-image fixture.'
