@@ -1139,6 +1139,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($styleResult.styledMetadataCount -ge 3) -Message 'Docx style formatter did not detect enough metadata paragraphs.'
   Assert-True -Condition ($styleResult.styledListCount -ge 2) -Message 'Docx style formatter did not detect enough numbered step paragraphs.'
   Assert-True -Condition ($styleResult.styledCommandCount -ge 6) -Message 'Docx style formatter did not detect enough command paragraphs.'
+  Assert-True -Condition ($styleResult.styledTableParagraphCount -ge 4) -Message 'Docx style formatter did not style expected table paragraphs.'
   Assert-True -Condition ([int]$styleResult.appliedSettings.BodyLineTwips -eq 360) -Message 'Default style profile should keep the baseline body line spacing.'
 
   $styledDocxTemp = Join-Path $tempRoot 'styled-docx-inspect'
@@ -1148,8 +1149,16 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:ind w:firstLine="420"') -Message 'Styled docx is missing the expected first-line indent.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:b/?') -Message 'Styled docx is missing bold heading formatting.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:rFonts[^>]*Consolas') -Message 'Styled docx is missing Consolas command formatting.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:rFonts[^>]*黑体') -Message 'Styled docx is missing heading/title font formatting.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:rFonts[^>]*宋体') -Message 'Styled docx is missing body/caption font formatting.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="24"') -Message 'Styled docx is missing 12pt body font sizing.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:sz[^>]*w:val="21"') -Message 'Styled docx is missing 10.5pt caption font sizing.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:shd[^>]*w:fill="F2F2F2"') -Message 'Styled docx is missing shaded command paragraphs.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="240"') -Message 'Styled docx is missing single-spaced command paragraphs.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:keepNext') -Message 'Styled docx is missing keep-next pagination hints.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:keepLines') -Message 'Styled docx is missing keep-lines pagination hints.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:tcMar') -Message 'Styled docx is missing table cell margin normalization.'
+  Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:vAlign[^>]*w:val="top"') -Message 'Styled docx is missing top-aligned table cell formatting.'
   Remove-Item -LiteralPath $styledDocxTemp -Recurse -Force
 
   $compactStyledDocx = Join-Path $tempRoot 'sample-template.row-images.compact-styled.docx'

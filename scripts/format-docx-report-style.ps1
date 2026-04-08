@@ -30,6 +30,18 @@ param(
 
   [int]$ImageAfterTwips = 80,
 
+  [int]$TitleFontHalfPoints = 32,
+
+  [int]$HeadingFontHalfPoints = 28,
+
+  [int]$BodyFontHalfPoints = 24,
+
+  [int]$CaptionFontHalfPoints = 21,
+
+  [int]$MetadataFontHalfPoints = 24,
+
+  [int]$ListFontHalfPoints = 24,
+
   [int]$ListAfterTwips = 0,
 
   [int]$CommandBeforeTwips = 40,
@@ -69,6 +81,12 @@ $styleSettingNames = @(
   "TitleAfterTwips",
   "ImageBeforeTwips",
   "ImageAfterTwips",
+  "TitleFontHalfPoints",
+  "HeadingFontHalfPoints",
+  "BodyFontHalfPoints",
+  "CaptionFontHalfPoints",
+  "MetadataFontHalfPoints",
+  "ListFontHalfPoints",
   "ListAfterTwips",
   "CommandBeforeTwips",
   "CommandAfterTwips",
@@ -98,6 +116,12 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 160
         ImageBeforeTwips = 80
         ImageAfterTwips = 80
+        TitleFontHalfPoints = 32
+        HeadingFontHalfPoints = 28
+        BodyFontHalfPoints = 24
+        CaptionFontHalfPoints = 21
+        MetadataFontHalfPoints = 24
+        ListFontHalfPoints = 24
         ListAfterTwips = 0
         CommandBeforeTwips = 40
         CommandAfterTwips = 40
@@ -116,6 +140,12 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 80
         ImageBeforeTwips = 40
         ImageAfterTwips = 40
+        TitleFontHalfPoints = 32
+        HeadingFontHalfPoints = 28
+        BodyFontHalfPoints = 24
+        CaptionFontHalfPoints = 21
+        MetadataFontHalfPoints = 24
+        ListFontHalfPoints = 24
         ListAfterTwips = 0
         CommandBeforeTwips = 20
         CommandAfterTwips = 20
@@ -134,6 +164,12 @@ function Get-StyleProfileSettings {
         TitleAfterTwips = 220
         ImageBeforeTwips = 100
         ImageAfterTwips = 100
+        TitleFontHalfPoints = 32
+        HeadingFontHalfPoints = 28
+        BodyFontHalfPoints = 24
+        CaptionFontHalfPoints = 21
+        MetadataFontHalfPoints = 24
+        ListFontHalfPoints = 24
         ListAfterTwips = 0
         CommandBeforeTwips = 60
         CommandAfterTwips = 60
@@ -562,6 +598,30 @@ function Set-ParagraphSpacing {
   }
 }
 
+function Set-ParagraphPagination {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [bool]$KeepNext = $false,
+
+    [bool]$KeepLines = $false
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  if ($KeepNext) {
+    [void](Get-OrCreateChildElement -Parent $pPr -LocalName "keepNext")
+  } else {
+    [void](Remove-WordChildElement -Parent $pPr -LocalName "keepNext")
+  }
+
+  if ($KeepLines) {
+    [void](Get-OrCreateChildElement -Parent $pPr -LocalName "keepLines")
+  } else {
+    [void](Remove-WordChildElement -Parent $pPr -LocalName "keepLines")
+  }
+}
+
 function Set-ParagraphBold {
   param(
     [Parameter(Mandatory = $true)]
@@ -658,6 +718,43 @@ function Set-CellVerticalAlignmentTop {
   Set-WordAttribute -Element $vAlign -LocalName "val" -Value "top"
 }
 
+function Set-CellMargins {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Cell,
+
+    [int]$TopTwips = 60,
+
+    [int]$BottomTwips = 60,
+
+    [int]$LeftTwips = 80,
+
+    [int]$RightTwips = 80
+  )
+
+  $tcPr = Get-OrCreateCellProperties -Cell $Cell
+  $tcMar = Get-OrCreateChildElement -Parent $tcPr -LocalName "tcMar"
+  foreach ($marginSpec in @(
+      @{ Name = "top"; Value = $TopTwips },
+      @{ Name = "bottom"; Value = $BottomTwips },
+      @{ Name = "left"; Value = $LeftTwips },
+      @{ Name = "right"; Value = $RightTwips }
+    )) {
+    $margin = Get-OrCreateChildElement -Parent $tcMar -LocalName $marginSpec.Name
+    Set-WordAttribute -Element $margin -LocalName "w" -Value ([string]$marginSpec.Value)
+    Set-WordAttribute -Element $margin -LocalName "type" -Value "dxa"
+  }
+}
+
+function Test-IsParagraphInTable {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph
+  )
+
+  return ($null -ne $Paragraph.SelectSingleNode("ancestor::w:tbl", $script:namespaceManager))
+}
+
 function Test-IsBodyTableRow {
   param(
     [Parameter(Mandatory = $true)]
@@ -723,6 +820,7 @@ function Normalize-TableRowLayout {
 
   foreach ($cell in @($Row.SelectNodes("./w:tc", $script:namespaceManager))) {
     Set-CellVerticalAlignmentTop -Cell $cell
+    Set-CellMargins -Cell $cell
   }
 
   return $true
@@ -941,17 +1039,21 @@ try {
   $styledMetadataCount = 0
   $styledListCount = 0
   $styledCommandCount = 0
+  $styledTableParagraphCount = 0
   $normalizedBodyRowCount = 0
 
   foreach ($paragraph in $paragraphs) {
     $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $script:namespaceManager
     $hasDrawing = ($null -ne $paragraph.SelectSingleNode(".//w:drawing", $script:namespaceManager))
+    $isInTable = Test-IsParagraphInTable -Paragraph $paragraph
 
     if ($hasDrawing) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.ImageBeforeTwips -After $styleSettings.ImageAfterTwips -Line $null
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $true -KeepLines $true
       $styledImageCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
@@ -964,7 +1066,10 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.TitleAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
+      Set-RunFont -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.TitleFontHalfPoints
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $true -KeepLines $true
       $styledTitleCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
@@ -972,7 +1077,10 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $styleSettings.BodyLineTwips
+      Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
       $styledCaptionCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
@@ -981,7 +1089,10 @@ try {
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.HeadingBeforeTwips -After $styleSettings.HeadingAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
+      Set-RunFont -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $true -KeepLines $true
       $styledHeadingCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
@@ -989,7 +1100,9 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.BodyLineTwips
+      Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.MetadataFontHalfPoints
       $styledMetadataCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
@@ -999,7 +1112,9 @@ try {
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
       Set-RunFont -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
       Set-ParagraphShading -Paragraph $paragraph -Fill "F2F2F2"
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
       $styledCommandCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
@@ -1007,14 +1122,20 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.ListAfterTwips -Line $styleSettings.BodyLineTwips
+      Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.ListFontHalfPoints
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
       $styledListCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
 
     Set-ParagraphJustification -Paragraph $paragraph -Value "left"
-    Set-ParagraphIndent -Paragraph $paragraph -FirstLine $styleSettings.BodyFirstLineTwips
+    Set-ParagraphIndent -Paragraph $paragraph -FirstLine $(if ($isInTable) { 0 } else { $styleSettings.BodyFirstLineTwips })
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
+    Set-RunFont -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints
+    Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $true
     $styledBodyCount++
+    if ($isInTable) { $styledTableParagraphCount++ }
   }
 
   foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
@@ -1043,6 +1164,7 @@ try {
     styledMetadataCount = $styledMetadataCount
     styledListCount = $styledListCount
     styledCommandCount = $styledCommandCount
+    styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
   }
 } finally {
