@@ -3,7 +3,7 @@
 ```text
 我会在飞书里直接上传实验截图，不再单独给本地图片路径。
 
-如果你已经在之前的生成任务里设置过课程名和实验名，而且这次不变，那么 `-CourseName` 和 `-ExperimentName` 可以省略。
+如果教程标题、提示词或参考文本里能看出实验名称，可以省略 `-ExperimentName`；脚本会先自动推断，推断不到再复用上次保存的实验名。
 
 请先检查当前对话或最近几条图片消息里是否包含类似 `[media attached ...]` 的附件路径提示。
 
@@ -24,7 +24,6 @@ E:\游戏\openclaw-experiment-report-skill
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
   -ReferenceUrls "https://blog.csdn.net/你的文章链接" `
   -CourseName "计算机网络" `
-  -ExperimentName "局域网搭建与常用 DOS 命令使用" `
   -TemplatePath "E:\实验报告\实验报告模版1.docx" `
   -StudentName "李亦非" `
   -StudentId "244100198" `

@@ -433,14 +433,50 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 
-$resolvedNames = Resolve-ExperimentReportNames -CourseName $CourseName -ExperimentName $ExperimentName
+$resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
+$referenceUrlList = @($ReferenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$referenceTextPathList = @($ReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$inferredExperimentName = Resolve-InferredExperimentName `
+  -PromptText $PromptText `
+  -PromptPath $resolvedPromptPath `
+  -ReferenceTextPaths $referenceTextPathList `
+  -ReferenceUrls $referenceUrlList
+
+$fetchedReferenceTextPathList = @()
+$effectiveReferenceUrlList = $referenceUrlList
+$effectiveReferenceTextPathList = $referenceTextPathList
+if ([string]::IsNullOrWhiteSpace($ExperimentName) -and [string]::IsNullOrWhiteSpace($inferredExperimentName) -and $referenceUrlList.Count -gt 0) {
+  $fetchedReferenceDir = Join-Path $resolvedOutputDir "references"
+  New-Item -ItemType Directory -Path $fetchedReferenceDir -Force | Out-Null
+
+  for ($referenceIndex = 0; $referenceIndex -lt $referenceUrlList.Count; $referenceIndex++) {
+    $referenceUrl = [string]$referenceUrlList[$referenceIndex]
+    $fetchedReferencePath = Join-Path $fetchedReferenceDir ("reference-{0:D2}.txt" -f ($referenceIndex + 1))
+    $fetchedReference = & (Join-Path $repoRoot "scripts\fetch-web-article.ps1") `
+      -Url $referenceUrl `
+      -BrowserProfile $BrowserProfile `
+      -OpenClawCmd $OpenClawCmd `
+      -MaxChars $ReferenceMaxChars
+    $fetchedReferenceText = (($fetchedReference | Out-String).Trim() + [Environment]::NewLine)
+    [System.IO.File]::WriteAllText($fetchedReferencePath, $fetchedReferenceText, (New-Object System.Text.UTF8Encoding($true)))
+    $fetchedReferenceTextPathList += $fetchedReferencePath
+
+    if ([string]::IsNullOrWhiteSpace($inferredExperimentName)) {
+      $inferredExperimentName = Get-ExperimentNameCandidateFromText -Text $fetchedReferenceText
+    }
+  }
+
+  $effectiveReferenceUrlList = @()
+  $effectiveReferenceTextPathList = @($referenceTextPathList + $fetchedReferenceTextPathList)
+}
+
+$resolvedNames = Resolve-ExperimentReportNames -CourseName $CourseName -ExperimentName $ExperimentName -InferredExperimentName $inferredExperimentName
 $resolvedCourseName = [string]$resolvedNames.courseName
 $resolvedExperimentName = [string]$resolvedNames.experimentName
 if ([string]::IsNullOrWhiteSpace($resolvedCourseName) -or [string]::IsNullOrWhiteSpace($resolvedExperimentName)) {
-  throw "CourseName and ExperimentName are required on the first generated run. After you set them once, later runs can omit them."
+  throw "CourseName and ExperimentName are required unless ExperimentName can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls. After you set them once, later runs can omit them."
 }
 
-$resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
 $resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
@@ -507,8 +543,8 @@ $rawReportPath = Join-Path $resolvedOutputDir "report.raw.txt"
 $cleanedReportPath = Join-Path $resolvedOutputDir "report.cleaned.txt"
 & (Join-Path $repoRoot "scripts\generate-report-chat.ps1") `
   -PromptPath $promptPathOut `
-  -ReferenceTextPaths $ReferenceTextPaths `
-  -ReferenceUrls $ReferenceUrls `
+  -ReferenceTextPaths $effectiveReferenceTextPathList `
+  -ReferenceUrls $effectiveReferenceUrlList `
   -BrowserProfile $BrowserProfile `
   -OpenClawCmd $OpenClawCmd `
   -ReferenceMaxChars $ReferenceMaxChars `
@@ -590,8 +626,6 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   }
 }
 
-$referenceUrlList = @($ReferenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-$referenceTextPathList = @($ReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 $savedDefaultsPath = Save-ExperimentReportDefaults -CourseName $resolvedCourseName -ExperimentName $resolvedExperimentName -DefaultsPath ([string]$resolvedNames.defaultsPath)
 
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
@@ -601,13 +635,16 @@ $wrapperSummary = [pscustomobject]@{
   experimentName = $resolvedExperimentName
   requestedCourseName = $CourseName
   requestedExperimentName = $ExperimentName
+  inferredExperimentName = [string]$resolvedNames.inferredExperimentName
   defaultsPath = $savedDefaultsPath
   usedStoredCourseName = [bool]$resolvedNames.usedStoredCourseName
   usedStoredExperimentName = [bool]$resolvedNames.usedStoredExperimentName
+  usedInferredExperimentName = [bool]$resolvedNames.usedInferredExperimentName
   detailLevel = $DetailLevel
   promptPath = $promptPathOut
   referenceUrls = $referenceUrlList
-  referenceTextPaths = $referenceTextPathList
+  referenceTextPaths = $effectiveReferenceTextPathList
+  fetchedReferenceTextPaths = $fetchedReferenceTextPathList
   rawReportPath = $rawReportPath
   cleanedReportPath = $cleanedReportPath
   metadataPath = $effectiveMetadataPath

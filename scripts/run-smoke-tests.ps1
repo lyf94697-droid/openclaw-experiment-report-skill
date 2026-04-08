@@ -495,6 +495,23 @@ try {
   Assert-True -Condition ([string]$resolvedSavedNames.courseName -eq '计算机网络') -Message 'Report-defaults helper did not restore the saved course name.'
   Assert-True -Condition ([string]$resolvedSavedNames.experimentName -eq '局域网搭建与常用 DOS 命令使用') -Message 'Report-defaults helper did not restore the saved experiment name.'
   Assert-True -Condition ([bool]$resolvedSavedNames.usedStoredExperimentName) -Message 'Report-defaults helper should report that it reused the stored experiment name.'
+  $promptInferredExperimentName = Resolve-InferredExperimentName -PromptText '实验名称：交换机 VLAN 配置实验' -ReferenceUrls @() -ReferenceTextPaths @()
+  Assert-True -Condition ([string]$promptInferredExperimentName -eq '交换机 VLAN 配置实验') -Message 'Report-defaults helper did not infer the experiment name from prompt text.'
+  $referenceTitlePath = Join-Path $tempRoot 'reference-title.txt'
+  @'
+TITLE: 路由器静态路由配置实验 - CSDN博客
+URL: https://example.com/network-lab
+
+正文内容
+'@ | Set-Content -LiteralPath $referenceTitlePath -Encoding UTF8
+  $referenceInferredExperimentName = Resolve-InferredExperimentName -ReferenceTextPaths @($referenceTitlePath) -ReferenceUrls @()
+  Assert-True -Condition ([string]$referenceInferredExperimentName -eq '路由器静态路由配置实验') -Message 'Report-defaults helper did not infer the experiment name from reference text title.'
+  $urlInferredExperimentName = Resolve-InferredExperimentName -ReferenceUrls @('https://example.com/labs/%E5%B1%80%E5%9F%9F%E7%BD%91%E6%90%AD%E5%BB%BA%E4%B8%8E%E5%B8%B8%E7%94%A8DOS%E5%91%BD%E4%BB%A4%E4%BD%BF%E7%94%A8.html')
+  Assert-True -Condition ([string]$urlInferredExperimentName -eq '局域网搭建与常用DOS命令使用') -Message 'Report-defaults helper did not infer the experiment name from the URL slug.'
+  $resolvedInferredNames = Resolve-ExperimentReportNames -CourseName '计算机网络' -ExperimentName '' -InferredExperimentName '交换机 VLAN 配置实验' -DefaultsPath $defaultsTempPath
+  Assert-True -Condition ([string]$resolvedInferredNames.experimentName -eq '交换机 VLAN 配置实验') -Message 'Report-defaults helper should prefer inferred experiment names over stored defaults.'
+  Assert-True -Condition ([bool]$resolvedInferredNames.usedInferredExperimentName) -Message 'Report-defaults helper should report that it used an inferred experiment name.'
+  Assert-True -Condition (-not [bool]$resolvedInferredNames.usedStoredExperimentName) -Message 'Report-defaults helper should not report stored experiment-name reuse when inference wins.'
   $results.Add('report defaults helper OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {

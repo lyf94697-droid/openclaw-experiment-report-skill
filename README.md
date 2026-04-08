@@ -113,7 +113,6 @@ openclaw skills list
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
   -ReferenceUrls "https://blog.csdn.net/..." `
   -CourseName "计算机网络" `
-  -ExperimentName "局域网搭建与常用 DOS 命令使用" `
   -TemplatePath "E:\reports\template.docx" `
   -StudentName "张三" `
   -StudentId "20260001" `
@@ -128,7 +127,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
   -ReferenceUrls "https://blog.csdn.net/..." `
   -CourseName "计算机网络" `
-  -ExperimentName "局域网搭建与常用 DOS 命令使用" `
   -TemplatePath "E:\reports\template.docx" `
   -StudentName "张三" `
   -StudentId "20260001" `
@@ -150,8 +148,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 
 补充说明：
 
-- `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 会记住最近一次使用过的 `CourseName` 和 `ExperimentName`，同类任务重复运行时可以少写参数
-- 在实验名称不变时，后续运行 can omit `-ExperimentName`
+- `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 会优先从提示词、参考文本或 URL 片段推断 `ExperimentName`；推断不到时才复用最近一次保存的实验名
+- 在教程标题或参考文本已经包含实验名称时，can omit `-ExperimentName`
 - `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
 - 多张图片连续归入同一实验章节时，插图流程会默认使用每行 2 张的自动分组布局；显式 `ImageSpecs` 里的 `layout` 配置仍然优先生效

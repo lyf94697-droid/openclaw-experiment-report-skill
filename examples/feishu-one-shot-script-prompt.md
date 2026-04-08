@@ -3,7 +3,7 @@
 ```text
 请在仓库根目录直接运行本地脚本 .\scripts\build-report-from-feishu.ps1，不要自己临时拼接一长串中间 JSON。
 
-如果你已经在之前的生成任务里设置过课程名和实验名，而且这次不变，那么 `-CourseName` 和 `-ExperimentName` 可以省略。
+如果教程标题、提示词或参考文本里能看出实验名称，可以省略 `-ExperimentName`；脚本会先自动推断，推断不到再复用上次保存的实验名。
 
 如果你当前工作目录不是仓库根目录，请先切换到：
 E:\游戏\openclaw-experiment-report-skill
@@ -15,7 +15,6 @@ E:\游戏\openclaw-experiment-report-skill
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 `
   -ReferenceUrls "https://blog.csdn.net/你的文章链接" `
   -CourseName "计算机网络" `
-  -ExperimentName "局域网搭建与常用 DOS 命令使用" `
   -TemplatePath "E:\实验报告\实验报告模版1.docx" `
   -StudentName "李亦非" `
   -StudentId "244100198" `
