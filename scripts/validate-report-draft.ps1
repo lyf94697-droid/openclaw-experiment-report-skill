@@ -4,6 +4,10 @@ param(
 
   [string]$Text,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [string]$RequirementsPath,
 
   [string]$RequirementsJson,
@@ -16,6 +20,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
 
 function ConvertTo-PlainHashtable {
   param(
@@ -102,37 +108,43 @@ function Get-RequirementsRoot {
     [string]$ConfigPath,
 
     [AllowNull()]
-    [string]$ConfigJson
+    [string]$ConfigJson,
+
+    [AllowNull()]
+    [string]$ProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ProfilePath,
+
+    [AllowNull()]
+    [string]$RepoRoot
   )
 
   if ([string]::IsNullOrWhiteSpace($ConfigPath) -and [string]::IsNullOrWhiteSpace($ConfigJson)) {
-    $ConfigJson = @'
-{
-  "courseName": "",
-  "experimentName": "",
-  "minChars": 600,
-  "sections": [
-    { "name": "\u5B9E\u9A8C\u76EE\u7684", "aliases": ["\u5B9E\u9A8C\u76EE\u7684"], "minChars": 40 },
-    { "name": "\u5B9E\u9A8C\u73AF\u5883", "aliases": ["\u5B9E\u9A8C\u73AF\u5883", "\u5B9E\u9A8C\u8BBE\u5907\u4E0E\u73AF\u5883"], "minChars": 40 },
-    { "name": "\u5B9E\u9A8C\u539F\u7406\u6216\u4EFB\u52A1\u8981\u6C42", "aliases": ["\u5B9E\u9A8C\u539F\u7406\u6216\u4EFB\u52A1\u8981\u6C42", "\u5B9E\u9A8C\u539F\u7406", "\u4EFB\u52A1\u8981\u6C42"], "minChars": 40 },
-    { "name": "\u5B9E\u9A8C\u6B65\u9AA4", "aliases": ["\u5B9E\u9A8C\u6B65\u9AA4", "\u5B9E\u9A8C\u8FC7\u7A0B", "\u5B9E\u9A8C\u6B65\u9AA4 / \u5173\u952E\u4EE3\u7801\u8BF4\u660E"], "minChars": 80 },
-    { "name": "\u5B9E\u9A8C\u7ED3\u679C", "aliases": ["\u5B9E\u9A8C\u7ED3\u679C", "\u5B9E\u9A8C\u73B0\u8C61\u4E0E\u7ED3\u679C\u8BB0\u5F55"], "minChars": 60 },
-    { "name": "\u95EE\u9898\u5206\u6790", "aliases": ["\u95EE\u9898\u5206\u6790", "\u7ED3\u679C\u5206\u6790"], "minChars": 40 },
-    { "name": "\u5B9E\u9A8C\u603B\u7ED3", "aliases": ["\u5B9E\u9A8C\u603B\u7ED3", "\u603B\u7ED3\u4E0E\u601D\u8003"], "minChars": 40 }
-  ],
-  "forbiddenPatterns": [
-    "TODO",
-    "\u5F85\u8865\u5145",
-    "\u81EA\u884C\u586B\u5199",
-    "\u53EF\u6839\u636E\u5B9E\u9645\u60C5\u51B5\u4FEE\u6539",
-    "\u793A\u4F8B",
-    "\u6837\u4F8B",
-    "ChatGPT",
-    "Claude",
-    "AI\u751F\u6210"
-  ]
-}
-'@
+    $profile = Get-ReportProfile -ProfileName $ProfileName -ProfilePath $ProfilePath -RepoRoot $RepoRoot
+    $detailProfile = Get-ReportProfileDetailProfile -Profile $profile -DetailLevel "standard"
+    $sections = foreach ($sectionField in (Get-ReportProfileSectionFields -Profile $profile)) {
+      $minChars = 0
+      if ($null -ne $sectionField.minChars -and $sectionField.minChars.PSObject.Properties.Name -contains "standard") {
+        $minChars = [int]$sectionField.minChars.standard
+      }
+
+      [pscustomobject]@{
+        name = [string]$sectionField.heading
+        aliases = @($sectionField.aliases)
+        minChars = $minChars
+      }
+    }
+
+    return @{
+      courseName = ""
+      experimentName = ""
+      minChars = [int]$detailProfile.minChars
+      sections = @($sections)
+      forbiddenPatterns = @($profile.forbiddenPatterns)
+      reportProfileName = [string]$profile.name
+      reportProfilePath = [string]$profile.resolvedProfilePath
+    }
   } elseif ([string]::IsNullOrWhiteSpace($ConfigPath) -eq [string]::IsNullOrWhiteSpace($ConfigJson)) {
     throw "Provide zero or one of -RequirementsPath and -RequirementsJson."
   }
@@ -233,7 +245,7 @@ function Normalize-ContentChars {
 
 $reportInfo = Get-ReportText -TextPath $Path -InlineText $Text
 $reportText = [string]$reportInfo.Text
-$requirementsRoot = Get-RequirementsRoot -ConfigPath $RequirementsPath -ConfigJson $RequirementsJson
+$requirementsRoot = Get-RequirementsRoot -ConfigPath $RequirementsPath -ConfigJson $RequirementsJson -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 $findings = New-Object System.Collections.Generic.List[object]
 $lines = @($reportText -split "\r?\n")
@@ -351,6 +363,8 @@ $warningCount = @($findings | Where-Object { $_.severity -eq "warning" }).Count
 
 $result = [pscustomobject]@{
   source = $reportInfo.Source
+  reportProfileName = $(if ($requirementsRoot.ContainsKey("reportProfileName")) { [string]$requirementsRoot["reportProfileName"] } else { $null })
+  reportProfilePath = $(if ($requirementsRoot.ContainsKey("reportProfilePath")) { [string]$requirementsRoot["reportProfilePath"] } else { $null })
   passed = ($errorCount -eq 0)
   summary = [pscustomobject]@{
     charCount = $normalizedReportChars

@@ -699,6 +699,10 @@ arp -a
   $validationResult = $validationOutput | ConvertFrom-Json
   Assert-True -Condition ($validationResult.passed) -Message 'Report validation should pass for the sample report.'
   Assert-True -Condition ($validationResult.summary.errorCount -eq 0) -Message 'Report validation returned unexpected errors for the sample report.'
+  $defaultValidationResult = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $sampleReportPath -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$defaultValidationResult.passed) -Message 'Profile-backed default report validation should pass for the sample report.'
+  Assert-True -Condition ([string]$defaultValidationResult.reportProfileName -eq 'experiment-report') -Message 'Default report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$defaultValidationResult.summary.sectionCount -ge 7) -Message 'Default report validation did not load the profile section rules.'
   $results.Add('report validation OK') | Out-Null
 
   $referenceTextPath = Join-Path $tempRoot 'tutorial-reference.txt'
@@ -1077,6 +1081,7 @@ URL: https://example.com/network-lab
   $layoutCheckPath = Join-Path $tempRoot 'sample-template.images.layout-check.json'
   & (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $imageFilledDocx -ExpectedImageCount 2 -ExpectedCaptionCount 2 -OutFile $layoutCheckPath | Out-Null
   $layoutCheck = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$layoutCheck.reportProfileName -eq 'experiment-report') -Message 'Layout check is missing the expected report profile name.'
   Assert-True -Condition ([int]$layoutCheck.actual.imageDrawingCount -eq 2) -Message 'Layout check did not count the expected inserted images.'
   Assert-True -Condition ([int]$layoutCheck.actual.captionCount -eq 2) -Message 'Layout check did not count the expected figure captions.'
   Assert-True -Condition ([string]$layoutCheck.message -match 'Layout check failed') -Message 'Layout check did not include a readable failure message.'
@@ -1352,6 +1357,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$buildReportSummary.layoutCheckMessage -match 'Layout check passed') -Message 'build-report summary is missing the readable layout-check message.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
+  Assert-True -Condition ([string]$buildReportSummary.reportProfileName -eq 'experiment-report') -Message 'build-report summary is missing the expected report profile name.'
   Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report summary did not preserve the requested auto style profile.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfilePath -eq $buildStyleProfilePath) -Message 'build-report summary is missing the custom style profile path.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'default') -Message 'build-report summary should resolve the sample template to the default style profile.'
@@ -1381,6 +1387,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Split-Path -Parent $feishuBuildSummary.finalDocxPath) -eq $feishuBuildOutputDir) -Message 'Feishu wrapper should copy the final docx to the output root.'
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
   Assert-True -Condition ([string]$feishuBuildSummary.artifactsDir -eq (Join-Path $feishuBuildOutputDir 'artifacts')) -Message 'Feishu wrapper summary is missing the expected artifacts directory.'
+  Assert-True -Condition ([string]$feishuBuildSummary.reportProfileName -eq 'experiment-report') -Message 'Feishu wrapper summary is missing the expected report profile name.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.imagePlanPath)) -Message 'Feishu wrapper summary image-plan path does not exist.'
   Assert-True -Condition ([int]$feishuBuildSummary.imagePlanLowConfidenceCount -eq 0) -Message 'Feishu wrapper summary reported an unexpected low-confidence image-plan count.'
   Assert-True -Condition (-not [bool]$feishuBuildSummary.imagePlanNeedsReview) -Message 'Feishu wrapper summary should not require manual review for explicit image specs.'
