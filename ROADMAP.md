@@ -1,41 +1,208 @@
 # Roadmap
 
-## Near Term
+## Direction
 
-- stabilize GitHub-facing repository governance and contribution flow
-- improve template compatibility diagnostics
-- improve direct-chat reliability when image attachments are staged by the runtime
-- strengthen regression fixtures for mixed cover/body templates and grouped image layouts
+The repository should not grow into a generic office tool.
 
-## Medium Term
+Its strongest path is narrower and more practical:
 
-- split report-generation logic into reusable document profiles
-- move more hardcoded experiment-report assumptions into profile metadata
-- support richer profile-specific validation rules
-- support reusable style packs beyond `default`, `compact`, and `school`
+- keep one reliable document pipeline
+- make that pipeline profile-driven
+- expand only into document types that share the same core workflow
 
-## Long Term
+The core workflow remains:
 
 The repository can support nearby document types only after the experiment-report path stays fast, stable, and easy to verify.
 
-That means:
+1. gather references and user inputs
+2. generate or clean the report body
+3. fit content into a local docx template
+4. plan image placement
+5. insert screenshots and captions
+6. apply final styling
+7. validate the output
 
-- one reliable core pipeline for reference gathering, body generation, validation, template filling, image mapping, and final styling
-- explicit document-type presets for structure, metadata labels, required sections, caption rules, and validation thresholds
-- prompt presets for each document type instead of embedding everything into one giant experiment-report prompt
+That makes this repository best suited to structured Chinese documents that:
 
-Potential future profiles:
+- usually have a fixed chapter outline
+- often come with a school or team template
+- benefit from screenshot or evidence insertion
+- need a reviewable `docx` result that follows a known template
 
-- internship reports
-- course design reports
-- training summaries
-- project weekly reports
-- software test reports
-- deployment or operations runbooks
-- meeting minutes with template filling
+## Phase 0: Stabilize The Experiment-Report Pipeline
+
+Before adding more document types, the current experiment-report flow should become easier to trust, debug, and reuse.
+
+Priority work:
+
+- integrate image-placement planning into the main wrappers instead of exposing it only as a lower-level script option
+- improve template compatibility diagnostics and explain why a template did or did not fit automatic filling rules
+- strengthen pagination and layout risk checks for grouped images, especially WPS-sensitive cases
+- keep expanding regression fixtures for mixed cover/body templates, grouped screenshots, and section-end image insertion
+- move more hardcoded experiment-report rules into explicit profile metadata
+
+Definition of done for this phase:
+
+- a user can run the main wrappers with less manual intervention
+- failures are explained in actionable terms
+- layout regressions are easier to catch before opening WPS or Word
+
+## Phase 1: Introduce Real Document Profiles
+
+The next architectural step is to stop treating `experiment-report` as the only first-class document type.
+
+Introduce reusable document profiles with profile-owned metadata such as:
+
+- required sections
+- metadata labels
+- caption rules
+- validation thresholds
+- default style profile
+- prompt preset
+- image placement defaults
+
+Initial goal:
+
+- keep one shared implementation pipeline
+- switch behavior by profile metadata rather than by more script-specific branching
+
+This phase is the prerequisite for healthy expansion.
+
+## Phase 2: Expand To The Closest Document Families
+
+The first new document types should be the ones that reuse the most of the current logic.
+
+### 1. Course Design Reports
+
+Why first:
+
+- closest to experiment reports
+- same need for template filling, screenshots, and structured sections
+- high reuse of current field-map, image-map, and style logic
+
+Likely profile differences:
+
+- richer design/implementation sections
+- more code explanation
+- more emphasis on architecture and results analysis
+
+### 2. Software Test Reports
+
+Why second:
+
+- naturally evidence-driven
+- screenshot and result insertion matter a lot
+- good fit for validation-oriented output
+
+Likely profile differences:
+
+- test case structure
+- expected vs actual result sections
+- defect or issue tracking sections
+- richer validation rules
+
+### 3. Deployment Or Operations Reports
+
+Why third:
+
+- still highly procedural
+- often template-based
+- command blocks, verification steps, and screenshots already fit the current pipeline
+
+Likely profile differences:
+
+- environment tables
+- deployment steps
+- verification and rollback sections
+- operations-focused captions and summaries
+
+## Phase 3: Expand To Adjacent School And Team Documents
+
+After the evidence-heavy document profiles are stable, the repository can move into less screenshot-centric but still structured document types.
+
+### 4. Internship Reports
+
+Good fit because they still benefit from:
+
+- fixed chapter structures
+- metadata fields
+- school templates
+- optional screenshot evidence
+
+### 5. Weekly And Monthly Reports
+
+Good fit when the structure is profile-driven rather than free-form:
+
+- progress
+- completed work
+- problems
+- next steps
+
+### 6. Meeting Minutes With Template Filling
+
+Good fit later, not sooner:
+
+- less image-heavy
+- more table- and action-item-oriented
+- still compatible with template filling and profile-specific validation
+
+## Recommended Profile Order
+
+The expansion order should stay disciplined:
+
+1. `experiment-report` stabilization
+2. `course-design-report`
+3. `software-test-report`
+4. `deployment-report`
+5. `internship-report`
+6. `weekly-report`
+7. `meeting-minutes`
+
+This order maximizes reuse and keeps the repository coherent.
+
+## Supporting Platform Work
+
+Alongside new profiles, the repository should keep investing in a few shared capabilities.
+
+### Template Fit And Diagnostics
+
+- better extraction of template structure
+- clearer field-lock and blank-block detection
+- explicit reasons when automatic filling falls back or skips content
+
+### Image Planning And Layout
+
+- stronger automatic section inference
+- confidence scoring for image placement
+- grouped-image chunking such as stable 2x2 blocks
+- more layout strategies beyond a single row-table approach
+
+### Validation And Risk Detection
+
+- richer output checks per profile
+- pagination-risk warnings
+- profile-specific structural validation
+- clearer summaries in machine-readable output files
+
+### Prompt Assets And Examples
+
+- one-shot prompt examples
+- plan-first prompt examples
+- profile-specific prompt presets
+- more realistic end-to-end fixtures
 
 ## Non-Goals For Now
 
 - turning the project into a general-purpose office suite
 - pretending every document type can be solved by a single catch-all prompt
-- shipping a GUI app before the profile model is stable
+- expanding to unrelated document types before the profile model is stable
+- shipping a GUI before the profile-driven pipeline is mature
+
+## Practical Success Metric
+
+This repository is on the right track if it becomes:
+
+- easy to run for repeatable school and engineering documents
+- predictable when templates and screenshots are involved
+- explainable when automation falls short
+- extensible by adding profiles rather than rewriting the pipeline
