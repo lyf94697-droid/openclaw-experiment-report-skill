@@ -97,6 +97,9 @@ function New-AutoPromptText {
     [string]$DetailLevel = "full"
   )
 
+  $documentLabel = Get-ReportProfileDisplayName -Profile $Profile -Fallback "报告"
+  $courseNameLabel = if ($Labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$Labels["CourseName"])) { [string]$Labels["CourseName"] } else { "课程名称" }
+  $titleNameLabel = if ($Labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$Labels["ExperimentName"])) { [string]$Labels["ExperimentName"] } else { "题目名称" }
   $requiredHeadings = (Get-ReportProfileRequiredHeadings -Profile $Profile) -join ", "
   $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
   $detailRequirements = @(
@@ -105,19 +108,19 @@ function New-AutoPromptText {
   ) -join [Environment]::NewLine
 
   return @"
-Write a formal Chinese university lab report body based on the reference webpages.
+Write a formal Chinese university $documentLabel body based on the reference webpages.
 
-Course name: $ResolvedCourseName
-Experiment name: $ResolvedExperimentName
+${courseNameLabel}: $ResolvedCourseName
+${titleNameLabel}: $ResolvedExperimentName
 
 Requirements:
-- The report must begin by explicitly writing the course name and experiment name in Chinese.
+- The report must begin by explicitly writing the Chinese $courseNameLabel and $titleNameLabel.
 - The report must include these Chinese headings: $requiredHeadings.
 - Use the webpages as procedural reference for background, theory, steps, and verification ideas, but do not copy them verbatim.
-- If the webpages are tutorial pages or lab guides, rewrite them into a submit-ready lab report in natural Chinese.
+- If the webpages are tutorial pages or lab guides, rewrite them into a submit-ready $documentLabel in natural Chinese.
 - If the webpages do not provide real screenshots, exact measured values, packet captures, teacher comments, or error logs, do not fabricate them. Write the result section as validation-oriented results instead.
 $($detailRequirements.Trim())
-- Return only the final Chinese report body.
+- Return only the final Chinese $documentLabel body.
 "@
 }
 
@@ -353,6 +356,9 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath) -and -not [string]::IsN
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 $labels = Get-ReportProfileLabels -Profile $reportProfile
+$documentLabel = Get-ReportProfileDisplayName -Profile $reportProfile -Fallback "报告"
+$courseNameLabel = if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" }
+$titleNameLabel = if ($labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["ExperimentName"])) { [string]$labels["ExperimentName"] } else { "题目名称" }
 if ([string]::IsNullOrWhiteSpace($ExperimentProperty)) {
   $ExperimentProperty = [string]$reportProfile.defaultExperimentProperty
 }
@@ -401,11 +407,16 @@ if ([string]::IsNullOrWhiteSpace($ExperimentName) -and [string]::IsNullOrWhiteSp
   $effectiveReferenceTextPathList = @($referenceTextPathList + $fetchedReferenceTextPathList)
 }
 
-$resolvedNames = Resolve-ExperimentReportNames -CourseName $CourseName -ExperimentName $ExperimentName -InferredExperimentName $inferredExperimentName
+$resolvedNames = Resolve-ExperimentReportNames `
+  -CourseName $CourseName `
+  -ExperimentName $ExperimentName `
+  -InferredExperimentName $inferredExperimentName `
+  -ReportProfileName ([string]$reportProfile.name) `
+  -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)
 $resolvedCourseName = [string]$resolvedNames.courseName
 $resolvedExperimentName = [string]$resolvedNames.experimentName
 if ([string]::IsNullOrWhiteSpace($resolvedCourseName) -or [string]::IsNullOrWhiteSpace($resolvedExperimentName)) {
-  throw "CourseName and ExperimentName are required unless ExperimentName can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls. After you set them once, later runs can omit them."
+  throw "$courseNameLabel and $titleNameLabel are required unless $titleNameLabel can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls. After you set them once for $documentLabel, later runs can omit them."
 }
 
 $resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
@@ -570,13 +581,19 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   }
 }
 
-$savedDefaultsPath = Save-ExperimentReportDefaults -CourseName $resolvedCourseName -ExperimentName $resolvedExperimentName -DefaultsPath ([string]$resolvedNames.defaultsPath)
+$savedDefaultsPath = Save-ExperimentReportDefaults `
+  -CourseName $resolvedCourseName `
+  -ExperimentName $resolvedExperimentName `
+  -DefaultsPath ([string]$resolvedNames.defaultsPath) `
+  -ReportProfileName ([string]$reportProfile.name) `
+  -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)
 
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
   reportProfileName = [string]$reportProfile.name
   reportProfilePath = [string]$reportProfile.resolvedProfilePath
+  reportProfileDisplayName = $documentLabel
   courseName = $resolvedCourseName
   experimentName = $resolvedExperimentName
   requestedCourseName = $CourseName

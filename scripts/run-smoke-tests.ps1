@@ -642,6 +642,7 @@ try {
   Assert-True -Condition ($repoReadme -match 'uploaded images and you also provide local image paths') -Message 'README is missing the hybrid uploaded-image plus local-path guidance.'
   Assert-True -Condition ($repoReadme -match 'media/inbound/example\.png') -Message 'README is missing the uploaded-attachment path guidance.'
   Assert-True -Condition ($repoReadme -match 'can omit `-ExperimentName`') -Message 'README is missing the remembered experiment-name guidance.'
+  Assert-True -Condition ($repoReadme -match '按 report profile 隔离保存') -Message 'README is missing the per-profile defaults guidance.'
   Assert-True -Condition ($repoReadme -match 'ROADMAP\.md') -Message 'README is missing the roadmap link.'
   Assert-True -Condition ($repoReadme -match 'Repository Health') -Message 'README is missing the repository health section.'
   $results.Add('README wrapper documentation OK') | Out-Null
@@ -676,6 +677,22 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$resolvedInferredNames.experimentName -eq '交换机 VLAN 配置实验') -Message 'Report-defaults helper should prefer inferred experiment names over stored defaults.'
   Assert-True -Condition ([bool]$resolvedInferredNames.usedInferredExperimentName) -Message 'Report-defaults helper should report that it used an inferred experiment name.'
   Assert-True -Condition (-not [bool]$resolvedInferredNames.usedStoredExperimentName) -Message 'Report-defaults helper should not report stored experiment-name reuse when inference wins.'
+  $originalAgentsHome = $env:AGENTS_HOME
+  $profileDefaultsHome = Join-Path $tempRoot 'profile-defaults-home'
+  try {
+    $env:AGENTS_HOME = $profileDefaultsHome
+    $savedExperimentDefaultsPath = Save-ExperimentReportDefaults -CourseName '计算机网络' -ExperimentName '局域网搭建与常用 DOS 命令使用'
+    $savedCourseDesignDefaultsPath = Save-ExperimentReportDefaults -CourseName '软件工程综合实践' -ExperimentName '校园导览小程序设计' -ReportProfileName 'course-design-report'
+    Assert-True -Condition ((Split-Path -Leaf $savedExperimentDefaultsPath) -eq 'experiment-report.defaults.json') -Message 'Report-defaults helper should keep the experiment-report defaults file name.'
+    Assert-True -Condition ((Split-Path -Leaf $savedCourseDesignDefaultsPath) -eq 'course-design-report.defaults.json') -Message 'Report-defaults helper should isolate course-design defaults by profile name.'
+    $resolvedExperimentDefaults = Resolve-ExperimentReportNames -CourseName '' -ExperimentName ''
+    $resolvedCourseDesignDefaults = Resolve-ExperimentReportNames -CourseName '' -ExperimentName '' -ReportProfileName 'course-design-report'
+    Assert-True -Condition ([string]$resolvedExperimentDefaults.experimentName -eq '局域网搭建与常用 DOS 命令使用') -Message 'Report-defaults helper lost the experiment-report stored title.'
+    Assert-True -Condition ([string]$resolvedCourseDesignDefaults.experimentName -eq '校园导览小程序设计') -Message 'Report-defaults helper should restore the course-design stored title from its own defaults file.'
+    Assert-True -Condition ([string]$resolvedExperimentDefaults.defaultsPath -ne [string]$resolvedCourseDesignDefaults.defaultsPath) -Message 'Report-defaults helper should not share defaults paths across report profiles.'
+  } finally {
+    $env:AGENTS_HOME = $originalAgentsHome
+  }
   $results.Add('report defaults helper OK') | Out-Null
 
   . (Join-Path $repoRoot 'scripts\report-profiles.ps1')
@@ -1990,6 +2007,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
   Assert-True -Condition ([string]$feishuBuildSummary.artifactsDir -eq (Join-Path $feishuBuildOutputDir 'artifacts')) -Message 'Feishu wrapper summary is missing the expected artifacts directory.'
   Assert-True -Condition ([string]$feishuBuildSummary.reportProfileName -eq 'experiment-report') -Message 'Feishu wrapper summary is missing the expected report profile name.'
+  Assert-True -Condition ([string]$feishuBuildSummary.reportProfileDisplayName -eq '实验报告') -Message 'Feishu wrapper summary is missing the expected report profile display name.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.imagePlanPath)) -Message 'Feishu wrapper summary image-plan path does not exist.'
   Assert-True -Condition ([int]$feishuBuildSummary.imagePlanLowConfidenceCount -eq 0) -Message 'Feishu wrapper summary reported an unexpected low-confidence image-plan count.'
   Assert-True -Condition (-not [bool]$feishuBuildSummary.imagePlanNeedsReview) -Message 'Feishu wrapper summary should not require manual review for explicit image specs.'
@@ -1997,6 +2015,30 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuBuildSummary.layoutCheckMessage -match 'Layout check passed') -Message 'Feishu wrapper summary is missing the readable layout-check message.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.layoutCheckPath)) -Message 'Feishu wrapper summary layout check path does not exist.'
   $results.Add('Feishu wrapper pipeline OK') | Out-Null
+
+  $originalWrapperAgentsHome = $env:AGENTS_HOME
+  try {
+    $env:AGENTS_HOME = (Join-Path $tempRoot 'wrapper-agents-home')
+    $courseDesignWrapperOutputDir = Join-Path $tempRoot 'course-design-feishu-output'
+    & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
+      -TemplatePath $courseDesignTemplateDocx `
+      -ReportPath $courseDesignReportPath `
+      -MetadataPath $courseDesignMetadataPath `
+      -ImageSpecsPath $courseDesignImageSpecsPath `
+      -OutputDir $courseDesignWrapperOutputDir `
+      -StyleProfile auto `
+      -ReportProfileName 'course-design-report' | Out-Null
+    $courseDesignWrapperSummaryPath = Join-Path $courseDesignWrapperOutputDir 'feishu-build-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $courseDesignWrapperSummaryPath) -Message 'Course-design Feishu wrapper did not create the wrapper summary.'
+    $courseDesignWrapperSummary = (Get-Content -LiteralPath $courseDesignWrapperSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$courseDesignWrapperSummary.reportProfileName -eq 'course-design-report') -Message 'Course-design Feishu wrapper summary is missing the expected report profile name.'
+    Assert-True -Condition ([string]$courseDesignWrapperSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Course-design Feishu wrapper summary is missing the expected display name.'
+    Assert-True -Condition ((Split-Path -Leaf ([string]$courseDesignWrapperSummary.defaultsPath)) -eq 'course-design-report.defaults.json') -Message 'Course-design Feishu wrapper should persist defaults under the profile-specific defaults file.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignWrapperSummary.finalDocxPath)) -Message 'Course-design Feishu wrapper final docx path does not exist.'
+  } finally {
+    $env:AGENTS_HOME = $originalWrapperAgentsHome
+  }
+  $results.Add('course-design Feishu wrapper OK') | Out-Null
 
   $installRoot = Join-Path $tempRoot 'install-root'
   $installTarget = Join-Path $installRoot 'skill-install'

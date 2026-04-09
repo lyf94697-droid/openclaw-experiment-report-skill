@@ -88,6 +88,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "report-defaults.ps1")
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
 
 function Resolve-AbsolutePathIfProvided {
   param(
@@ -186,6 +187,11 @@ function Copy-InputImagesToArchive {
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$labels = Get-ReportProfileLabels -Profile $reportProfile
+$documentLabel = Get-ReportProfileDisplayName -Profile $reportProfile -Fallback "报告"
+$courseNameLabel = if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" }
+$titleNameLabel = if ($labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["ExperimentName"])) { [string]$labels["ExperimentName"] } else { "题目名称" }
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $resolvedReportPath = Resolve-AbsolutePathIfProvided -Path $ReportPath
 $resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
@@ -208,7 +214,12 @@ $inferredExperimentName = Resolve-InferredExperimentName `
   -PromptPath $resolvedPromptPath `
   -ReferenceTextPaths $referenceTextPathList `
   -ReferenceUrls $referenceUrlList
-$resolvedNames = Resolve-ExperimentReportNames -CourseName $CourseName -ExperimentName $ExperimentName -InferredExperimentName $inferredExperimentName
+$resolvedNames = Resolve-ExperimentReportNames `
+  -CourseName $CourseName `
+  -ExperimentName $ExperimentName `
+  -InferredExperimentName $inferredExperimentName `
+  -ReportProfileName ([string]$reportProfile.name) `
+  -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)
 $resolvedCourseName = [string]$resolvedNames.courseName
 $resolvedExperimentName = [string]$resolvedNames.experimentName
 
@@ -218,7 +229,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath) -and $generationInput
 
 if ([string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if ([string]::IsNullOrWhiteSpace($resolvedCourseName)) {
-    throw "CourseName is required on the first generated run. ExperimentName can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls or reused from saved defaults."
+    throw "$courseNameLabel is required on the first generated run. $titleNameLabel can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls or reused from saved defaults."
   }
 }
 
@@ -298,10 +309,10 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
   if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
-    $buildParams.ReportProfileName = $ReportProfileName
+    $buildParams.ReportProfileName = [string]$reportProfile.name
   }
-  if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
-    $buildParams.ReportProfilePath = $resolvedReportProfilePath
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
+    $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
   }
 
   & (Join-Path $repoRoot "scripts\build-report.ps1") @buildParams | Out-Null
@@ -376,10 +387,10 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
   if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
-    $buildParams.ReportProfileName = $ReportProfileName
+    $buildParams.ReportProfileName = [string]$reportProfile.name
   }
-  if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
-    $buildParams.ReportProfilePath = $resolvedReportProfilePath
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
+    $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
   }
 
   if ($SkipSessionReset) {
@@ -443,14 +454,24 @@ $wrapperSummary = [pscustomobject]@{
   artifactsDir = $resolvedArtifactsDir
   templatePath = $resolvedTemplatePath
   mode = $wrapperMode
-  reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { $ReportProfileName })
-  reportProfilePath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfilePath") { [string]$innerSummary.reportProfilePath } else { $resolvedReportProfilePath })
+  reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { [string]$reportProfile.name })
+  reportProfilePath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfilePath") { [string]$innerSummary.reportProfilePath } else { [string]$reportProfile.resolvedProfilePath })
+  reportProfileDisplayName = $documentLabel
   courseName = $resolvedCourseName
   experimentName = $resolvedExperimentName
   requestedCourseName = $CourseName
   requestedExperimentName = $ExperimentName
   inferredExperimentName = $inferredExperimentName
-  defaultsPath = $(if (-not [string]::IsNullOrWhiteSpace($resolvedCourseName) -and -not [string]::IsNullOrWhiteSpace($resolvedExperimentName)) { Save-ExperimentReportDefaults -CourseName $resolvedCourseName -ExperimentName $resolvedExperimentName -DefaultsPath ([string]$resolvedNames.defaultsPath) } else { [string]$resolvedNames.defaultsPath })
+  defaultsPath = $(if (-not [string]::IsNullOrWhiteSpace($resolvedCourseName) -and -not [string]::IsNullOrWhiteSpace($resolvedExperimentName)) {
+      Save-ExperimentReportDefaults `
+        -CourseName $resolvedCourseName `
+        -ExperimentName $resolvedExperimentName `
+        -DefaultsPath ([string]$resolvedNames.defaultsPath) `
+        -ReportProfileName ([string]$reportProfile.name) `
+        -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)
+    } else {
+      [string]$resolvedNames.defaultsPath
+    })
   usedStoredCourseName = [bool]$resolvedNames.usedStoredCourseName
   usedStoredExperimentName = $([bool]$resolvedNames.usedStoredExperimentName -or $innerUsedStoredExperimentName)
   usedInferredExperimentName = $([bool]$resolvedNames.usedInferredExperimentName -or $innerUsedInferredExperimentName)

@@ -104,6 +104,22 @@ function Get-ReportProfileLabels {
   return $labels
 }
 
+function Get-ReportProfileDisplayName {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [string]$Fallback = "报告"
+  )
+
+  $displayName = [string](Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "displayName")
+  if ([string]::IsNullOrWhiteSpace($displayName)) {
+    return $Fallback
+  }
+
+  return $displayName
+}
+
 function Get-ReportProfileMetadataIdFromKey {
   param(
     [AllowNull()]

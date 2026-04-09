@@ -110,7 +110,7 @@ $messageText = @(
   "User request:"
   $userPrompt.Trim()
   ""
-  "Return only the final Chinese experiment report body. Prefer a complete, moderately detailed, submission-ready report instead of a terse outline. Do not ask follow-up questions. Do not output explanations or meta commentary."
+  "Return only the final Chinese report body. Prefer a complete, moderately detailed, submission-ready report instead of a terse outline. Do not ask follow-up questions. Do not output explanations or meta commentary."
 ) -join [Environment]::NewLine
 
 $messageFile = Join-Path $outDir (([System.IO.Path]::GetFileNameWithoutExtension($resolvedOutFile)) + ".prompt.txt")
