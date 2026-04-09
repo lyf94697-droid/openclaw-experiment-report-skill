@@ -16,6 +16,10 @@ param(
 
   [string[]]$ImagePaths,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [string]$RequirementsPath,
 
   [string]$RequirementsJson,
@@ -45,6 +49,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
 function Ensure-ParentDirectory {
   param(
     [Parameter(Mandatory = $true)]
@@ -70,6 +76,8 @@ $resolvedRequirementsPath = $null
 if (-not [string]::IsNullOrWhiteSpace($RequirementsPath)) {
   $resolvedRequirementsPath = (Resolve-Path -LiteralPath $RequirementsPath).Path
 }
+
+$resolvedReportProfilePath = Resolve-ReportProfilePath -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 
 $imageInputModes = 0
 if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) { $imageInputModes++ }
@@ -126,6 +134,12 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath) -or -not [strin
   $validationParams = @{
     Path = $resolvedReportPath
     Format = "json"
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+    $validationParams.ReportProfileName = $ReportProfileName
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
+    $validationParams.ReportProfilePath = $resolvedReportProfilePath
   }
   if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath)) {
     $validationParams.RequirementsPath = $resolvedRequirementsPath
@@ -265,6 +279,12 @@ $layoutCheckParams = @{
   Format = "json"
   OutFile = $layoutCheckPath
 }
+if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+  $layoutCheckParams.ReportProfileName = $ReportProfileName
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
+  $layoutCheckParams.ReportProfilePath = $resolvedReportProfilePath
+}
 if ($expectedLayoutImageCount -ge 0) {
   $layoutCheckParams.ExpectedImageCount = $expectedLayoutImageCount
 }
@@ -276,6 +296,8 @@ $layoutCheckResult = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding U
 
 $summary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
+  reportProfileName = $ReportProfileName
+  reportProfilePath = $resolvedReportProfilePath
   templatePath = $resolvedTemplatePath
   reportPath = $resolvedReportPath
   metadataPath = $resolvedMetadataPath

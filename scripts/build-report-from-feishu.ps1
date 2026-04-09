@@ -297,6 +297,12 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+    $buildParams.ReportProfileName = $ReportProfileName
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
+    $buildParams.ReportProfilePath = $resolvedReportProfilePath
+  }
 
   & (Join-Path $repoRoot "scripts\build-report.ps1") @buildParams | Out-Null
   $innerSummaryPath = Join-Path $resolvedArtifactsDir "summary.json"

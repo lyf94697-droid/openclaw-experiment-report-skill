@@ -525,6 +525,12 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedStyleProfilePath)) {
     $buildParams.StyleProfilePath = $resolvedStyleProfilePath
   }
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+    $buildParams.ReportProfileName = $ReportProfileName
+  }
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
+    $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
+  }
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
