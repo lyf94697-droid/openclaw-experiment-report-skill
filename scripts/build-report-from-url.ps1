@@ -124,6 +124,31 @@ $($detailRequirements.Trim())
 "@
 }
 
+function New-AutoPromptText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$Labels,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full"
+  )
+
+  return (New-ReportProfileAutoPromptText `
+    -ResolvedCourseName $ResolvedCourseName `
+    -ResolvedExperimentName $ResolvedExperimentName `
+    -Profile $Profile `
+    -DetailLevel $DetailLevel)
+}
+
 function New-AutoRequirementsJson {
   param(
     [Parameter(Mandatory = $true)]

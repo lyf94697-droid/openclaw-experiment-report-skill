@@ -120,6 +120,20 @@ function Get-ReportProfileDisplayName {
   return $displayName
 }
 
+function Get-ReportProfilePromptLabels {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $labels = Get-ReportProfileLabels -Profile $Profile
+  return [pscustomobject]@{
+    documentLabel = Get-ReportProfileDisplayName -Profile $Profile -Fallback "报告"
+    courseNameLabel = $(if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" })
+    titleNameLabel = $(if ($labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["ExperimentName"])) { [string]$labels["ExperimentName"] } else { "题目名称" })
+  }
+}
+
 function Get-ReportProfileMetadataIdFromKey {
   param(
     [AllowNull()]
@@ -557,4 +571,47 @@ function Get-ReportProfileDetailProfile {
   }
 
   return $Profile.detailProfiles.$DetailLevel
+}
+
+function New-ReportProfileAutoPromptText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full"
+  )
+
+  $promptLabels = Get-ReportProfilePromptLabels -Profile $Profile
+  $documentLabel = [string]$promptLabels.documentLabel
+  $courseNameLabel = [string]$promptLabels.courseNameLabel
+  $titleNameLabel = [string]$promptLabels.titleNameLabel
+  $requiredHeadings = (Get-ReportProfileRequiredHeadings -Profile $Profile) -join ", "
+  $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
+  $detailRequirements = @(
+    @($detailProfile.promptGuidance | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) |
+      ForEach-Object { "- {0}" -f [string]$_ }
+  ) -join [Environment]::NewLine
+
+  return @"
+Write a formal Chinese university $documentLabel body based on the reference webpages.
+
+${courseNameLabel}: $ResolvedCourseName
+${titleNameLabel}: $ResolvedExperimentName
+
+Requirements:
+- The report must begin by explicitly writing the Chinese $courseNameLabel and $titleNameLabel.
+- The report must include these Chinese headings: $requiredHeadings.
+- Use the webpages as procedural reference for background, theory, steps, and verification ideas, but do not copy them verbatim.
+- If the webpages are tutorial pages or lab guides, rewrite them into a submit-ready $documentLabel in natural Chinese.
+- If the webpages do not provide real screenshots, exact measured values, packet captures, teacher comments, or error logs, do not fabricate them. Write the result section as validation-oriented results instead.
+$($detailRequirements.Trim())
+- Return only the final Chinese $documentLabel body.
+"@
 }

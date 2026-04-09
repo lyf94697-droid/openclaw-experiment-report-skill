@@ -720,6 +720,15 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $courseDesignProfile) -contains '指导老师') -Message 'Course-design profile metadata prefixes are missing 指导老师.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $courseDesignProfile) -contains '方案设计与实现') -Message 'Course-design profile required headings are missing 方案设计与实现.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $courseDesignProfile -SectionId 'result' -BaseName 'ui-home') -eq '运行结果截图') -Message 'Course-design profile image caption defaults are missing the result caption.'
+  $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
+  Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
+  Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
+  Assert-True -Condition ($experimentPromptText -match '实验名称: 交换机 VLAN 配置实验') -Message 'Auto prompt helper did not emit the experiment-report title label.'
+  $courseDesignPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -DetailLevel 'full'
+  Assert-True -Condition ($courseDesignPromptText -match '课程设计报告 body') -Message 'Auto prompt helper did not use the course-design display name.'
+  Assert-True -Condition ($courseDesignPromptText -match '课程名称: 软件工程综合实践') -Message 'Auto prompt helper did not emit the course-design course-name label.'
+  Assert-True -Condition ($courseDesignPromptText -match '课题名称: 校园导览小程序设计') -Message 'Auto prompt helper did not emit the course-design title label.'
+  Assert-True -Condition ($courseDesignPromptText -match '方案设计与实现') -Message 'Auto prompt helper did not include course-design required headings.'
   $results.Add('report profile loader OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
