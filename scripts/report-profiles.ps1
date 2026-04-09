@@ -104,6 +104,35 @@ function Get-ReportProfileLabels {
   return $labels
 }
 
+function Get-ReportProfileMetadataIdFromKey {
+  param(
+    [AllowNull()]
+    [string]$Key
+  )
+
+  switch ([string]$Key) {
+    "Name" { return "student_name" }
+    "StudentId" { return "student_id" }
+    "ClassName" { return "class_name" }
+    "TeacherName" { return "teacher_name" }
+    "CourseName" { return "course_name" }
+    "ExperimentName" { return "experiment_name" }
+    "ExperimentProperty" { return "experiment_property" }
+    "ExperimentDate" { return "experiment_date" }
+    "ExperimentLocation" { return "experiment_location" }
+    "Date" { return "date" }
+    "College" { return "college" }
+    "Major" { return "major" }
+    default {
+      if ([string]::IsNullOrWhiteSpace($Key)) {
+        return ""
+      }
+
+      return (Normalize-ReportProfileLookupKey -Text $Key)
+    }
+  }
+}
+
 function ConvertTo-ReportProfilePlainHashtable {
   param(
     [AllowNull()]
@@ -250,12 +279,44 @@ function Get-ReportProfileMetadataPrefixes {
     [psobject]$Profile
   )
 
+  return @(
+    @(Get-ReportProfileMetadataRules -Profile $Profile) |
+      ForEach-Object { @([string]$_.canonicalLabel) + @($_.explicitAliases) } |
+      ForEach-Object { [string]$_ } |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+      Select-Object -Unique
+  )
+}
+
+function Get-ReportProfileMetadataRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
   $extraLabelFields = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels"
   return @(
     @($Profile.metadataFields + $(if ($null -eq $extraLabelFields) { @() } else { @($extraLabelFields) })) |
-      ForEach-Object { [string]$_.label } |
-      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-      Select-Object -Unique
+      ForEach-Object {
+        $metadataId = Get-ReportProfileMetadataIdFromKey -Key ([string]$_.key)
+        $canonicalLabel = [string]$_.label
+        $explicitAliases = @(
+          ConvertTo-ReportProfileStringArray -Value (Get-ReportProfileOptionalPropertyValue -Object $_ -Name "aliases")
+        )
+        $inputAliases = @(
+          @(@($canonicalLabel) + @($explicitAliases) + @([string]$_.key, $metadataId)) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            Select-Object -Unique
+        )
+
+        [pscustomobject]@{
+          id = $metadataId
+          key = [string]$_.key
+          canonicalLabel = $canonicalLabel
+          explicitAliases = $explicitAliases
+          inputAliases = $inputAliases
+        }
+      }
   )
 }
 
