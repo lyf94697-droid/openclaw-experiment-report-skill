@@ -1006,6 +1006,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $generatedFieldMapPath) -Message 'Field-map generator did not write the output file.'
   $generatedFieldMapRoot = (Get-Content -LiteralPath $generatedFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$generatedFieldMapRoot.reportProfileName -eq 'experiment-report') -Message 'Field-map generator is missing the expected report profile name.'
+  Assert-True -Condition ([string]$generatedFieldMapRoot.reportInputMode -eq 'path') -Message 'Field-map generator should record reportInputMode=path for file-backed reports.'
+  Assert-True -Condition ([string]$generatedFieldMapRoot.metadataInputMode -eq 'path') -Message 'Field-map generator should record metadataInputMode=path for metadata files.'
   Assert-True -Condition ($generatedFieldMapRoot.summary.fieldCount -ge 7) -Message 'Field-map generator produced too few fields.'
   Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '课程名称') -Message 'Field-map generator did not map the course name.'
   Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '班级') -Message 'Field-map generator did not map the class field.'
@@ -1210,6 +1212,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((@($templateFitCheckRoot.inputGaps.missingReportSections | Where-Object { $_.heading -eq '问题分析' }).Count) -ge 1) -Message 'Template-fit checker should surface the missing 问题分析 report section.'
   Assert-True -Condition ((@($templateFitCheckRoot.suggestions.compositeRulesToAdd | Where-Object { $_.cellText -eq '实验目的 / 实验结果' }).Count) -ge 1) -Message 'Template-fit checker should suggest a composite rule for the unmatched cover/body cell.'
   Assert-True -Condition ((@($templateFitCheckRoot.suggestions.compositeRulesToAdd | Where-Object { $_.cellText -eq '实验目的 / 实验结果' -and @($_.suggestedProfilePatch.matchAll).Count -ge 2 }).Count) -ge 1) -Message 'Template-fit checker should emit a scaffolded matchAll array for composite-rule suggestions.'
+  Assert-True -Condition ([string]$templateFitCheckRoot.reportInputMode -eq 'path') -Message 'Template-fit checker should record reportInputMode=path for file-backed reports.'
+  Assert-True -Condition ([string]$templateFitCheckRoot.metadataInputMode -eq 'path') -Message 'Template-fit checker should record metadataInputMode=path for metadata files.'
 
   $templateFitMarkdown = & (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
     -TemplatePath $diagnosticTemplateDocx `
@@ -1386,6 +1390,7 @@ URL: https://example.com/network-lab
   $courseDesignImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $courseDesignStyledDocx -MappingPath $courseDesignImageMapPath -OutPath $courseDesignImageFilledDocx
   Assert-True -Condition (Test-Path -LiteralPath $courseDesignImageFilledDocx) -Message 'Course-design image insertion did not create the filled docx.'
   Assert-True -Condition ([string]$courseDesignImageInsertResult.reportProfileName -eq 'course-design-report') -Message 'Course-design image insertion is missing the expected report profile name.'
+  Assert-True -Condition ([string]$courseDesignImageInsertResult.mappingInputMode -eq 'mapping-path') -Message 'Course-design image insertion should record mappingInputMode=mapping-path for image-map files.'
   Assert-True -Condition ($courseDesignImageInsertResult.insertedImageCount -eq 2) -Message 'Course-design image insertion inserted an unexpected number of images.'
   $courseDesignImageTemp = Join-Path $tempRoot 'course-design-image-inspect'
   [System.IO.Compression.ZipFile]::ExtractToDirectory($courseDesignImageFilledDocx, $courseDesignImageTemp)
@@ -1496,6 +1501,7 @@ URL: https://example.com/network-lab
   $generatedImageMapRoot = (Get-Content -LiteralPath $generatedImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition (@($generatedImageMapRoot.images).Count -eq 2) -Message 'Image-map generator produced an unexpected number of images.'
   Assert-True -Condition ([string]$generatedImageMapRoot.summary.reportProfileName -eq 'experiment-report') -Message 'Image-map generator is missing the expected report profile name.'
+  Assert-True -Condition ([string]$generatedImageMapRoot.summary.imageInputMode -eq 'specs-path') -Message 'Image-map generator should record imageInputMode=specs-path for file-backed image specs.'
   Assert-True -Condition ([string]$generatedImageMapRoot.images[0].section -eq '实验步骤') -Message 'Image-map generator did not keep the first section.'
   Assert-True -Condition ([string]$generatedImageMapRoot.images[1].section -eq '实验结果') -Message 'Image-map generator did not keep the second section.'
   Assert-True -Condition ([string]$generatedImageMapRoot.images[0].caption -match '^图1 ') -Message 'Image-map generator did not create the first caption.'
@@ -1518,6 +1524,7 @@ URL: https://example.com/network-lab
       -PlanOnly | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$imagePlanJson.summary.planOnly) -Message 'Image-map planner JSON should mark planOnly output.'
   Assert-True -Condition ([string]$imagePlanJson.summary.reportProfileName -eq 'experiment-report') -Message 'Image-map planner JSON is missing the expected report profile name.'
+  Assert-True -Condition ([string]$imagePlanJson.summary.imageInputMode -eq 'image-paths') -Message 'Image-map planner JSON should record imageInputMode=image-paths for direct image lists.'
   Assert-True -Condition (@($imagePlanJson.plan).Count -eq 2) -Message 'Image-map planner JSON produced an unexpected number of plan rows.'
   Assert-True -Condition ([string]$imagePlanJson.plan[0].proposedSection -eq '实验步骤') -Message 'Image-map planner should place the first fallback image in the procedure section.'
   Assert-True -Condition ([string]$imagePlanJson.plan[1].proposedSection -eq '实验结果') -Message 'Image-map planner should place the second fallback image in the result section.'
@@ -2046,6 +2053,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
   Assert-True -Condition ([string]$buildReportSummary.reportProfileName -eq 'experiment-report') -Message 'build-report summary is missing the expected report profile name.'
+  Assert-True -Condition ([string]$buildReportSummary.reportInputMode -eq 'path') -Message 'build-report summary should record reportInputMode=path for file-backed reports.'
+  Assert-True -Condition ([string]$buildReportSummary.metadataInputMode -eq 'path') -Message 'build-report summary should record metadataInputMode=path for metadata files.'
+  Assert-True -Condition ([string]$buildReportSummary.requirementsInputMode -eq 'path') -Message 'build-report summary should record requirementsInputMode=path for requirements files.'
+  Assert-True -Condition ([string]$buildReportSummary.imageInputMode -eq 'specs-path') -Message 'build-report summary should record imageInputMode=specs-path for image spec files.'
   Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report should default the requested style profile from the report profile.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfilePath -eq $buildStyleProfilePath) -Message 'build-report summary is missing the custom style profile path.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'default') -Message 'build-report summary should resolve the sample template to the default style profile.'

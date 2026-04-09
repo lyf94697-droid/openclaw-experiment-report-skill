@@ -923,6 +923,13 @@ if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
   $resolvedSpecsPathForProbe = (Resolve-Path -LiteralPath $ImageSpecsPath).Path
 }
 $script:ImagePathProbeRoots = Get-ImagePathProbeRoots -DocxPath $resolvedDocxPath -SpecsPath $resolvedSpecsPathForProbe
+$imageInputMode = if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
+  "specs-path"
+} elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
+  "specs-json"
+} else {
+  "image-paths"
+}
 
 $rawItems = Get-ImageInputItems -SpecsPath $ImageSpecsPath -SpecsJson $ImageSpecsJson -Paths $ImagePaths
 $imageSpecs = @($rawItems | ForEach-Object { Resolve-ImageInputSpec -Item $_ })
@@ -1053,6 +1060,7 @@ $result = [pscustomobject]@{
     docxPath = $resolvedDocxPath
     reportProfileName = [string]$reportProfile.name
     reportProfilePath = [string]$reportProfile.resolvedProfilePath
+    imageInputMode = $imageInputMode
     imageCount = $resultImages.Count
     availableSections = @($discoveredSections | ForEach-Object { $_.headingText } | Select-Object -Unique)
     planOnly = [bool]$PlanOnly

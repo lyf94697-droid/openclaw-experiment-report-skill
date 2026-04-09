@@ -1039,6 +1039,14 @@ function Add-FieldMapEntry {
 
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $reportInfo = Get-ReportInput -TextPath $ReportPath -InlineText $ReportText
+$reportInputMode = if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { "path" } else { "inline" }
+$metadataInputMode = if (-not [string]::IsNullOrWhiteSpace($MetadataPath)) {
+  "path"
+} elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
+  "inline"
+} else {
+  "none"
+}
 $metadataValues = @{}
 Import-OptionalMetadata -PathToJson $MetadataPath -InlineJson $MetadataJson -MetadataValues $metadataValues
 $reportAnalysis = Get-ReportAnalysis -Text ([string]$reportInfo.Text) -MetadataValues $metadataValues
@@ -1310,6 +1318,8 @@ $result = [ordered]@{
   reportSource = $reportInfo.Source
   reportProfileName = [string]$reportProfile.name
   reportProfilePath = [string]$reportProfile.resolvedProfilePath
+  reportInputMode = $reportInputMode
+  metadataInputMode = $metadataInputMode
   summary = [ordered]@{
     metadataValueCount = $metadataValues.Count
     reportSectionCount = $reportAnalysis.SectionsById.Count

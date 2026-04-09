@@ -1409,6 +1409,7 @@ if ([System.IO.Path]::GetExtension($resolvedDocxPath).ToLowerInvariant() -ne ".d
   throw "Only .docx files are supported: $resolvedDocxPath"
 }
 
+$mappingInputMode = if (-not [string]::IsNullOrWhiteSpace($MappingPath)) { "mapping-path" } else { "images-json" }
 $resolvedMappingPathForProbe = $null
 if (-not [string]::IsNullOrWhiteSpace($MappingPath)) {
   $resolvedMappingPathForProbe = (Resolve-Path -LiteralPath $MappingPath).Path
@@ -1603,6 +1604,7 @@ try {
     outPath = $resolvedOutPath
     reportProfileName = [string]$reportProfile.name
     reportProfilePath = [string]$reportProfile.resolvedProfilePath
+    mappingInputMode = $mappingInputMode
     insertedImageCount = $insertedImageCount
     insertedCaptionCount = $insertedCaptionCount
     anchorCount = @($resolvedTargets | Select-Object -Unique).Count

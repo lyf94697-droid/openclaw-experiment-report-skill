@@ -84,6 +84,20 @@ $effectiveStyleProfile = if ($PSBoundParameters.ContainsKey("StyleProfile")) {
 } else {
   Get-ReportProfileDefaultStyleProfile -Profile $reportProfile
 }
+$metadataInputMode = if (-not [string]::IsNullOrWhiteSpace($resolvedMetadataPath)) {
+  "path"
+} elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
+  "inline"
+} else {
+  "none"
+}
+$requirementsInputMode = if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath)) {
+  "path"
+} elseif (-not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
+  "inline"
+} else {
+  "none"
+}
 
 $imageInputModes = 0
 if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) { $imageInputModes++ }
@@ -92,6 +106,15 @@ if ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) { $imageInputModes++ 
 $imageInputsProvided = ($imageInputModes -gt 0)
 if ($imageInputModes -gt 1) {
   throw "Provide zero or one of -ImageSpecsPath, -ImageSpecsJson, or -ImagePaths."
+}
+$imageInputMode = if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
+  "specs-path"
+} elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
+  "specs-json"
+} elseif ($null -ne $ImagePaths -and @($ImagePaths).Count -gt 0) {
+  "image-paths"
+} else {
+  "none"
 }
 
 $styleOutputRequested = $StyleFinalDocx -or (-not [string]::IsNullOrWhiteSpace($StyledDocxOutPath))
@@ -318,7 +341,11 @@ $summary = [pscustomobject]@{
   reportProfilePath = $resolvedReportProfilePath
   templatePath = $resolvedTemplatePath
   reportPath = $resolvedReportPath
+  reportInputMode = "path"
   metadataPath = $resolvedMetadataPath
+  metadataInputMode = $metadataInputMode
+  requirementsInputMode = $requirementsInputMode
+  imageInputMode = $imageInputMode
   fieldMapPath = $resolvedFieldMapOutPath
   filledDocxPath = $resolvedFilledDocxOutPath
   filledOutlinePath = $filledOutlinePath
