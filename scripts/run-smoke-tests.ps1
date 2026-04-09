@@ -2112,6 +2112,33 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
   $results.Add('build-report pipeline OK') | Out-Null
 
+  $buildReportInlineOutputDir = Join-Path $tempRoot 'build-report-inline-output'
+  $buildReportInlineMetadataJson = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') -Raw -Encoding UTF8
+  $buildReportInlineRequirementsJson = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') -Raw -Encoding UTF8
+  $buildReportInlineImageSpecsJson = Get-Content -LiteralPath $rowImageSpecsPath -Raw -Encoding UTF8
+  $buildReportInlineResult = & (Join-Path $repoRoot 'scripts\build-report.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataJson $buildReportInlineMetadataJson `
+    -ImageSpecsJson $buildReportInlineImageSpecsJson `
+    -RequirementsJson $buildReportInlineRequirementsJson `
+    -OutputDir $buildReportInlineOutputDir `
+    -StyleFinalDocx `
+    -StyleProfilePath $buildStyleProfilePath
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportInlineOutputDir 'generated-field-map.json')) -Message 'Inline build-report did not create the generated field map.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportInlineOutputDir 'sample-template.filled.images.styled.docx')) -Message 'Inline build-report did not create the styled docx.'
+  $buildReportInlineSummary = (Get-Content -LiteralPath (Join-Path $buildReportInlineOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$buildReportInlineSummary.reportInputMode -eq 'path') -Message 'Inline build-report should still record reportInputMode=path for file-backed reports.'
+  Assert-True -Condition ([string]$buildReportInlineSummary.metadataInputMode -eq 'inline') -Message 'Inline build-report should record metadataInputMode=inline for inline metadata JSON.'
+  Assert-True -Condition ([string]$buildReportInlineSummary.requirementsInputMode -eq 'inline') -Message 'Inline build-report should record requirementsInputMode=inline for inline requirements JSON.'
+  Assert-True -Condition ([string]$buildReportInlineSummary.imageInputMode -eq 'specs-json') -Message 'Inline build-report should record imageInputMode=specs-json for inline image specs JSON.'
+  Assert-True -Condition ([bool]$buildReportInlineSummary.validationPassed) -Message 'Inline build-report summary reported a failed validation result.'
+  Assert-True -Condition ([bool]$buildReportInlineSummary.layoutCheckPassed) -Message 'Inline build-report summary reported a failed layout check.'
+  Assert-True -Condition ([int]$buildReportInlineSummary.expectedLayoutImageCount -eq 4) -Message 'Inline build-report summary is missing the expected layout image count.'
+  Assert-True -Condition ([int]$buildReportInlineSummary.expectedLayoutCaptionCount -eq 4) -Message 'Inline build-report summary is missing the expected layout caption count.'
+  Assert-True -Condition ([string]$buildReportInlineSummary.styleProfile -eq 'default') -Message 'Inline build-report summary should resolve the sample template to the default style profile.'
+  $results.Add('build-report inline inputs OK') | Out-Null
+
   $preparedSummaryMockReportPath = Join-Path $tempRoot 'course-design-generated-report.txt'
   @'
 软件工程课程设计报告
