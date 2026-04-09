@@ -49,29 +49,6 @@ if ([string]::IsNullOrWhiteSpace($PromptPath) -eq [string]::IsNullOrWhiteSpace($
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$configPath = Join-Path (Join-Path $HOME ".openclaw") "openclaw.json"
-$resolvedConfigPath = (Resolve-Path -LiteralPath $configPath).Path
-$config = (Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8) | ConvertFrom-Json
-
-$gatewayHost = "127.0.0.1"
-$gatewayPort = 18789
-$gateway = Get-ConfigValue -Object $config -Name "gateway"
-if ($null -ne (Get-ConfigValue -Object $gateway -Name "bindHost")) {
-  $gatewayHost = [string](Get-ConfigValue -Object $gateway -Name "bindHost")
-}
-if ($null -ne (Get-ConfigValue -Object $gateway -Name "port") -and -not [string]::IsNullOrWhiteSpace([string](Get-ConfigValue -Object $gateway -Name "port"))) {
-  $gatewayPort = [int](Get-ConfigValue -Object $gateway -Name "port")
-}
-$gatewayAuth = Get-ConfigValue -Object $gateway -Name "auth"
-$gatewayToken = [string](Get-ConfigValue -Object $gatewayAuth -Name "token")
-if ([string]::IsNullOrWhiteSpace($gatewayToken)) {
-  throw "OpenClaw gateway token is missing in $resolvedConfigPath"
-}
-
-$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
-if ($null -eq $nodeCommand -or [string]::IsNullOrWhiteSpace($nodeCommand.Source)) {
-  throw "Node.js is required to send chat requests through the OpenClaw gateway."
-}
 
 $userPrompt = if (-not [string]::IsNullOrWhiteSpace($PromptPath)) {
   Get-Content -LiteralPath (Resolve-Path -LiteralPath $PromptPath).Path -Raw -Encoding UTF8
@@ -99,6 +76,39 @@ $preparedPromptResult = & (Join-Path $repoRoot "scripts\prepare-report-prompt.ps
   -OpenClawCmd $OpenClawCmd `
   -ReferenceMaxChars $ReferenceMaxChars
 $userPrompt = Get-Content -LiteralPath $preparedPromptPath -Raw -Encoding UTF8
+
+$preGeneratedReportPath = $env:OPENCLAW_PREGENERATED_REPORT_PATH
+if (-not [string]::IsNullOrWhiteSpace($preGeneratedReportPath)) {
+  $resolvedPreGeneratedReportPath = (Resolve-Path -LiteralPath $preGeneratedReportPath).Path
+  $preGeneratedReportText = Get-Content -LiteralPath $resolvedPreGeneratedReportPath -Raw -Encoding UTF8
+  [System.IO.File]::WriteAllText($resolvedOutFile, $preGeneratedReportText, (New-Object System.Text.UTF8Encoding($false)))
+  Write-Output $preGeneratedReportText
+  return
+}
+
+$configPath = Join-Path (Join-Path $HOME ".openclaw") "openclaw.json"
+$resolvedConfigPath = (Resolve-Path -LiteralPath $configPath).Path
+$config = (Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8) | ConvertFrom-Json
+
+$gatewayHost = "127.0.0.1"
+$gatewayPort = 18789
+$gateway = Get-ConfigValue -Object $config -Name "gateway"
+if ($null -ne (Get-ConfigValue -Object $gateway -Name "bindHost")) {
+  $gatewayHost = [string](Get-ConfigValue -Object $gateway -Name "bindHost")
+}
+if ($null -ne (Get-ConfigValue -Object $gateway -Name "port") -and -not [string]::IsNullOrWhiteSpace([string](Get-ConfigValue -Object $gateway -Name "port"))) {
+  $gatewayPort = [int](Get-ConfigValue -Object $gateway -Name "port")
+}
+$gatewayAuth = Get-ConfigValue -Object $gateway -Name "auth"
+$gatewayToken = [string](Get-ConfigValue -Object $gatewayAuth -Name "token")
+if ([string]::IsNullOrWhiteSpace($gatewayToken)) {
+  throw "OpenClaw gateway token is missing in $resolvedConfigPath"
+}
+
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+if ($null -eq $nodeCommand -or [string]::IsNullOrWhiteSpace($nodeCommand.Source)) {
+  throw "Node.js is required to send chat requests through the OpenClaw gateway."
+}
 
 $skillMarkdown = Get-Content -LiteralPath (Join-Path $repoRoot "SKILL.md") -Raw -Encoding UTF8
 $skillBody = [regex]::Replace($skillMarkdown, '^(?s)---\s*.*?\s*---\s*', '')

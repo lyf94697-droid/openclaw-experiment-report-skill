@@ -323,16 +323,20 @@ $studentNameForFilename = if (-not [string]::IsNullOrWhiteSpace($StudentName)) {
 
 $rawReportPath = Join-Path $resolvedOutputDir "report.raw.txt"
 $cleanedReportPath = Join-Path $resolvedOutputDir "report.cleaned.txt"
-& (Join-Path $repoRoot "scripts\generate-report-chat.ps1") `
-  -PromptPath $promptPathOut `
-  -ReferenceTextPaths $effectiveReferenceTextPathList `
-  -ReferenceUrls $effectiveReferenceUrlList `
-  -BrowserProfile $BrowserProfile `
-  -OpenClawCmd $OpenClawCmd `
-  -ReferenceMaxChars $ReferenceMaxChars `
-  -SessionKey $SessionKey `
-  -OutFile $rawReportPath `
-  $(if ($SkipSessionReset) { "-SkipSessionReset" }) | Out-Null
+$generateChatParams = @{
+  PromptPath = $promptPathOut
+  ReferenceTextPaths = $effectiveReferenceTextPathList
+  ReferenceUrls = $effectiveReferenceUrlList
+  BrowserProfile = $BrowserProfile
+  OpenClawCmd = $OpenClawCmd
+  ReferenceMaxChars = $ReferenceMaxChars
+  SessionKey = $SessionKey
+  OutFile = $rawReportPath
+}
+if ($SkipSessionReset) {
+  $generateChatParams.SkipSessionReset = $true
+}
+& (Join-Path $repoRoot "scripts\generate-report-chat.ps1") @generateChatParams | Out-Null
 
 $rawReportText = Get-Content -LiteralPath $rawReportPath -Raw -Encoding UTF8
 $cleanedReportText = Normalize-GeneratedReportText -Text $rawReportText -Labels $labels

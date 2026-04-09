@@ -222,7 +222,15 @@ $model = $null
 $skillActive = $false
 
 if ($Mode -eq "guided-chat") {
-  $guidedOutput = & (Join-Path $repoRoot "scripts\generate-report-chat.ps1") -PromptPath $promptOutPath -SessionKey $SessionKey -OutFile $reportPath $(if ($SkipSessionReset) { '-SkipSessionReset' })
+  $generateChatParams = @{
+    PromptPath = $promptOutPath
+    SessionKey = $SessionKey
+    OutFile = $reportPath
+  }
+  if ($SkipSessionReset) {
+    $generateChatParams.SkipSessionReset = $true
+  }
+  $guidedOutput = & (Join-Path $repoRoot "scripts\generate-report-chat.ps1") @generateChatParams
   $reportText = (Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8).Trim()
   [System.IO.File]::WriteAllText($agentOutputPath, ($guidedOutput | Out-String), (New-Object System.Text.UTF8Encoding($true)))
   $responseFormat = 'gateway-chat'

@@ -2054,6 +2054,70 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
   $results.Add('build-report pipeline OK') | Out-Null
 
+  $preparedSummaryMockReportPath = Join-Path $tempRoot 'course-design-generated-report.txt'
+  @'
+软件工程课程设计报告
+
+课程名称：软件工程综合实践
+课题名称：校园导览小程序设计
+学生姓名：李四
+学号：20261234
+指导老师：王老师
+完成时间：2026-04-08
+设计地点：实验楼 A201
+
+一、设计目标
+本次课程设计面向新生入校后对校园空间陌生、目标地点分散、路线信息不明确的典型问题，设计并实现一个聚焦校园导览场景的小程序系统。系统目标不仅是展示地点列表，而是围绕“搜索地点、查看详情、获得路线、完成到达”这一条连续任务链路组织页面能力，保证用户在教学楼、实验楼、宿舍区和公共服务区之间切换时可以快速完成信息查询与路径判断。为了让课程设计报告体现完整的工程思路，目标部分还强调了界面清晰度、检索速度、地点信息准确性、可演示性和后续扩展能力五项约束，使小程序既能用于课堂答辩展示，也能作为后续校园导览产品原型继续迭代。
+
+二、开发环境
+项目开发环境采用 Windows 11 作为主机系统，前端使用微信开发者工具完成小程序页面开发与调试，后端接口模拟层采用 Node.js 运行时组织数据与逻辑，地点数据使用 SQLite 进行本地持久化存储。为了提升课程设计阶段的联调效率，项目额外配置了接口日志输出、静态资源目录、假数据回放脚本和本地构建命令，保证校园导览小程序在离线演示时依然能够稳定展示搜索、筛选、详情与路线提示结果。开发环境选择的核心考虑是学习成本适中、调试链路清晰、便于演示答辩时快速复现，因此页面样式、数据脚本和接口调试流程都围绕“小程序可重复运行、校园导览能力可直接观察”这一目标来组织。
+
+三、需求分析
+在需求分析阶段，首先从校园导览的真实使用场景出发，将用户需求拆分为地点检索、分类浏览、详情查看、推荐路线、收藏常用地点和异常提示六类核心能力。对新生用户而言，最重要的是在不熟悉校园布局的情况下，通过输入教学楼、食堂、图书馆或宿舍关键词快速找到目标位置，并在详情页看到楼宇简介、开放时间和相邻地标，从而降低迷路概率。对演示者而言，系统还需要在小程序首页突出搜索入口、分类卡片和推荐模块，让课程设计答辩时能够在短时间内清楚展示校园导览的主要流程。结合这些场景分析后，需求部分进一步明确了性能和准确性要求，即关键词搜索应尽量减少无关结果，路线提示应能给出可理解的步骤描述，收藏状态应在切换页面后保持一致，保证小程序不是单纯的页面堆叠，而是具备连续可用性的校园导览工具。
+
+四、方案设计与实现
+系统方案采用前后端分层结构。前端小程序负责首页分类导航、搜索结果列表、地点详情页、收藏状态展示和路线提示入口；后端数据层负责地点数据组织、关键词过滤、分类映射和路线推荐结果拼装。首页通过显眼的搜索框和功能卡片承接用户的第一步操作，搜索模块支持按关键词匹配地点名称、标签和描述字段，列表页增加了分类筛选与空结果提示，详情页则集中展示地点介绍、楼层信息、附近地标和收藏按钮，使校园导览链路在页面层面保持连贯。实现过程中，为了提升小程序在校园导览场景下的响应速度，项目对热门地点列表进行了本地缓存，对重复搜索结果进行了简单去重，并把路线提示描述抽象为可复用的数据结构，便于后续接入真实地图接口。课程设计实现部分还记录了组件拆分、接口模拟、状态同步、日志调试和异常提示的具体处理方式，说明系统不仅实现了可视化界面，还在工程组织、代码可维护性和演示稳定性方面做了针对性设计。
+
+五、运行结果
+完成编码与联调后，校园导览小程序已经能够稳定展示首页推荐地点、分类入口、关键词搜索结果、地点详情信息和基础路线提示流程。在实际演示中，输入“图书馆”“实验楼”“食堂”等关键词后，系统都能在较短时间内返回匹配结果，并在详情页正确显示地点简介、位置说明与收藏状态；当用户点击路线提示入口时，页面可以展示从当前位置到目标区域的文字化引导，满足课程设计对“能看、能查、能演示”的要求。运行结果部分还验证了收藏功能在页面切换后的状态保持、空结果场景下的提示信息和日志输出是否清晰，说明小程序不仅能够完成校园导览的核心流程，还对常见交互边界做了基础覆盖。整体来看，系统已经达到课程设计答辩所需的可运行、可观察、可解释状态。
+
+六、问题与改进
+虽然当前版本已经具备校园导览小程序的核心能力，但在路线推荐精度、地点数据规模和交互细节上仍存在继续优化空间。首先，当前路线提示主要依赖预设文本和简化规则，尚未接入真实地图服务，因此在复杂路径场景下缺少更细粒度的导航能力；其次，地点数据仍以课程设计阶段整理的样例数据为主，覆盖面有限，当校园导览扩展到更多教学楼、实验室和服务窗口时，需要进一步补充与维护。除此之外，页面交互也可以继续增强，例如为小程序加入最近搜索记录、按学院分组的地点入口、收藏夹批量管理和更明显的异常反馈。后续改进的方向应当继续围绕校园导览这一核心任务链路展开，而不是单纯堆叠功能项，确保新增能力能够真实提升用户在找地点、看详情和判断路线时的效率。
+
+七、设计总结
+通过本次课程设计，进一步理解了从需求分析、页面拆分、数据建模、接口模拟到联调演示的完整实现流程，也更加明确了“以用户任务链路为中心”对小程序设计的重要性。校园导览场景看似简单，但真正落地时需要同时处理搜索效率、信息组织、交互连续性、演示稳定性和后续扩展性等多方面问题，因此课程设计过程不仅锻炼了编码能力，也训练了围绕目标场景拆解需求和验证结果的能力。最终完成的校园导览小程序虽然仍有改进空间，但已经形成了一套结构清晰、功能闭环明确、适合课堂展示和后续迭代的实现方案。整个过程最大的收获，是学会了把课程设计报告中的分析、设计、实现、结果和改进真正对应到一个可运行的小程序系统上，而不是停留在概念层面的描述。
+'@ | Set-Content -LiteralPath $preparedSummaryMockReportPath -Encoding UTF8
+
+  $originalPreGeneratedReportPath = $env:OPENCLAW_PREGENERATED_REPORT_PATH
+  try {
+    $env:OPENCLAW_PREGENERATED_REPORT_PATH = $preparedSummaryMockReportPath
+    $preparedSummaryBuildOutputDir = Join-Path $tempRoot 'prepared-summary-url-build-output'
+    & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+      -TemplatePath $courseDesignTemplateDocx `
+      -PreparedInputsSummaryPath $reportInputsSummaryPath `
+      -ImageSpecsPath $courseDesignImageSpecsPath `
+      -OutputDir $preparedSummaryBuildOutputDir `
+      -StyleProfile auto `
+      -SkipSessionReset | Out-Null
+    $preparedSummaryBuildSummaryPath = Join-Path $preparedSummaryBuildOutputDir 'url-build-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $preparedSummaryBuildSummaryPath) -Message 'Prepared-summary URL wrapper did not create the wrapper summary.'
+    $preparedSummaryBuildSummary = (Get-Content -LiteralPath $preparedSummaryBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileName -eq 'course-design-report') -Message 'Prepared-summary URL wrapper should inherit the course-design profile.'
+    Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Prepared-summary URL wrapper should inherit the course-design display name.'
+    Assert-True -Condition ([string]$preparedSummaryBuildSummary.detailLevel -eq 'full') -Message 'Prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+    Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportInputsSummaryPath -eq $reportInputsSummaryPath) -Message 'Prepared-summary URL wrapper should keep the original input summary path.'
+    Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedCourseName -eq '软件工程综合实践') -Message 'Prepared-summary URL wrapper lost the requested course name from the prepared summary.'
+    Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedExperimentName -eq '校园导览小程序设计') -Message 'Prepared-summary URL wrapper lost the requested title from the prepared summary.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.rawReportPath)) -Message 'Prepared-summary URL wrapper did not write the raw report file.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath)) -Message 'Prepared-summary URL wrapper did not write the cleaned report file.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.finalDocxPath)) -Message 'Prepared-summary URL wrapper final docx path does not exist.'
+    $preparedSummaryCleanedReport = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+    Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
+  } finally {
+    $env:OPENCLAW_PREGENERATED_REPORT_PATH = $originalPreGeneratedReportPath
+  }
+  $results.Add('build-report-from-url prepared summary OK') | Out-Null
+
   $feishuBuildOutputDir = Join-Path $tempRoot 'feishu-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
     -TemplatePath $sampleDocx `
