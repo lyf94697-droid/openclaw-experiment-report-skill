@@ -366,6 +366,7 @@ try {
       (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\sample-report.txt'),
       (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
+      (Join-Path $repoRoot 'profiles\experiment-report.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
@@ -383,6 +384,7 @@ try {
       (Join-Path $repoRoot 'scripts\insert-docx-images.ps1'),
       (Join-Path $repoRoot 'scripts\prepare-report-prompt.ps1'),
       (Join-Path $repoRoot 'scripts\report-defaults.ps1'),
+      (Join-Path $repoRoot 'scripts\report-profiles.ps1'),
       (Join-Path $repoRoot 'scripts\reset-openclaw-session.ps1'),
       (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1'),
       (Join-Path $repoRoot 'scripts\self-check.ps1'),
@@ -510,6 +512,21 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([bool]$resolvedInferredNames.usedInferredExperimentName) -Message 'Report-defaults helper should report that it used an inferred experiment name.'
   Assert-True -Condition (-not [bool]$resolvedInferredNames.usedStoredExperimentName) -Message 'Report-defaults helper should not report stored experiment-name reuse when inference wins.'
   $results.Add('report defaults helper OK') | Out-Null
+
+  . (Join-Path $repoRoot 'scripts\report-profiles.ps1')
+  $reportProfile = Get-ReportProfile -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$reportProfile.name -eq 'experiment-report') -Message 'Report profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$reportProfile.displayName -eq '实验报告') -Message 'Report profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string]$reportProfile.defaultExperimentProperty -eq '③验证性实验') -Message 'Report profile is missing the default experiment property.'
+  $reportProfileLabels = Get-ReportProfileLabels -Profile $reportProfile
+  Assert-True -Condition ([string]$reportProfileLabels['CourseName'] -eq '课程名称') -Message 'Report profile labels are missing the course-name field.'
+  Assert-True -Condition ([string]$reportProfileLabels['Results'] -eq '实验结果') -Message 'Report profile labels are missing the results heading.'
+  $reportProfileSections = @(Get-ReportProfileSectionFields -Profile $reportProfile)
+  Assert-True -Condition ($reportProfileSections.Count -ge 7) -Message 'Report profile is missing required section definitions.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $reportProfile) -contains '问题分析') -Message 'Report profile required headings are missing 问题分析.'
+  $fullDetailProfile = Get-ReportProfileDetailProfile -Profile $reportProfile -DetailLevel 'full'
+  Assert-True -Condition ([int]$fullDetailProfile.minChars -eq 1100) -Message 'Report profile full detail level is missing the expected minChars.'
+  $results.Add('report profile loader OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
     Test-PowerShellSyntax -Path $scriptPath
@@ -1394,9 +1411,11 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-defaults.ps1')) -Message 'Install script did not copy the report-defaults helper script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-profiles.ps1')) -Message 'Install script did not copy the report-profiles helper script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\apply-docx-field-map.ps1')) -Message 'Install script did not copy fill script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\experiment-report.json')) -Message 'Install script did not copy the experiment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'

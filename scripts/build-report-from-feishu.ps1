@@ -35,6 +35,10 @@ param(
 
   [string]$ExperimentLocation,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [string]$RequirementsPath,
 
   [string]$RequirementsJson,
@@ -187,6 +191,7 @@ $resolvedReportPath = Resolve-AbsolutePathIfProvided -Path $ReportPath
 $resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
+$resolvedReportProfilePath = Resolve-AbsolutePathIfProvided -Path $ReportProfilePath
 $resolvedImageSpecsPath = Resolve-AbsolutePathIfProvided -Path $ImageSpecsPath
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
@@ -364,6 +369,12 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+    $buildParams.ReportProfileName = $ReportProfileName
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
+    $buildParams.ReportProfilePath = $resolvedReportProfilePath
+  }
 
   if ($SkipSessionReset) {
     $buildParams.SkipSessionReset = $true
@@ -426,6 +437,8 @@ $wrapperSummary = [pscustomobject]@{
   artifactsDir = $resolvedArtifactsDir
   templatePath = $resolvedTemplatePath
   mode = $wrapperMode
+  reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { $ReportProfileName })
+  reportProfilePath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfilePath") { [string]$innerSummary.reportProfilePath } else { $resolvedReportProfilePath })
   courseName = $resolvedCourseName
   experimentName = $resolvedExperimentName
   requestedCourseName = $CourseName
