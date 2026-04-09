@@ -473,6 +473,34 @@ $generationMode = if ($wrapperMode -eq "local-report") {
 } else {
   "live"
 }
+$buildReportInputMode = if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "buildReportInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.buildReportInputMode)) {
+  [string]$innerSummary.buildReportInputMode
+} elseif ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.reportInputMode)) {
+  [string]$innerSummary.reportInputMode
+} else {
+  $null
+}
+$buildMetadataInputMode = if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "buildMetadataInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.buildMetadataInputMode)) {
+  [string]$innerSummary.buildMetadataInputMode
+} elseif ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "metadataInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.metadataInputMode)) {
+  [string]$innerSummary.metadataInputMode
+} else {
+  $null
+}
+$buildRequirementsInputMode = if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "buildRequirementsInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.buildRequirementsInputMode)) {
+  [string]$innerSummary.buildRequirementsInputMode
+} elseif ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "requirementsInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.requirementsInputMode)) {
+  [string]$innerSummary.requirementsInputMode
+} else {
+  $null
+}
+$buildImageInputMode = if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "buildImageInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.buildImageInputMode)) {
+  [string]$innerSummary.buildImageInputMode
+} elseif ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imageInputMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.imageInputMode)) {
+  [string]$innerSummary.imageInputMode
+} else {
+  $null
+}
 
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -509,6 +537,10 @@ $wrapperSummary = [pscustomobject]@{
   archivedImagePaths = $archivedImagePaths
   summaryPath = $resolvedSummaryPath
   innerSummaryPath = $innerSummaryPath
+  buildReportInputMode = $buildReportInputMode
+  buildMetadataInputMode = $buildMetadataInputMode
+  buildRequirementsInputMode = $buildRequirementsInputMode
+  buildImageInputMode = $buildImageInputMode
   imagePlanPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$innerSummary.imagePlanPath } else { $null })
   imagePlanLowConfidenceCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imagePlanLowConfidenceCount") { $innerSummary.imagePlanLowConfidenceCount } else { $null })
   imagePlanNeedsReview = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imagePlanNeedsReview") { $innerSummary.imagePlanNeedsReview } else { $null })

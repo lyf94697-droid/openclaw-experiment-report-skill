@@ -429,6 +429,10 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
 }
 
 $generationMode = if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) { "replay" } else { "live" }
+$buildReportInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "reportInputMode") { [string]$buildSummary.reportInputMode } else { $null })
+$buildMetadataInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "metadataInputMode") { [string]$buildSummary.metadataInputMode } else { $null })
+$buildRequirementsInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "requirementsInputMode") { [string]$buildSummary.requirementsInputMode } else { $null })
+$buildImageInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imageInputMode") { [string]$buildSummary.imageInputMode } else { $null })
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -460,6 +464,10 @@ $wrapperSummary = [pscustomobject]@{
   styleProfilePath = $resolvedStyleProfilePath
   preGeneratedReportPath = $resolvedPreGeneratedReportPath
   buildSummaryPath = $buildSummaryPath
+  buildReportInputMode = $buildReportInputMode
+  buildMetadataInputMode = $buildMetadataInputMode
+  buildRequirementsInputMode = $buildRequirementsInputMode
+  buildImageInputMode = $buildImageInputMode
   imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
   imagePlanLowConfidenceCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanLowConfidenceCount") { $buildSummary.imagePlanLowConfidenceCount } else { $null })
   imagePlanNeedsReview = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanNeedsReview") { $buildSummary.imagePlanNeedsReview } else { $null })
