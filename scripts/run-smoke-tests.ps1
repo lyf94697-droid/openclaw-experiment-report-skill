@@ -1018,6 +1018,20 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($generatedFieldMapRoot.fieldMap.实验步骤.mode -eq 'after') -Message 'Field-map generator should preserve the procedure heading and fill after it.'
   $results.Add('docx field-map generation OK') | Out-Null
 
+  $inlineReportText = Get-Content -LiteralPath $sampleReportPath -Raw -Encoding UTF8
+  $inlineMetadataJson = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') -Raw -Encoding UTF8
+  $inlineFieldMapRoot = ((& (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+      -TemplatePath $sampleDocx `
+      -ReportText $inlineReportText `
+      -MetadataJson $inlineMetadataJson `
+      -Format json) | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([string]$inlineFieldMapRoot.reportInputMode -eq 'inline') -Message 'Field-map generator should record reportInputMode=inline for inline report text.'
+  Assert-True -Condition ([string]$inlineFieldMapRoot.metadataInputMode -eq 'inline') -Message 'Field-map generator should record metadataInputMode=inline for inline metadata JSON.'
+  Assert-True -Condition ([string]$inlineFieldMapRoot.reportSource -eq '[inline text]') -Message 'Field-map generator should expose [inline text] as the reportSource for inline report input.'
+  Assert-True -Condition ([string]$inlineFieldMapRoot.fieldMap.课程名称 -eq '计算机网络') -Message 'Field-map generator should still map metadata values when using inline inputs.'
+  Assert-True -Condition ($inlineFieldMapRoot.fieldMap.实验步骤.mode -eq 'after') -Message 'Field-map generator should still preserve section headings when using inline report text.'
+  $results.Add('docx field-map inline inputs OK') | Out-Null
+
   $generatedFieldMapMarkdown = & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
     -TemplatePath $sampleDocx `
     -ReportPath $sampleReportPath `
@@ -1508,6 +1522,17 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$generatedImageMapRoot.images[1].caption -match '^图2 ') -Message 'Image-map generator did not create the second caption.'
   $results.Add('docx image-map generation OK') | Out-Null
 
+  $inlineImageSpecsJson = Get-Content -LiteralPath $imageSpecsPath -Raw -Encoding UTF8
+  $inlineImageMapRoot = ((& (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
+      -DocxPath $generatedFilledDocx `
+      -ImageSpecsJson $inlineImageSpecsJson `
+      -Format json) | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([string]$inlineImageMapRoot.summary.imageInputMode -eq 'specs-json') -Message 'Image-map generator should record imageInputMode=specs-json for inline image specs JSON.'
+  Assert-True -Condition (@($inlineImageMapRoot.images).Count -eq 2) -Message 'Inline image-map generator produced an unexpected number of images.'
+  Assert-True -Condition ([string]$inlineImageMapRoot.images[0].section -eq '实验步骤') -Message 'Inline image-map generator did not keep the first section.'
+  Assert-True -Condition ([string]$inlineImageMapRoot.images[1].section -eq '实验结果') -Message 'Inline image-map generator did not keep the second section.'
+  $results.Add('docx image-map inline specs OK') | Out-Null
+
   $imagePlanMarkdown = & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
     -DocxPath $generatedFilledDocx `
     -ImagePaths $sampleImageOne,$sampleImageTwo `
@@ -1759,6 +1784,14 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($imageRelationshipsXml.Relationships.Relationship | Where-Object { $_.Target -match '^media/image\d+\.png$' }).Count -ge 2) -Message 'Inserted docx is missing expected image relationships.'
   Assert-True -Condition (@($imageContentTypesXml.Types.Default | Where-Object { $_.Extension -eq 'png' -and $_.ContentType -eq 'image/png' }).Count -ge 1) -Message 'Inserted docx is missing the png content type registration.'
   $results.Add('docx image insertion OK') | Out-Null
+
+  $inlineImageMappingJson = Get-Content -LiteralPath $generatedImageMapPath -Raw -Encoding UTF8
+  $inlineImageFilledDocx = Join-Path $tempRoot 'sample-template.generated-filled.inline-images.docx'
+  $inlineImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -ImagesJson $inlineImageMappingJson -OutPath $inlineImageFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $inlineImageFilledDocx) -Message 'Inline image insertion did not create the filled docx.'
+  Assert-True -Condition ([string]$inlineImageInsertResult.mappingInputMode -eq 'images-json') -Message 'Image insertion should record mappingInputMode=images-json for inline image-map JSON.'
+  Assert-True -Condition ($inlineImageInsertResult.insertedImageCount -eq 2) -Message 'Inline image insertion inserted an unexpected number of images.'
+  $results.Add('docx image insertion inline mapping OK') | Out-Null
 
   $layoutCheckPath = Join-Path $tempRoot 'sample-template.images.layout-check.json'
   & (Join-Path $repoRoot 'scripts\check-docx-layout.ps1') -DocxPath $imageFilledDocx -ExpectedImageCount 2 -ExpectedCaptionCount 2 -OutFile $layoutCheckPath | Out-Null
