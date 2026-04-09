@@ -71,6 +71,65 @@ function Get-ReportProfile {
   return $profile
 }
 
+function Resolve-PreparedInputsSummaryContext {
+  param(
+    [AllowNull()]
+    [string]$PreparedInputsSummaryPath,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath,
+
+    [bool]$ReportProfileNameProvided = $false,
+
+    [bool]$ReportProfilePathProvided = $false,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full",
+
+    [bool]$DetailLevelProvided = $false
+  )
+
+  $resolvedPreparedInputsSummaryPath = if ([string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath)) {
+    $null
+  } else {
+    (Resolve-Path -LiteralPath $PreparedInputsSummaryPath).Path
+  }
+
+  $preparedInputsSummary = if (-not [string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
+    (Get-Content -LiteralPath $resolvedPreparedInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  } else {
+    $null
+  }
+
+  $useSummaryProfile = ($null -ne $preparedInputsSummary) -and (-not $ReportProfileNameProvided) -and (-not $ReportProfilePathProvided)
+  $effectiveReportProfileName = if ($useSummaryProfile -and $preparedInputsSummary.PSObject.Properties.Name -contains "reportProfileName" -and -not [string]::IsNullOrWhiteSpace([string]$preparedInputsSummary.reportProfileName)) {
+    [string]$preparedInputsSummary.reportProfileName
+  } else {
+    $ReportProfileName
+  }
+  $effectiveReportProfilePath = if ($useSummaryProfile -and $preparedInputsSummary.PSObject.Properties.Name -contains "reportProfilePath" -and -not [string]::IsNullOrWhiteSpace([string]$preparedInputsSummary.reportProfilePath)) {
+    [string]$preparedInputsSummary.reportProfilePath
+  } else {
+    $ReportProfilePath
+  }
+  $effectiveDetailLevel = if (-not $DetailLevelProvided -and $null -ne $preparedInputsSummary -and $preparedInputsSummary.PSObject.Properties.Name -contains "detailLevel" -and -not [string]::IsNullOrWhiteSpace([string]$preparedInputsSummary.detailLevel)) {
+    [string]$preparedInputsSummary.detailLevel
+  } else {
+    $DetailLevel
+  }
+
+  return [pscustomobject]@{
+    resolvedPreparedInputsSummaryPath = $resolvedPreparedInputsSummaryPath
+    summary = $preparedInputsSummary
+    reportProfileName = $effectiveReportProfileName
+    reportProfilePath = $effectiveReportProfilePath
+    detailLevel = $effectiveDetailLevel
+  }
+}
+
 function Get-ReportProfileLabels {
   param(
     [Parameter(Mandatory = $true)]

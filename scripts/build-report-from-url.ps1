@@ -212,7 +212,16 @@ if (-not [string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath) -and $generati
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$preparedInputsContext = Resolve-PreparedInputsSummaryContext `
+  -PreparedInputsSummaryPath $PreparedInputsSummaryPath `
+  -ReportProfileName $ReportProfileName `
+  -ReportProfilePath $ReportProfilePath `
+  -ReportProfileNameProvided:$PSBoundParameters.ContainsKey("ReportProfileName") `
+  -ReportProfilePathProvided:$PSBoundParameters.ContainsKey("ReportProfilePath") `
+  -DetailLevel $DetailLevel `
+  -DetailLevelProvided:$PSBoundParameters.ContainsKey("DetailLevel")
+$resolvedPreparedInputsSummaryPath = [string]$preparedInputsContext.resolvedPreparedInputsSummaryPath
+$reportProfile = Get-ReportProfile -ProfileName ([string]$preparedInputsContext.reportProfileName) -ProfilePath ([string]$preparedInputsContext.reportProfilePath) -RepoRoot $repoRoot
 $labels = Get-ReportProfileLabels -Profile $reportProfile
 $documentLabel = Get-ReportProfileDisplayName -Profile $reportProfile -Fallback "报告"
 $courseNameLabel = if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" }
@@ -234,8 +243,6 @@ $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPa
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
-
-$resolvedPreparedInputsSummaryPath = Resolve-AbsolutePathIfProvided -Path $PreparedInputsSummaryPath
 $inputSummaryPath = if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
   Join-Path $resolvedOutputDir "report-inputs-summary.json"
 } else {
@@ -275,6 +282,7 @@ if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
 $inputSummary = (Get-Content -LiteralPath $inputSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
 $resolvedCourseName = [string]$inputSummary.courseName
 $resolvedExperimentName = [string]$inputSummary.experimentName
+$effectiveDetailLevel = [string]$preparedInputsContext.detailLevel
 $promptPathOut = [string]$inputSummary.promptPath
 $effectiveReferenceUrlList = @($inputSummary.referenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
 $effectiveReferenceTextPathList = @($inputSummary.referenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
@@ -365,8 +373,8 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedStyleProfilePath)) {
     $buildParams.StyleProfilePath = $resolvedStyleProfilePath
   }
-  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
-    $buildParams.ReportProfileName = $ReportProfileName
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.name)) {
+    $buildParams.ReportProfileName = [string]$reportProfile.name
   }
   if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
     $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
@@ -425,7 +433,7 @@ $wrapperSummary = [pscustomobject]@{
   usedStoredCourseName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredCourseName") { [bool]$inputSummary.usedStoredCourseName } else { $false })
   usedStoredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredExperimentName") { [bool]$inputSummary.usedStoredExperimentName } else { $false })
   usedInferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedInferredExperimentName") { [bool]$inputSummary.usedInferredExperimentName } else { $false })
-  detailLevel = $DetailLevel
+  detailLevel = $effectiveDetailLevel
   promptPath = $promptPathOut
   requestedReferenceUrls = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedReferenceUrls") { @($inputSummary.requestedReferenceUrls) } else { @() })
   referenceUrls = $effectiveReferenceUrlList

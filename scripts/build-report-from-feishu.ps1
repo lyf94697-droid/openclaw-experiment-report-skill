@@ -399,12 +399,6 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
-  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
-    $buildParams.ReportProfileName = [string]$reportProfile.name
-  }
-  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
-    $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
-  }
 
   if ($SkipSessionReset) {
     $buildParams.SkipSessionReset = $true

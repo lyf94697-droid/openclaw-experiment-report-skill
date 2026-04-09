@@ -773,6 +773,10 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([string]$reportInputsSummary.reportProfileName -eq 'course-design-report') -Message 'Report-input generation summary is missing the expected report profile name.'
     Assert-True -Condition ([string]$reportInputsSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Report-input generation summary is missing the expected display name.'
     Assert-True -Condition ((Split-Path -Leaf ([string]$reportInputsSummary.defaultsPath)) -eq 'course-design-report.defaults.json') -Message 'Report-input generation should persist defaults under the profile-specific defaults file.'
+    $preparedInputsContext = Resolve-PreparedInputsSummaryContext -PreparedInputsSummaryPath $reportInputsSummaryPath
+    Assert-True -Condition ([string]$preparedInputsContext.reportProfileName -eq 'course-design-report') -Message 'Prepared-input summary context should inherit the report profile name from the summary.'
+    Assert-True -Condition ([string]$preparedInputsContext.reportProfilePath -eq [string]$reportInputsSummary.reportProfilePath) -Message 'Prepared-input summary context should inherit the report profile path from the summary.'
+    Assert-True -Condition ([string]$preparedInputsContext.detailLevel -eq 'full') -Message 'Prepared-input summary context should inherit the detail level from the summary.'
     $generatedPromptText = Get-Content -LiteralPath (Join-Path $reportInputsOutputDir 'prompt.txt') -Raw -Encoding UTF8
     Assert-True -Condition ($generatedPromptText -match '课程设计报告 body') -Message 'Report-input generation did not emit the expected course-design prompt body.'
     Assert-True -Condition ($generatedPromptText -match '课题名称: 校园导览小程序设计') -Message 'Report-input generation did not emit the expected course-design title label.'
