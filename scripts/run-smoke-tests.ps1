@@ -273,6 +273,76 @@ function New-ParagraphCoverTemplateDocx {
   }
 }
 
+function New-FieldMapDiagnosticTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>模板适配诊断用例</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验地点：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验台号：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>问题分析</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实验器材与拓扑</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>实验目的 / 实验结果</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-SamplePngImage {
   param(
     [Parameter(Mandatory = $true)]
@@ -802,6 +872,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$coverBodyFieldMapRoot.fieldMap.T1R5C1.mode -eq 'after-table') -Message 'Cover-body template mapping should use after-table mode.'
   Assert-True -Condition ([string]$coverBodyFieldMapRoot.fieldMap.T1R5C1.through -eq 'T1R6C1') -Message 'Cover-body template mapping should span the full composite body row range.'
   Assert-True -Condition (@($coverBodyFieldMapRoot.fieldMap.T1R5C1.paragraphs).Count -ge 6) -Message 'Cover-body template mapping is missing expected body paragraphs.'
+  Assert-True -Condition ((@($coverBodyFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'composite_body_after_table' }).Count) -ge 1) -Message 'Cover-body template mapping should emit the structured composite-body diagnostic.'
   $results.Add('docx cover-body field-map generation OK') | Out-Null
 
   $coverBodyFilledDocx = Join-Path $tempRoot 'cover-body-template.filled.docx'
@@ -890,6 +961,49 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((@($customCompositeOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '乙. 环境与原理' }).Count) -ge 1) -Message 'Custom composite field-map fill did not insert the custom merged heading after the table.'
   Assert-True -Condition ((@($customCompositeOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '丙. 操作步骤' }).Count) -ge 1) -Message 'Custom composite field-map fill did not insert the custom procedure heading after the table.'
   $results.Add('docx cover-body field-map custom profile OK') | Out-Null
+
+  $diagnosticReportPath = Join-Path $tempRoot 'diagnostic-report.md'
+  @'
+计算机网络实验报告
+
+课程名称：计算机网络
+实验名称：局域网搭建与常用 DOS 命令使用
+
+一、实验目的
+通过本次实验掌握局域网的基本搭建方法，并理解 DOS 命令在网络排查中的作用。
+
+四、实验步骤
+首先将两台虚拟机配置在同一网段，并通过 ipconfig 与 ping 命令确认网络参数和连通性。
+
+五、实验结果
+实验结果表明，两台主机能够正常互通，网络参数符合实验要求。
+'@ | Set-Content -LiteralPath $diagnosticReportPath -Encoding UTF8
+
+  $diagnosticTemplateDocx = Join-Path $tempRoot 'field-map-diagnostic-template.docx'
+  New-FieldMapDiagnosticTemplateDocx -Path $diagnosticTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $diagnosticTemplateDocx) -Message 'Failed to create the field-map diagnostic template fixture.'
+
+  $diagnosticFieldMapPath = Join-Path $tempRoot 'field-map-diagnostic-output.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $diagnosticTemplateDocx `
+    -ReportPath $diagnosticReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format json `
+    -OutFile $diagnosticFieldMapPath | Out-Null
+  $diagnosticFieldMapRoot = (Get-Content -LiteralPath $diagnosticFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ($diagnosticFieldMapRoot.summary.diagnosticCount -ge 4) -Message 'Field-map diagnostics fixture should produce multiple diagnostics.'
+  Assert-True -Condition (($diagnosticFieldMapRoot.summary.diagnosticCountsByCode.missing_metadata_value -as [int]) -ge 1) -Message 'Field-map diagnostics should count missing metadata values.'
+  Assert-True -Condition (($diagnosticFieldMapRoot.summary.diagnosticCountsByCode.unrecognized_template_metadata_label -as [int]) -ge 1) -Message 'Field-map diagnostics should count unrecognized metadata labels.'
+  Assert-True -Condition (($diagnosticFieldMapRoot.summary.diagnosticCountsByCode.missing_report_section -as [int]) -ge 1) -Message 'Field-map diagnostics should count missing report sections.'
+  Assert-True -Condition (($diagnosticFieldMapRoot.summary.diagnosticCountsByCode.unrecognized_template_section_heading -as [int]) -ge 1) -Message 'Field-map diagnostics should count unrecognized section headings.'
+  Assert-True -Condition (($diagnosticFieldMapRoot.summary.diagnosticCountsByCode.unmatched_composite_template_cell -as [int]) -ge 1) -Message 'Field-map diagnostics should count unmatched composite template cells.'
+  Assert-True -Condition ((@($diagnosticFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'missing_metadata_value' -and $_.context.label -eq '实验地点' }).Count) -ge 1) -Message 'Field-map diagnostics should identify the missing 实验地点 metadata value.'
+  Assert-True -Condition ((@($diagnosticFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'unrecognized_template_metadata_label' -and $_.context.label -eq '实验台号' }).Count) -ge 1) -Message 'Field-map diagnostics should identify the unrecognized 实验台号 label.'
+  Assert-True -Condition ((@($diagnosticFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'missing_report_section' -and $_.context.heading -eq '问题分析' }).Count) -ge 1) -Message 'Field-map diagnostics should identify the missing 问题分析 section.'
+  Assert-True -Condition ((@($diagnosticFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'unrecognized_template_section_heading' -and $_.context.heading -eq '实验器材与拓扑' }).Count) -ge 1) -Message 'Field-map diagnostics should identify the unrecognized 实验器材与拓扑 heading.'
+  Assert-True -Condition ((@($diagnosticFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'unmatched_composite_template_cell' -and $_.context.location -eq 'T1R1C1' }).Count) -ge 1) -Message 'Field-map diagnostics should identify unmatched composite template cells.'
+  Assert-True -Condition ((@($diagnosticFieldMapRoot.notes | Where-Object { $_ -match '实验台号' }).Count) -ge 1) -Message 'Field-map diagnostics should continue mirroring messages into notes.'
+  $results.Add('docx field-map diagnostics OK') | Out-Null
 
   $sampleImageOne = Join-Path $tempRoot 'sample-image-1.png'
   $sampleImageTwo = Join-Path $tempRoot 'sample-image-2.png'
