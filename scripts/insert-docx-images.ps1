@@ -7,6 +7,10 @@ param(
 
   [string]$ImagesJson,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [string]$OutPath,
 
   [switch]$Overwrite
@@ -19,6 +23,8 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.Drawing
 
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 $relationshipNamespace = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -27,15 +33,7 @@ $drawingNamespace = "http://schemas.openxmlformats.org/drawingml/2006/main"
 $pictureNamespace = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 $wordprocessingDrawingNamespace = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 $defaultImageWidthCm = 11.5
-$sectionRules = @(
-  [pscustomobject]@{ id = "purpose"; headingAliases = @("实验目的"); inputAliases = @("purpose", "实验目的") },
-  [pscustomobject]@{ id = "environment"; headingAliases = @("实验环境", "实验设备与环境"); inputAliases = @("environment", "实验环境", "实验设备与环境") },
-  [pscustomobject]@{ id = "theory"; headingAliases = @("实验原理或任务要求", "实验原理", "任务要求"); inputAliases = @("theory", "实验原理或任务要求", "实验原理", "任务要求") },
-  [pscustomobject]@{ id = "steps"; headingAliases = @("实验步骤", "实验过程"); inputAliases = @("steps", "step", "实验步骤", "实验过程") },
-  [pscustomobject]@{ id = "result"; headingAliases = @("实验结果", "实验现象与结果记录"); inputAliases = @("result", "results", "实验结果", "实验现象与结果记录") },
-  [pscustomobject]@{ id = "analysis"; headingAliases = @("问题分析", "结果分析"); inputAliases = @("analysis", "问题分析", "结果分析") },
-  [pscustomobject]@{ id = "summary"; headingAliases = @("实验总结", "总结与思考", "实验小结"); inputAliases = @("summary", "实验总结", "总结与思考", "实验小结") }
-)
+$sectionRules = @()
 $sectionInputAliasLookup = @{}
 $script:ImagePathProbeRoots = @()
 
@@ -270,6 +268,24 @@ function Normalize-FieldKey {
   return $normalized
 }
 
+function Get-ProfileImageSectionId {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$SectionField
+  )
+
+  switch ([string]$SectionField.key) {
+    "Purpose" { return "purpose" }
+    "Environment" { return "environment" }
+    "Theory" { return "theory" }
+    "Steps" { return "steps" }
+    "Results" { return "result" }
+    "Analysis" { return "analysis" }
+    "Summary" { return "summary" }
+    default { return ([string]$SectionField.key).Trim().ToLowerInvariant() }
+  }
+}
+
 function Normalize-TargetSelector {
   param(
     [AllowNull()]
@@ -294,15 +310,6 @@ function Normalize-TargetSelector {
   }
 
   return $trimmed
-}
-
-foreach ($rule in $sectionRules) {
-  foreach ($alias in @($rule.inputAliases + $rule.id)) {
-    $normalizedAlias = Normalize-FieldKey -Text $alias
-    if (-not [string]::IsNullOrWhiteSpace($normalizedAlias)) {
-      $sectionInputAliasLookup[$normalizedAlias] = $rule.id
-    }
-  }
 }
 
 function ConvertTo-PlainHashtable {
@@ -341,6 +348,128 @@ function ConvertTo-ObjectArray {
   }
 
   return @($Value)
+}
+
+function Initialize-SectionRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$ReportProfile
+  )
+
+  $script:sectionRules = @(
+    @(Get-ReportProfileSectionFields -Profile $ReportProfile) |
+      ForEach-Object {
+        $sectionId = Get-ProfileImageSectionId -SectionField $_
+        $heading = [string]$_.heading
+        $headingAliases = @(
+          @($_.aliases) |
+            ForEach-Object { [string]$_ } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+        if ($headingAliases.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($heading)) {
+          $headingAliases = @($heading)
+        }
+
+        $inputAliases = @(
+          @($headingAliases + @($heading, [string]$_.key, $sectionId)) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            Select-Object -Unique
+        )
+
+        [pscustomobject]@{
+          id = $sectionId
+          headingAliases = $headingAliases
+          inputAliases = $inputAliases
+        }
+      }
+  )
+
+  $script:sectionInputAliasLookup = @{}
+  foreach ($rule in $script:sectionRules) {
+    foreach ($alias in @($rule.inputAliases + $rule.id)) {
+      $normalizedAlias = Normalize-FieldKey -Text $alias
+      if (-not [string]::IsNullOrWhiteSpace($normalizedAlias)) {
+        $script:sectionInputAliasLookup[$normalizedAlias] = $rule.id
+      }
+    }
+  }
+}
+
+function Get-ImageMappingRootObject {
+  param(
+    [AllowNull()]
+    [string]$PathToJson,
+
+    [AllowNull()]
+    [string]$InlineJson
+  )
+
+  if ([string]::IsNullOrWhiteSpace($PathToJson) -eq [string]::IsNullOrWhiteSpace($InlineJson)) {
+    throw "Provide exactly one of -MappingPath or -ImagesJson."
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($PathToJson)) {
+    $resolvedPath = Resolve-Path -LiteralPath $PathToJson
+    $rootObject = (Get-Content -LiteralPath $resolvedPath.Path -Raw -Encoding UTF8) | ConvertFrom-Json
+  } else {
+    $resolvedPath = $null
+    $rootObject = $InlineJson | ConvertFrom-Json
+  }
+
+  if ($null -eq $rootObject) {
+    throw "Image mapping JSON is empty."
+  }
+
+  return [pscustomobject]@{
+    RootObject = $rootObject
+    ResolvedMappingPath = $(if ($null -ne $resolvedPath) { $resolvedPath.Path } else { $null })
+  }
+}
+
+function Resolve-ImageMappingReportProfile {
+  param(
+    [AllowNull()]
+    [object]$RootObject,
+
+    [AllowNull()]
+    [string]$ProfileName,
+
+    [AllowNull()]
+    [string]$ProfilePath
+  )
+
+  $summaryProfileName = $null
+  $summaryProfilePath = $null
+  if ($null -ne $RootObject -and ($RootObject -isnot [System.Collections.IEnumerable] -or $RootObject -is [string])) {
+    $rootTable = ConvertTo-PlainHashtable -InputObject $RootObject
+    if ($rootTable.ContainsKey("summary") -and $null -ne $rootTable["summary"]) {
+      $summaryTable = ConvertTo-PlainHashtable -InputObject $rootTable["summary"]
+      if ($summaryTable.ContainsKey("reportProfileName") -and -not [string]::IsNullOrWhiteSpace([string]$summaryTable["reportProfileName"])) {
+        $summaryProfileName = [string]$summaryTable["reportProfileName"]
+      }
+      if ($summaryTable.ContainsKey("reportProfilePath") -and -not [string]::IsNullOrWhiteSpace([string]$summaryTable["reportProfilePath"])) {
+        $summaryProfilePath = [string]$summaryTable["reportProfilePath"]
+      }
+    }
+  }
+
+  $effectiveProfilePath = if (-not [string]::IsNullOrWhiteSpace($ProfilePath)) {
+    $ProfilePath
+  } elseif (-not [string]::IsNullOrWhiteSpace($summaryProfilePath)) {
+    $summaryProfilePath
+  } else {
+    $null
+  }
+
+  $effectiveProfileName = $ProfileName
+  if ([string]::IsNullOrWhiteSpace($effectiveProfileName) -or ($effectiveProfileName -eq "experiment-report" -and -not [string]::IsNullOrWhiteSpace($summaryProfileName))) {
+    $effectiveProfileName = $summaryProfileName
+  }
+  if ([string]::IsNullOrWhiteSpace($effectiveProfileName)) {
+    $effectiveProfileName = "experiment-report"
+  }
+
+  return Get-ReportProfile -ProfileName $effectiveProfileName -ProfilePath $effectiveProfilePath -RepoRoot $script:RepoRoot
 }
 
 function Resolve-ImageLayoutSpec {
@@ -517,38 +646,20 @@ function Get-NodeText {
 
 function Get-ImageMappingItems {
   param(
-    [AllowNull()]
-    [string]$PathToJson,
-
-    [AllowNull()]
-    [string]$InlineJson
+    [Parameter(Mandatory = $true)]
+    [object]$RootObject
   )
 
-  if ([string]::IsNullOrWhiteSpace($PathToJson) -eq [string]::IsNullOrWhiteSpace($InlineJson)) {
-    throw "Provide exactly one of -MappingPath or -ImagesJson."
+  if ($RootObject -is [System.Collections.IEnumerable] -and $RootObject -isnot [string]) {
+    return @(ConvertTo-ObjectArray -Value $RootObject)
   }
 
-  if (-not [string]::IsNullOrWhiteSpace($PathToJson)) {
-    $resolvedPath = Resolve-Path -LiteralPath $PathToJson
-    $rootObject = (Get-Content -LiteralPath $resolvedPath.Path -Raw -Encoding UTF8) | ConvertFrom-Json
-  } else {
-    $rootObject = $InlineJson | ConvertFrom-Json
-  }
-
-  if ($null -eq $rootObject) {
-    throw "Image mapping JSON is empty."
-  }
-
-  if ($rootObject -is [System.Collections.IEnumerable] -and $rootObject -isnot [string]) {
-    return @(ConvertTo-ObjectArray -Value $rootObject)
-  }
-
-  $rootTable = ConvertTo-PlainHashtable -InputObject $rootObject
+  $rootTable = ConvertTo-PlainHashtable -InputObject $RootObject
   if ($rootTable.ContainsKey("images")) {
     return @(ConvertTo-ObjectArray -Value $rootTable["images"])
   }
 
-  return @(ConvertTo-ObjectArray -Value $rootObject)
+  return @(ConvertTo-ObjectArray -Value $RootObject)
 }
 
 function Resolve-ImageSpecification {
@@ -1348,7 +1459,11 @@ if (-not [string]::IsNullOrWhiteSpace($MappingPath)) {
 }
 $script:ImagePathProbeRoots = Get-ImagePathProbeRoots -DocxPath $resolvedDocxPath -MappingPath $resolvedMappingPathForProbe
 
-$imageItems = Get-ImageMappingItems -PathToJson $MappingPath -InlineJson $ImagesJson
+$imageMappingDocument = Get-ImageMappingRootObject -PathToJson $MappingPath -InlineJson $ImagesJson
+$reportProfile = Resolve-ImageMappingReportProfile -RootObject $imageMappingDocument.RootObject -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath
+Initialize-SectionRules -ReportProfile $reportProfile
+
+$imageItems = Get-ImageMappingItems -RootObject $imageMappingDocument.RootObject
 $imageSpecs = @($imageItems | ForEach-Object { Resolve-ImageSpecification -Item $_ })
 if ($imageSpecs.Count -eq 0) {
   throw "No image mapping items were provided."
@@ -1530,6 +1645,8 @@ try {
   [pscustomobject]@{
     docxPath = $resolvedDocxPath
     outPath = $resolvedOutPath
+    reportProfileName = [string]$reportProfile.name
+    reportProfilePath = [string]$reportProfile.resolvedProfilePath
     insertedImageCount = $insertedImageCount
     insertedCaptionCount = $insertedCaptionCount
     anchorCount = @($resolvedTargets | Select-Object -Unique).Count
