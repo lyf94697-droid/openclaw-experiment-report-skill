@@ -544,6 +544,7 @@ try {
       (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1'),
       (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1'),
+      (Join-Path $repoRoot 'scripts\generate-report-inputs.ps1'),
       (Join-Path $repoRoot 'scripts\generate-report-chat.ps1'),
       (Join-Path $repoRoot 'scripts\install-skill.ps1'),
       (Join-Path $repoRoot 'scripts\insert-docx-images.ps1'),
@@ -642,6 +643,7 @@ try {
   Assert-True -Condition ($repoReadme -match 'uploaded images and you also provide local image paths') -Message 'README is missing the hybrid uploaded-image plus local-path guidance.'
   Assert-True -Condition ($repoReadme -match 'media/inbound/example\.png') -Message 'README is missing the uploaded-attachment path guidance.'
   Assert-True -Condition ($repoReadme -match 'can omit `-ExperimentName`') -Message 'README is missing the remembered experiment-name guidance.'
+  Assert-True -Condition ($repoReadme -match 'generate-report-inputs\.ps1') -Message 'README is missing the report-input generation script documentation.'
   Assert-True -Condition ($repoReadme -match '按 report profile 隔离保存') -Message 'README is missing the per-profile defaults guidance.'
   Assert-True -Condition ($repoReadme -match 'ROADMAP\.md') -Message 'README is missing the roadmap link.'
   Assert-True -Condition ($repoReadme -match 'Repository Health') -Message 'README is missing the repository health section.'
@@ -743,6 +745,47 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$courseDesignMetadata.学生姓名 -eq '李四') -Message 'Auto metadata helper did not emit the course-design student label.'
   Assert-True -Condition ([string]$courseDesignMetadata.课题名称 -eq '校园导览小程序设计') -Message 'Auto metadata helper did not emit the course-design title label.'
   $results.Add('report profile loader OK') | Out-Null
+
+  $originalInputsAgentsHome = $env:AGENTS_HOME
+  try {
+    $env:AGENTS_HOME = (Join-Path $tempRoot 'report-inputs-agents-home')
+    $reportInputsOutputDir = Join-Path $tempRoot 'report-inputs-output'
+    & (Join-Path $repoRoot 'scripts\generate-report-inputs.ps1') `
+      -CourseName '软件工程综合实践' `
+      -ExperimentName '校园导览小程序设计' `
+      -StudentName '李四' `
+      -StudentId '20261234' `
+      -ClassName '软工 2302' `
+      -TeacherName '王老师' `
+      -ExperimentProperty '课程设计' `
+      -ExperimentDate '2026-04-08' `
+      -ExperimentLocation '实验楼 A201' `
+      -ReportProfileName 'course-design-report' `
+      -RequiredKeywords @('小程序', '校园导览') `
+      -OutputDir $reportInputsOutputDir `
+      -DetailLevel full | Out-Null
+    $reportInputsSummaryPath = Join-Path $reportInputsOutputDir 'report-inputs-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $reportInputsSummaryPath) -Message 'Report-input generation did not create the summary JSON.'
+    Assert-True -Condition (Test-Path -LiteralPath (Join-Path $reportInputsOutputDir 'prompt.txt')) -Message 'Report-input generation did not create prompt.txt.'
+    Assert-True -Condition (Test-Path -LiteralPath (Join-Path $reportInputsOutputDir 'metadata.auto.json')) -Message 'Report-input generation did not create metadata.auto.json.'
+    Assert-True -Condition (Test-Path -LiteralPath (Join-Path $reportInputsOutputDir 'requirements.auto.json')) -Message 'Report-input generation did not create requirements.auto.json.'
+    $reportInputsSummary = (Get-Content -LiteralPath $reportInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$reportInputsSummary.reportProfileName -eq 'course-design-report') -Message 'Report-input generation summary is missing the expected report profile name.'
+    Assert-True -Condition ([string]$reportInputsSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Report-input generation summary is missing the expected display name.'
+    Assert-True -Condition ((Split-Path -Leaf ([string]$reportInputsSummary.defaultsPath)) -eq 'course-design-report.defaults.json') -Message 'Report-input generation should persist defaults under the profile-specific defaults file.'
+    $generatedPromptText = Get-Content -LiteralPath (Join-Path $reportInputsOutputDir 'prompt.txt') -Raw -Encoding UTF8
+    Assert-True -Condition ($generatedPromptText -match '课程设计报告 body') -Message 'Report-input generation did not emit the expected course-design prompt body.'
+    Assert-True -Condition ($generatedPromptText -match '课题名称: 校园导览小程序设计') -Message 'Report-input generation did not emit the expected course-design title label.'
+    $generatedMetadata = (Get-Content -LiteralPath (Join-Path $reportInputsOutputDir 'metadata.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$generatedMetadata.学生姓名 -eq '李四') -Message 'Report-input generation metadata is missing the course-design student label.'
+    Assert-True -Condition ([string]$generatedMetadata.课题名称 -eq '校园导览小程序设计') -Message 'Report-input generation metadata is missing the course-design title label.'
+    $generatedRequirements = (Get-Content -LiteralPath (Join-Path $reportInputsOutputDir 'requirements.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([int]$generatedRequirements.minChars -eq 1400) -Message 'Report-input generation requirements are missing the expected course-design minChars.'
+    Assert-True -Condition (@($generatedRequirements.sections | Where-Object { $_.name -eq '方案设计与实现' }).Count -eq 1) -Message 'Report-input generation requirements are missing the course-design implementation section.'
+  } finally {
+    $env:AGENTS_HOME = $originalInputsAgentsHome
+  }
+  $results.Add('report inputs generation OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
     Test-PowerShellSyntax -Path $scriptPath
@@ -2082,6 +2125,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\format-docx-report-style.ps1')) -Message 'Install script did not copy style formatter script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-field-map.ps1')) -Message 'Install script did not copy field-map generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-image-map.ps1')) -Message 'Install script did not copy image-map generator script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-report-inputs.ps1')) -Message 'Install script did not copy report-input generation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-defaults.ps1')) -Message 'Install script did not copy the report-defaults helper script.'

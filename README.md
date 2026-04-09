@@ -92,7 +92,7 @@ openclaw skills list
 
 ### 2. 常用入口脚本
 
-最常用的本地入口有 3 个：
+最常用的本地入口有 4 个：
 
 - `scripts/build-report-from-feishu.ps1`
   适合飞书或直接聊天场景，负责把生成、模板填充、插图和最终输出串起来
@@ -100,6 +100,8 @@ openclaw skills list
   适合“教程链接 -> 报告正文 -> 模板填充 -> 最终 docx”这类流程
 - `scripts/build-report.ps1`
   适合你已经有正文和模板，只想走确定性的本地 `docx` 打包流程
+- `scripts/generate-report-inputs.ps1`
+  适合先单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`，再手动调试生成或对接外部流水线
 
 如果你需要拆开流水线逐步处理，仓库里也已经提供模板抽取、字段映射生成、图片映射生成、插图、样式优化、网页抓取、提示词准备和端到端验证脚本，入口都在 [scripts](scripts) 目录。
 
@@ -156,6 +158,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 仓库现在内置两个 profile：`experiment-report` 和 `course-design-report`；如果你要生成课程设计报告，可以直接传 `-ReportProfileName course-design-report`
 - `build-report-from-url.ps1` 的自动 prompt 也会跟随 active report profile 调整文案，像 `课程名称` / `课题名称` 这类字段标签会直接从 profile 里取，而不再固定写成实验报告措辞
 - 最近一次保存的 `CourseName` / `ExperimentName` 默认值现在会按 report profile 隔离保存，`course-design-report` 不会再复用 `experiment-report` 的最近一次题目
+- 如果你只想先拿到自动生成的输入物，不想立刻跑 OpenClaw 或 `docx` 流水线，可以先运行 `scripts/generate-report-inputs.ps1`，它会单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json` 和一份 summary
 - `generate-docx-field-map.ps1` 的 JSON 输出现在会额外带 `diagnostics` 和 `summary.diagnosticCountsByCode`，用于解释模板里哪些章节标题、metadata 标签或复合正文单元格没有命中自动映射规则
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
