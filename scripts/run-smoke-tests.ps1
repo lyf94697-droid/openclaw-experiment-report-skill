@@ -1229,6 +1229,20 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$templateFitCheckRoot.reportInputMode -eq 'path') -Message 'Template-fit checker should record reportInputMode=path for file-backed reports.'
   Assert-True -Condition ([string]$templateFitCheckRoot.metadataInputMode -eq 'path') -Message 'Template-fit checker should record metadataInputMode=path for metadata files.'
 
+  $inlineDiagnosticReportText = Get-Content -LiteralPath $diagnosticReportPath -Raw -Encoding UTF8
+  $inlineDiagnosticMetadataJson = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') -Raw -Encoding UTF8
+  $inlineTemplateFitRoot = ((& (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
+      -TemplatePath $diagnosticTemplateDocx `
+      -ReportText $inlineDiagnosticReportText `
+      -MetadataJson $inlineDiagnosticMetadataJson `
+      -Format json) | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([string]$inlineTemplateFitRoot.reportInputMode -eq 'inline') -Message 'Template-fit checker should record reportInputMode=inline for inline report text.'
+  Assert-True -Condition ([string]$inlineTemplateFitRoot.metadataInputMode -eq 'inline') -Message 'Template-fit checker should record metadataInputMode=inline for inline metadata JSON.'
+  Assert-True -Condition ([string]$inlineTemplateFitRoot.reportSource -eq '[inline text]') -Message 'Template-fit checker should expose [inline text] as the reportSource for inline report input.'
+  Assert-True -Condition ([int]$inlineTemplateFitRoot.summary.profileChangeSuggestionCount -ge 3) -Message 'Template-fit checker should keep profile-change suggestions when using inline inputs.'
+  Assert-True -Condition ([int]$inlineTemplateFitRoot.summary.inputGapCount -ge 2) -Message 'Template-fit checker should keep input-gap diagnostics when using inline inputs.'
+  $results.Add('docx template-fit inline inputs OK') | Out-Null
+
   $templateFitMarkdown = & (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
     -TemplatePath $diagnosticTemplateDocx `
     -ReportPath $diagnosticReportPath `
