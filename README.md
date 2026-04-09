@@ -155,7 +155,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
 - 自动生成正文、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
-- 仓库现在内置两个 profile：`experiment-report` 和 `course-design-report`；如果你要生成课程设计报告，可以直接传 `-ReportProfileName course-design-report`
+- 仓库现在内置三个 profile：`experiment-report`、`course-design-report` 和 `internship-report`；如果你要生成课程设计报告或专业实习报告，可以直接传对应的 `-ReportProfileName`
 - `build-report-from-url.ps1` 的自动 prompt 也会跟随 active report profile 调整文案，像 `课程名称` / `课题名称` 这类字段标签会直接从 profile 里取，而不再固定写成实验报告措辞
 - 最近一次保存的 `CourseName` / `ExperimentName` 默认值现在会按 report profile 隔离保存，`course-design-report` 不会再复用 `experiment-report` 的最近一次题目
 - 如果你只想先拿到自动生成的输入物，不想立刻跑 OpenClaw 或 `docx` 流水线，可以先运行 `scripts/generate-report-inputs.ps1`，它会单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json` 和一份 summary

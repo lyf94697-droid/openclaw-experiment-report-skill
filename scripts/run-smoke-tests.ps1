@@ -214,6 +214,99 @@ function New-CourseDesignTemplateDocx {
   }
 }
 
+function New-InternshipTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>专业实习报告</w:t></w:r></w:p>
+    <w:p><w:r><w:t>专业名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实习项目：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学生姓名</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>校内指导教师：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>实习时间：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>班级：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>实习单位：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>实习目的</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实习单位与环境</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实习任务与要求</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实习过程与内容</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实习成果</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>问题分析与改进</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>实习总结</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-CoverBodyTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -531,6 +624,7 @@ try {
       (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
       (Join-Path $repoRoot 'profiles\experiment-report.json'),
       (Join-Path $repoRoot 'profiles\course-design-report.json'),
+      (Join-Path $repoRoot 'profiles\internship-report.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
@@ -722,6 +816,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $courseDesignProfile) -contains '指导老师') -Message 'Course-design profile metadata prefixes are missing 指导老师.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $courseDesignProfile) -contains '方案设计与实现') -Message 'Course-design profile required headings are missing 方案设计与实现.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $courseDesignProfile -SectionId 'result' -BaseName 'ui-home') -eq '运行结果截图') -Message 'Course-design profile image caption defaults are missing the result caption.'
+  $internshipProfile = Get-ReportProfile -ProfileName 'internship-report' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$internshipProfile.name -eq 'internship-report') -Message 'Internship profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$internshipProfile.displayName -eq '专业实习报告') -Message 'Internship profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $internshipProfile) -eq 'school') -Message 'Internship profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $internshipProfile) -contains '校内指导教师') -Message 'Internship profile metadata prefixes are missing 校内指导教师.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $internshipProfile) -contains '实习过程与内容') -Message 'Internship profile required headings are missing 实习过程与内容.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $internshipProfile -SectionId 'result' -BaseName 'intern-home') -eq '实习成果截图') -Message 'Internship profile image caption defaults are missing the result caption.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -744,6 +845,17 @@ URL: https://example.com/network-lab
   $courseDesignMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '课程设计' -ResolvedExperimentDate '2026-04-08' -ResolvedExperimentLocation '实验楼 A201') | ConvertFrom-Json
   Assert-True -Condition ([string]$courseDesignMetadata.学生姓名 -eq '李四') -Message 'Auto metadata helper did not emit the course-design student label.'
   Assert-True -Condition ([string]$courseDesignMetadata.课题名称 -eq '校园导览小程序设计') -Message 'Auto metadata helper did not emit the course-design title label.'
+  $internshipPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '软件工程' -ResolvedExperimentName '企业门户管理后台开发' -Profile $internshipProfile -DetailLevel 'full'
+  Assert-True -Condition ($internshipPromptText -match '专业实习报告 body') -Message 'Auto prompt helper did not use the internship display name.'
+  Assert-True -Condition ($internshipPromptText -match '专业名称: 软件工程') -Message 'Auto prompt helper did not emit the internship course-name label.'
+  Assert-True -Condition ($internshipPromptText -match '实习项目: 企业门户管理后台开发') -Message 'Auto prompt helper did not emit the internship title label.'
+  Assert-True -Condition ($internshipPromptText -match '实习过程与内容') -Message 'Auto prompt helper did not include internship required headings.'
+  $internshipRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '软件工程' -ResolvedExperimentName '企业门户管理后台开发' -Profile $internshipProfile -ExtraKeywords @('后台开发', '企业门户管理后台开发') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$internshipRequirements.minChars -eq 1600) -Message 'Auto requirements helper did not use the internship full minChars.'
+  Assert-True -Condition (@($internshipRequirements.sections | Where-Object { $_.name -eq '实习过程与内容' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the internship process section heading.'
+  $internshipMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件工程' -ResolvedExperimentName '企业门户管理后台开发' -Profile $internshipProfile -ResolvedStudentName '王敏' -ResolvedStudentId '20262345' -ResolvedClassName '软工 2303' -ResolvedTeacherName '周老师' -ResolvedExperimentProperty '专业实习' -ResolvedExperimentDate '2026-03-01 至 2026-03-28' -ResolvedExperimentLocation '杭州云帆科技有限公司（滨江区）') | ConvertFrom-Json
+  Assert-True -Condition ([string]$internshipMetadata.学生姓名 -eq '王敏') -Message 'Auto metadata helper did not emit the internship student label.'
+  Assert-True -Condition ([string]$internshipMetadata.实习项目 -eq '企业门户管理后台开发') -Message 'Auto metadata helper did not emit the internship title label.'
   $results.Add('report profile loader OK') | Out-Null
 
   $originalInputsAgentsHome = $env:AGENTS_HOME
@@ -1427,6 +1539,169 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignImageDocumentXml.OuterXml -match '图2 运行结果截图') -Message 'Course-design image insertion is missing the result caption.'
   Remove-Item -LiteralPath $courseDesignImageTemp -Recurse -Force
   $results.Add('course-design profile pipeline OK') | Out-Null
+
+  $internshipReportPath = Join-Path $tempRoot 'internship-report.md'
+  @'
+专业实习报告
+
+专业名称：软件工程
+实习项目：企业门户管理后台开发
+学生姓名：王敏
+学号：20262345
+指导教师：周老师
+实习时间：2026-03-01 至 2026-03-28
+实习单位：杭州云帆科技有限公司（滨江区）
+
+一、实习目标
+本次专业实习的目标是在真实企业环境中参与后台管理系统的模块开发与联调过程，理解学校课程中的需求分析、接口设计和前后端协作在实际项目中的落地方式。
+除了完成指定开发任务，还需要在实习过程中学习团队的代码评审、缺陷跟踪和迭代交付流程，形成对企业项目节奏和工程规范的整体认识。
+
+二、实习单位
+实习单位为杭州云帆科技有限公司，团队主要负责企业门户与内部运营系统的研发维护，日常开发环境包括 Windows 11、Node.js、Vue 和 MySQL。
+办公环境采用小组协作方式推进任务，开发期间需要通过飞书同步需求、在 Git 仓库提交分支代码，并在测试环境完成接口联调和页面验收。
+
+三、岗位职责
+实习阶段主要承担企业门户管理后台中菜单权限、公告发布和操作日志三个模块的前端联调与接口适配工作，同时需要配合后端同学完成字段校验和错误提示策略调整。
+在岗位要求上，不仅要按任务单完成页面开发，还要保证表单交互清晰、接口异常可回显、提交记录可追溯，并在每周例会上汇报当前进度与遗留风险。
+
+四、工作内容
+进入项目后首先熟悉现有后台项目结构，梳理登录态校验、路由权限控制和公共请求封装的实现方式，然后在导师指导下完成公告管理列表页与详情页的改造。
+在后续两周里，继续参与角色权限页面、操作日志筛选条件和批量导出功能的开发，对接了新增接口字段，并针对分页状态丢失、日期筛选不准确等问题做了多轮修复与验证。
+为了保证交付质量，还配合测试同学复现缺陷，补充了按钮禁用、空状态提示和异常回显逻辑，并将关键页面的提交流程整理成操作文档，便于后续成员继续维护。
+
+五、工作成果
+通过本次实习，已经能够独立完成公告发布、日志筛选和权限配置等典型后台页面的功能修改，并能在测试环境中定位接口返回与前端展示不一致的问题。
+最终提交的成果包括三个稳定可用的业务模块改造、若干条缺陷修复记录、配套的操作说明文档以及一份面向组内交接的联调注意事项清单，使项目能够更顺畅地进入后续迭代阶段。
+
+六、遇到的问题与改进
+实习初期最大的困难是对项目上下文不熟悉，看到需求单时很难快速判断应该修改哪一层代码，导致早期提交需要反复返工。
+后续通过先画模块关系、再对照接口文档梳理数据流的方式，逐渐降低了理解成本，但在组件复用和跨页面状态同步方面仍然存在设计不够统一的问题，后续可以继续通过抽取公共表单配置与状态管理层来改进。
+
+七、实习体会
+这次专业实习最大的收获，是把课堂上分散学习的前端开发、数据库接口、版本管理和缺陷协作真正串成了一条完整的工程链路，理解了企业项目为什么强调规范和沟通。
+相比只在课程作业中完成单点功能，真实实习更要求对任务背景、影响范围和交付质量负责，也让我明确了后续需要继续提升接口抽象能力、问题定位速度和文档表达能力。
+'@ | Set-Content -LiteralPath $internshipReportPath -Encoding UTF8
+
+  $internshipMetadataPath = Join-Path $tempRoot 'internship-metadata.json'
+  @'
+{
+  "学生姓名": "王敏",
+  "学号": "20262345",
+  "班级": "软工 2303",
+  "指导教师": "周老师",
+  "所属专业": "软件工程",
+  "项目名称": "企业门户管理后台开发",
+  "实习性质": "专业实习",
+  "实习时间": "2026-03-01 至 2026-03-28",
+  "实习地点": "杭州云帆科技有限公司（滨江区）"
+}
+'@ | Set-Content -LiteralPath $internshipMetadataPath -Encoding UTF8
+
+  $internshipValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $internshipReportPath -ReportProfileName 'internship-report' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$internshipValidation.passed) -Message 'Internship report validation should pass for the internship profile.'
+  Assert-True -Condition ([string]$internshipValidation.reportProfileName -eq 'internship-report') -Message 'Internship report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$internshipValidation.summary.sectionCount -ge 7) -Message 'Internship report validation did not load the expected section rules.'
+
+  $internshipTemplateDocx = Join-Path $tempRoot 'internship-template.docx'
+  New-InternshipTemplateDocx -Path $internshipTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $internshipTemplateDocx) -Message 'Failed to create the internship template fixture.'
+
+  $internshipTemplateFitPath = Join-Path $tempRoot 'internship-template-fit.json'
+  & (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
+    -TemplatePath $internshipTemplateDocx `
+    -ReportPath $internshipReportPath `
+    -MetadataPath $internshipMetadataPath `
+    -ReportProfileName 'internship-report' `
+    -Format json `
+    -OutFile $internshipTemplateFitPath | Out-Null
+  $internshipTemplateFit = (Get-Content -LiteralPath $internshipTemplateFitPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$internshipTemplateFit.reportProfileName -eq 'internship-report') -Message 'Internship template-fit checker is missing the expected profile name.'
+  Assert-True -Condition ([int]$internshipTemplateFit.summary.profileChangeSuggestionCount -eq 0) -Message 'Internship template-fit checker should not request profile changes for the built-in internship profile.'
+  Assert-True -Condition ([int]$internshipTemplateFit.summary.inputGapCount -eq 0) -Message 'Internship template-fit checker should not report input gaps for the complete sample inputs.'
+  Assert-True -Condition ([bool]$internshipTemplateFit.summary.readyForNewProfile) -Message 'Internship template-fit checker should report that the profile is ready for reuse.'
+
+  $internshipFieldMapPath = Join-Path $tempRoot 'internship-field-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $internshipTemplateDocx `
+    -ReportPath $internshipReportPath `
+    -MetadataPath $internshipMetadataPath `
+    -ReportProfileName 'internship-report' `
+    -Format json `
+    -OutFile $internshipFieldMapPath | Out-Null
+  $internshipFieldMapRoot = (Get-Content -LiteralPath $internshipFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$internshipFieldMapRoot.reportProfileName -eq 'internship-report') -Message 'Internship field-map generator is missing the expected report profile name.'
+  Assert-True -Condition ($internshipFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '专业名称') -Message 'Internship field-map generator did not map the major field.'
+  Assert-True -Condition ($internshipFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '实习项目') -Message 'Internship field-map generator did not map the internship title field.'
+  Assert-True -Condition ($internshipFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '学生姓名') -Message 'Internship field-map generator did not map the student name field.'
+  Assert-True -Condition ([string]$internshipFieldMapRoot.fieldMap.专业名称 -eq '软件工程') -Message 'Internship field-map generator did not fill the major field.'
+  Assert-True -Condition ([string]$internshipFieldMapRoot.fieldMap.实习项目 -eq '企业门户管理后台开发') -Message 'Internship field-map generator did not fill the internship title.'
+  Assert-True -Condition ([string]$internshipFieldMapRoot.fieldMap.学生姓名 -eq '王敏') -Message 'Internship field-map generator did not fill the student name.'
+  Assert-True -Condition ([string]$internshipFieldMapRoot.fieldMap.实习过程与内容.mode -eq 'after') -Message 'Internship field-map generator should preserve the process heading and fill after it.'
+  Assert-True -Condition ([string]$internshipFieldMapRoot.fieldMap.实习成果.mode -eq 'after') -Message 'Internship field-map generator should preserve the results heading and fill after it.'
+  Assert-True -Condition ($internshipFieldMapRoot.summary.diagnosticCount -eq 0) -Message 'Internship field-map generator should not emit diagnostics for the built-in internship profile fixture.'
+
+  $internshipFilledDocx = Join-Path $tempRoot 'internship-template.filled.docx'
+  $internshipFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $internshipTemplateDocx -MappingPath $internshipFieldMapPath -OutPath $internshipFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $internshipFilledDocx) -Message 'Internship field-map fill did not create the filled docx.'
+  Assert-True -Condition ($internshipFillResult.labelFillCount -ge 6) -Message 'Internship field-map fill applied too few label fields.'
+  Assert-True -Condition ($internshipFillResult.blockFillCount -ge 5) -Message 'Internship field-map fill applied too few block fills.'
+  $internshipFilledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $internshipFilledDocx -Format markdown | Out-String
+  Assert-True -Condition ($internshipFilledOutline -match '实习项目：企业门户管理后台开发') -Message 'Internship field-map fill did not update the internship title.'
+  Assert-True -Condition ($internshipFilledOutline -match '学生姓名：王敏|T1R1C2: 王敏') -Message 'Internship field-map fill did not update the student name.'
+  Assert-True -Condition ($internshipFilledOutline -match '进入项目后首先熟悉现有后台项目结构') -Message 'Internship field-map fill did not write the internship process section.'
+
+  $internshipStyledDocx = Join-Path $tempRoot 'internship-template.styled.docx'
+  $internshipStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') `
+    -DocxPath $internshipFilledDocx `
+    -OutPath $internshipStyledDocx `
+    -Overwrite `
+    -Profile auto `
+    -ReportProfileName 'internship-report'
+  Assert-True -Condition (Test-Path -LiteralPath $internshipStyledDocx) -Message 'Internship style formatter did not create the styled docx.'
+  Assert-True -Condition ([string]$internshipStyleResult.reportProfileName -eq 'internship-report') -Message 'Internship style formatter is missing the expected report profile name.'
+  Assert-True -Condition ([string]$internshipStyleResult.resolvedProfile -eq 'school') -Message 'Internship style formatter should resolve auto to the internship default style profile.'
+
+  $internshipImageSpecsPath = Join-Path $tempRoot 'internship-image-specs.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "section": "工作内容"
+    },
+    {
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "section": "工作成果"
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $internshipImageSpecsPath -Encoding UTF8
+
+  $internshipImageMapPath = Join-Path $tempRoot 'internship-image-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
+    -DocxPath $internshipStyledDocx `
+    -ImageSpecsPath $internshipImageSpecsPath `
+    -ReportProfileName 'internship-report' `
+    -Format json `
+    -OutFile $internshipImageMapPath | Out-Null
+  $internshipImageMapRoot = (Get-Content -LiteralPath $internshipImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$internshipImageMapRoot.summary.reportProfileName -eq 'internship-report') -Message 'Internship image-map generator is missing the expected report profile name.'
+  Assert-True -Condition ([string]$internshipImageMapRoot.images[0].caption -eq '图1 实习过程截图') -Message 'Internship image-map generator did not use the profile-defined default caption for the process section.'
+  Assert-True -Condition ([string]$internshipImageMapRoot.images[1].caption -eq '图2 实习成果截图') -Message 'Internship image-map generator did not use the profile-defined default caption for the results section.'
+
+  $internshipImageFilledDocx = Join-Path $tempRoot 'internship-template.images.docx'
+  $internshipImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $internshipStyledDocx -MappingPath $internshipImageMapPath -OutPath $internshipImageFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $internshipImageFilledDocx) -Message 'Internship image insertion did not create the filled docx.'
+  Assert-True -Condition ([string]$internshipImageInsertResult.reportProfileName -eq 'internship-report') -Message 'Internship image insertion is missing the expected report profile name.'
+  Assert-True -Condition ([string]$internshipImageInsertResult.mappingInputMode -eq 'mapping-path') -Message 'Internship image insertion should record mappingInputMode=mapping-path for image-map files.'
+  Assert-True -Condition ($internshipImageInsertResult.insertedImageCount -eq 2) -Message 'Internship image insertion inserted an unexpected number of images.'
+  $internshipImageTemp = Join-Path $tempRoot 'internship-image-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($internshipImageFilledDocx, $internshipImageTemp)
+  [xml]$internshipImageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $internshipImageTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($internshipImageDocumentXml.OuterXml -match '图1 实习过程截图') -Message 'Internship image insertion is missing the process caption.'
+  Assert-True -Condition ($internshipImageDocumentXml.OuterXml -match '图2 实习成果截图') -Message 'Internship image insertion is missing the results caption.'
+  Remove-Item -LiteralPath $internshipImageTemp -Recurse -Force
+  $results.Add('internship profile pipeline OK') | Out-Null
 
   $mixedGroupImageSpecsPath = Join-Path $tempRoot 'image-specs-mixed-group.json'
   @"
@@ -2368,6 +2643,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\experiment-report.json')) -Message 'Install script did not copy the experiment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\course-design-report.json')) -Message 'Install script did not copy the course-design-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\internship-report.json')) -Message 'Install script did not copy the internship-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
