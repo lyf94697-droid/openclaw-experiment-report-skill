@@ -164,6 +164,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - `build-report.ps1`、`generate-docx-field-map.ps1`、`check-report-profile-template-fit.ps1`、`generate-docx-image-map.ps1`、`insert-docx-images.ps1` 的输出现在也会补充 `inputMode` 字段，用于区分报告、metadata、requirements、图片规格和 image-map 分别来自文件、内联 JSON 还是直接图片列表
 - `build-report-from-url.ps1` 和 `build-report-from-feishu.ps1` 的 wrapper summary 现在也会透出下游 `buildReportInputMode` / `buildMetadataInputMode` / `buildRequirementsInputMode` / `buildImageInputMode`，用于把 wrapper 的 `generationMode` 和实际 docx 构建输入来源串成一条完整链路
 - 这两个 wrapper 现在还会额外写出一份 `pipeline-trace.json`，把 `wrapper.mode`、`wrapper.generationMode`、下游 `build.*InputMode` 和关键产物路径聚合到一份更短的调试视图里
+- 同时也会生成一份更适合人工快速查看的 `pipeline-trace.md`
 - `generate-docx-field-map.ps1` 的 JSON 输出现在会额外带 `diagnostics` 和 `summary.diagnosticCountsByCode`，用于解释模板里哪些章节标题、metadata 标签或复合正文单元格没有命中自动映射规则
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`

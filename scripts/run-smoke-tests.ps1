@@ -2195,6 +2195,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Prepared-summary URL wrapper should expose buildRequirementsInputMode=path from the downstream build summary.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.buildImageInputMode -eq 'specs-path') -Message 'Prepared-summary URL wrapper should expose buildImageInputMode=specs-path from the downstream build summary.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTracePath)) -Message 'Prepared-summary URL wrapper should create a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTraceMarkdownPath)) -Message 'Prepared-summary URL wrapper should create a pipeline-trace markdown file.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedCourseName -eq '软件工程综合实践') -Message 'Prepared-summary URL wrapper lost the requested course name from the prepared summary.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedExperimentName -eq '校园导览小程序设计') -Message 'Prepared-summary URL wrapper lost the requested title from the prepared summary.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.preGeneratedReportPath -eq $preparedSummaryMockReportPath) -Message 'Prepared-summary URL wrapper summary is missing the explicit replay report path.'
@@ -2205,6 +2206,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$preparedSummaryTrace.wrapper.generationMode -eq 'replay') -Message 'Prepared-summary URL pipeline trace should keep generationMode=replay.'
   Assert-True -Condition ([string]$preparedSummaryTrace.build.reportInputMode -eq 'path') -Message 'Prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
   Assert-True -Condition ([string]$preparedSummaryTrace.build.imageInputMode -eq 'specs-path') -Message 'Prepared-summary URL pipeline trace should keep build.imageInputMode=specs-path.'
+  $preparedSummaryTraceMarkdown = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($preparedSummaryTraceMarkdown -match 'Generation mode: replay') -Message 'Prepared-summary URL pipeline markdown should include the replay generation mode.'
+  Assert-True -Condition ($preparedSummaryTraceMarkdown -match 'Image input mode: specs-path') -Message 'Prepared-summary URL pipeline markdown should include the build image input mode.'
   $preparedSummaryCleanedReport = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
   Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
   $results.Add('build-report-from-url prepared summary OK') | Out-Null
@@ -2255,6 +2259,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Feishu wrapper summary should expose buildRequirementsInputMode=path from the downstream build summary.'
   Assert-True -Condition ([string]$feishuBuildSummary.buildImageInputMode -eq 'specs-path') -Message 'Feishu wrapper summary should expose buildImageInputMode=specs-path from the downstream build summary.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.pipelineTracePath)) -Message 'Feishu wrapper summary should point to a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.pipelineTraceMarkdownPath)) -Message 'Feishu wrapper summary should point to a pipeline-trace markdown file.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.imagePlanPath)) -Message 'Feishu wrapper summary image-plan path does not exist.'
   Assert-True -Condition ([int]$feishuBuildSummary.imagePlanLowConfidenceCount -eq 0) -Message 'Feishu wrapper summary reported an unexpected low-confidence image-plan count.'
   Assert-True -Condition (-not [bool]$feishuBuildSummary.imagePlanNeedsReview) -Message 'Feishu wrapper summary should not require manual review for explicit image specs.'
@@ -2265,6 +2270,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuPipelineTrace.wrapper.mode -eq 'local-report') -Message 'Feishu pipeline trace should keep wrapper.mode=local-report.'
   Assert-True -Condition ([string]$feishuPipelineTrace.wrapper.generationMode -eq 'none') -Message 'Feishu pipeline trace should keep wrapper.generationMode=none.'
   Assert-True -Condition ([string]$feishuPipelineTrace.build.requirementsInputMode -eq 'path') -Message 'Feishu pipeline trace should keep build.requirementsInputMode=path.'
+  $feishuPipelineTraceMarkdown = Get-Content -LiteralPath ([string]$feishuBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Mode: local-report') -Message 'Feishu pipeline markdown should include wrapper mode.'
+  Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Requirements input mode: path') -Message 'Feishu pipeline markdown should include build requirements input mode.'
   $results.Add('Feishu wrapper pipeline OK') | Out-Null
 
   $originalWrapperAgentsHome = $env:AGENTS_HOME
@@ -2313,6 +2321,7 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.buildRequirementsInputMode -eq 'path') -Message 'Course-design Feishu replay wrapper should expose buildRequirementsInputMode=path from the downstream build summary.'
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.buildImageInputMode -eq 'specs-path') -Message 'Course-design Feishu replay wrapper should expose buildImageInputMode=specs-path from the downstream build summary.'
     Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignReplayWrapperSummary.pipelineTracePath)) -Message 'Course-design Feishu replay wrapper should create a pipeline-trace JSON.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignReplayWrapperSummary.pipelineTraceMarkdownPath)) -Message 'Course-design Feishu replay wrapper should create a pipeline-trace markdown file.'
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.reportProfileName -eq 'course-design-report') -Message 'Course-design Feishu replay wrapper summary is missing the expected profile name.'
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.preGeneratedReportPath -eq $preparedSummaryMockReportPath) -Message 'Course-design Feishu replay wrapper summary is missing the explicit replay report path.'
     Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignReplayWrapperSummary.reportPath)) -Message 'Course-design Feishu replay wrapper did not copy the replayed report body.'
@@ -2321,6 +2330,9 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([string]$courseDesignReplayTrace.wrapper.mode -eq 'generated-report') -Message 'Course-design Feishu replay pipeline trace should keep wrapper.mode=generated-report.'
     Assert-True -Condition ([string]$courseDesignReplayTrace.wrapper.generationMode -eq 'replay') -Message 'Course-design Feishu replay pipeline trace should keep wrapper.generationMode=replay.'
     Assert-True -Condition ([string]$courseDesignReplayTrace.build.imageInputMode -eq 'specs-path') -Message 'Course-design Feishu replay pipeline trace should keep build.imageInputMode=specs-path.'
+    $courseDesignReplayTraceMarkdown = Get-Content -LiteralPath ([string]$courseDesignReplayWrapperSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+    Assert-True -Condition ($courseDesignReplayTraceMarkdown -match 'Mode: generated-report') -Message 'Course-design Feishu replay pipeline markdown should include wrapper mode.'
+    Assert-True -Condition ($courseDesignReplayTraceMarkdown -match 'Generation mode: replay') -Message 'Course-design Feishu replay pipeline markdown should include replay generation mode.'
   } finally {
     $env:AGENTS_HOME = $originalWrapperAgentsHome
   }

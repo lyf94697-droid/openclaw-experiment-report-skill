@@ -434,6 +434,7 @@ $buildMetadataInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObj
 $buildRequirementsInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "requirementsInputMode") { [string]$buildSummary.requirementsInputMode } else { $null })
 $buildImageInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imageInputMode") { [string]$buildSummary.imageInputMode } else { $null })
 $pipelineTracePath = Join-Path $resolvedOutputDir "pipeline-trace.json"
+$pipelineTraceMarkdownPath = Join-Path $resolvedOutputDir "pipeline-trace.md"
 $pipelineTrace = [pscustomobject]@{
   wrapper = [pscustomobject]@{
     script = "build-report-from-url.ps1"
@@ -463,6 +464,38 @@ $pipelineTrace = [pscustomobject]@{
   }
 }
 [System.IO.File]::WriteAllText($pipelineTracePath, ($pipelineTrace | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
+$pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
+[void]$pipelineTraceMarkdownLines.Add("# Pipeline Trace")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("## Wrapper")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("- Script: build-report-from-url.ps1")
+[void]$pipelineTraceMarkdownLines.Add("- Mode: generated-report")
+[void]$pipelineTraceMarkdownLines.Add("- Generation mode: $generationMode")
+[void]$pipelineTraceMarkdownLines.Add("- Report profile: $([string]$reportProfile.name)")
+[void]$pipelineTraceMarkdownLines.Add("- Display name: $documentLabel")
+[void]$pipelineTraceMarkdownLines.Add("- Detail level: $effectiveDetailLevel")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("## Build")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("- Summary path: $buildSummaryPath")
+[void]$pipelineTraceMarkdownLines.Add("- Report input mode: $buildReportInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Metadata input mode: $buildMetadataInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Requirements input mode: $buildRequirementsInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Image input mode: $buildImageInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Image plan path: $($pipelineTrace.build.imagePlanPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Layout check path: $($pipelineTrace.build.layoutCheckPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Layout check passed: $($pipelineTrace.build.layoutCheckPassed)")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("## Artifacts")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("- Report inputs summary: $inputSummaryPath")
+[void]$pipelineTraceMarkdownLines.Add("- Prompt path: $promptPathOut")
+[void]$pipelineTraceMarkdownLines.Add("- Raw report path: $rawReportPath")
+[void]$pipelineTraceMarkdownLines.Add("- Cleaned report path: $cleanedReportPath")
+[void]$pipelineTraceMarkdownLines.Add("- Final docx path: $finalDocxPath")
+[void]$pipelineTraceMarkdownLines.Add("- Pre-generated report path: $resolvedPreGeneratedReportPath")
+[System.IO.File]::WriteAllText($pipelineTraceMarkdownPath, ($pipelineTraceMarkdownLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($true)))
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -494,6 +527,7 @@ $wrapperSummary = [pscustomobject]@{
   styleProfilePath = $resolvedStyleProfilePath
   preGeneratedReportPath = $resolvedPreGeneratedReportPath
   pipelineTracePath = $pipelineTracePath
+  pipelineTraceMarkdownPath = $pipelineTraceMarkdownPath
   buildSummaryPath = $buildSummaryPath
   buildReportInputMode = $buildReportInputMode
   buildMetadataInputMode = $buildMetadataInputMode
