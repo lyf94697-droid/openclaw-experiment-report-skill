@@ -526,6 +526,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $reportProfile) -contains '问题分析') -Message 'Report profile required headings are missing 问题分析.'
   $fullDetailProfile = Get-ReportProfileDetailProfile -Profile $reportProfile -DetailLevel 'full'
   Assert-True -Condition ([int]$fullDetailProfile.minChars -eq 1100) -Message 'Report profile full detail level is missing the expected minChars.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $reportProfile) -eq 'auto') -Message 'Report profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $reportProfile) -contains '课程名称') -Message 'Report profile metadata prefixes are missing 课程名称.'
+  Assert-True -Condition ((Get-ReportProfileExtraSectionHeadings -Profile $reportProfile) -contains '实验内容') -Message 'Report profile extra section headings are missing 实验内容.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId 'steps' -BaseName 'setup-step') -eq '实验步骤截图') -Message 'Report profile image caption defaults are missing the steps caption.'
   $results.Add('report profile loader OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
@@ -1044,7 +1048,7 @@ URL: https://example.com/network-lab
 {
   "name": "image-insert-custom-profile",
   "displayName": "自定义插图实验报告",
-  "defaultStyleProfile": "auto",
+  "defaultStyleProfile": "compact",
   "defaultExperimentProperty": "③验证性实验",
   "metadataFields": [
     { "key": "Name", "label": "姓名" }
@@ -1059,6 +1063,14 @@ URL: https://example.com/network-lab
     { "key": "Analysis", "heading": "问题分析", "aliases": ["问题分析"], "minChars": { "standard": 30, "full": 80 } },
     { "key": "Summary", "heading": "实验总结", "aliases": ["实验总结"], "minChars": { "standard": 30, "full": 80 } }
   ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis"],
+    "defaultCaptions": {
+      "steps": "过程记录图",
+      "result": "现象记录图",
+      "default": "自定义实验截图"
+    }
+  },
   "detailProfiles": {
     "standard": { "minChars": 700, "promptGuidance": [] },
     "full": { "minChars": 1100, "promptGuidance": [] }
@@ -1099,13 +1111,11 @@ URL: https://example.com/network-lab
   "images": [
     {
       "path": "$($sampleImageOne.Replace('\', '\\'))",
-      "section": "实验过程记录",
-      "caption": "图1 自定义过程截图"
+      "section": "实验过程记录"
     },
     {
       "path": "$($sampleImageTwo.Replace('\', '\\'))",
-      "section": "实验现象记录",
-      "caption": "图2 自定义结果截图"
+      "section": "实验现象记录"
     }
   ]
 }
@@ -1116,6 +1126,8 @@ URL: https://example.com/network-lab
   $customProfileImageMapRoot = (Get-Content -LiteralPath $customProfileImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$customProfileImageMapRoot.summary.reportProfileName -eq 'image-insert-custom-profile') -Message 'Custom-profile image-map generator is missing the expected report profile name.'
   Assert-True -Condition ([string]$customProfileImageMapRoot.summary.reportProfilePath -eq $resolvedCustomImageProfilePath) -Message 'Custom-profile image-map generator is missing the expected report profile path.'
+  Assert-True -Condition ([string]$customProfileImageMapRoot.images[0].caption -eq '图1 过程记录图') -Message 'Custom-profile image-map generator did not use the profile-defined default caption for the steps section.'
+  Assert-True -Condition ([string]$customProfileImageMapRoot.images[1].caption -eq '图2 现象记录图') -Message 'Custom-profile image-map generator did not use the profile-defined default caption for the results section.'
 
   $customProfileFilledDocx = Join-Path $tempRoot 'sample-template.custom-profile-images.docx'
   $customProfileInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $customSectionDocx -MappingPath $customProfileImageMapPath -OutPath $customProfileFilledDocx
@@ -1129,8 +1141,8 @@ URL: https://example.com/network-lab
   $customProfileDocumentText = $customProfileDocumentXml.OuterXml
   $customStepsHeadingIndex = $customProfileDocumentText.IndexOf('实验过程记录')
   $customResultsHeadingIndex = $customProfileDocumentText.IndexOf('实验现象记录')
-  $customStepsCaptionIndex = $customProfileDocumentText.IndexOf('图1 自定义过程截图')
-  $customResultsCaptionIndex = $customProfileDocumentText.IndexOf('图2 自定义结果截图')
+  $customStepsCaptionIndex = $customProfileDocumentText.IndexOf('图1 过程记录图')
+  $customResultsCaptionIndex = $customProfileDocumentText.IndexOf('图2 现象记录图')
   Assert-True -Condition ($customStepsHeadingIndex -ge 0 -and $customResultsHeadingIndex -gt $customStepsHeadingIndex) -Message 'Custom-profile image insertion document is missing the expected custom section headings.'
   Assert-True -Condition ($customStepsCaptionIndex -gt $customStepsHeadingIndex -and $customStepsCaptionIndex -lt $customResultsHeadingIndex) -Message 'Custom-profile image insertion did not place the first image under 实验过程记录.'
   Assert-True -Condition ($customResultsCaptionIndex -gt $customResultsHeadingIndex) -Message 'Custom-profile image insertion did not place the second image under 实验现象记录.'
@@ -1422,6 +1434,20 @@ URL: https://example.com/network-lab
   [xml]$autoSchoolStyledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $autoSchoolStyledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
   Assert-True -Condition ($autoSchoolStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="400"') -Message 'Auto school styled docx is missing the expected school line spacing.'
   Remove-Item -LiteralPath $autoSchoolStyledDocxTemp -Recurse -Force
+
+  $customProfileStyledDocx = Join-Path $tempRoot 'sample-template.custom-profile-sections.styled.docx'
+  $customProfileStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') `
+    -DocxPath $customSectionDocx `
+    -OutPath $customProfileStyledDocx `
+    -Overwrite `
+    -Profile auto `
+    -ReportProfilePath $customImageProfilePath
+  Assert-True -Condition (Test-Path -LiteralPath $customProfileStyledDocx) -Message 'Custom-profile style formatting did not create the styled docx.'
+  Assert-True -Condition ([string]$customProfileStyleResult.reportProfileName -eq 'image-insert-custom-profile') -Message 'Custom-profile style formatting is missing the expected report profile name.'
+  Assert-True -Condition ([string]$customProfileStyleResult.reportProfilePath -eq $resolvedCustomImageProfilePath) -Message 'Custom-profile style formatting is missing the expected report profile path.'
+  Assert-True -Condition ([string]$customProfileStyleResult.styleProfile -eq 'compact') -Message 'Custom-profile style formatting should resolve to the report profile defaultStyleProfile.'
+  Assert-True -Condition ([string]$customProfileStyleResult.profileReason -match 'defaultStyleProfile') -Message 'Custom-profile style formatting is missing the expected profile-default decision reason.'
+  Assert-True -Condition ($customProfileStyleResult.styledHeadingCount -ge 2) -Message 'Custom-profile style formatting did not recognize the custom section headings.'
   $results.Add('docx report style formatting OK') | Out-Null
 
   $buildReportOutputDir = Join-Path $tempRoot 'build-report-output'
@@ -1442,7 +1468,6 @@ URL: https://example.com/network-lab
     -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') `
     -OutputDir $buildReportOutputDir `
     -StyleFinalDocx `
-    -StyleProfile auto `
     -StyleProfilePath $buildStyleProfilePath
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'generated-field-map.json')) -Message 'build-report did not create the generated field map.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.docx')) -Message 'build-report did not create the filled docx.'
@@ -1460,7 +1485,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
   Assert-True -Condition ([string]$buildReportSummary.reportProfileName -eq 'experiment-report') -Message 'build-report summary is missing the expected report profile name.'
-  Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report summary did not preserve the requested auto style profile.'
+  Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report should default the requested style profile from the report profile.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfilePath -eq $buildStyleProfilePath) -Message 'build-report summary is missing the custom style profile path.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'default') -Message 'build-report summary should resolve the sample template to the default style profile.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfileReason -match 'default profile') -Message 'build-report summary is missing the resolved auto-style reason.'
