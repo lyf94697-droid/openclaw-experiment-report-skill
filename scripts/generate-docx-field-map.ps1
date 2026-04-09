@@ -28,6 +28,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$fieldMapCompositeRules = @(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile)
 
 $labelPattern = '^(?<label>[^:\uFF1A]{1,60})[:\uFF1A]\s*(?<rest>.*)$'
 $placeholderPattern = '[_\uFF3F]{2,}|\.{3,}|\uFF08\s*\uFF09|\(\s*\)|\u25A1|\u25A0'
@@ -280,18 +281,9 @@ function Get-ProfileSectionFieldMapId {
   }
 
   $sectionKey = if ($SectionField.PSObject.Properties.Name -contains "key") { [string]$SectionField.key } else { "" }
-  switch ($sectionKey) {
-    "Purpose" { return "purpose" }
-    "Environment" { return "environment" }
-    "Theory" { return "theory" }
-    "Steps" { return "steps" }
-    "Results" { return "result" }
-    "Analysis" { return "analysis" }
-    "Summary" { return "summary" }
-  }
-
-  if (-not [string]::IsNullOrWhiteSpace($sectionKey)) {
-    return $sectionKey.ToLowerInvariant()
+  $resolvedSectionId = Get-ReportProfileSectionIdFromKey -Key $sectionKey
+  if (-not [string]::IsNullOrWhiteSpace($resolvedSectionId)) {
+    return $resolvedSectionId
   }
 
   throw "Profile section field is missing both fieldMapId and key."
@@ -683,60 +675,54 @@ function Get-CompositeCellFillSpec {
   $paragraphs = New-Object System.Collections.Generic.List[string]
   $mappedSectionIds = New-Object System.Collections.Generic.List[string]
 
-  if (($normalizedCellText -match '实验目的') -and ($normalizedCellText -match '实验内容')) {
-    if (Add-SectionParagraphBlock -Target $paragraphs -Heading '一. 实验目的' -SectionInfo $SectionsById["purpose"]) {
-      [void]$mappedSectionIds.Add("purpose")
+  foreach ($compositeRule in $fieldMapCompositeRules) {
+    $matchesRule = $true
+    foreach ($pattern in @($compositeRule.matchAll)) {
+      if ([string]::IsNullOrWhiteSpace([string]$pattern) -or $normalizedCellText -notmatch [string]$pattern) {
+        $matchesRule = $false
+        break
+      }
     }
 
-    $contentAdded = $false
-    if ($SectionsById.ContainsKey("environment") -and @($SectionsById["environment"].paragraphs).Count -gt 0) {
-      if (-not $contentAdded) {
-        [void]$paragraphs.Add('二. 实验内容')
-        $contentAdded = $true
-      }
-      foreach ($paragraph in @($SectionsById["environment"].paragraphs)) {
-        if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
-          [void]$paragraphs.Add([string]$paragraph)
+    if (-not $matchesRule) {
+      continue
+    }
+
+    foreach ($block in @($compositeRule.blocks)) {
+      $blockAdded = $false
+      foreach ($sectionId in @($block.sectionIds)) {
+        if (-not $SectionsById.ContainsKey([string]$sectionId)) {
+          continue
         }
-      }
-      [void]$mappedSectionIds.Add("environment")
-    }
 
-    if ($SectionsById.ContainsKey("theory") -and @($SectionsById["theory"].paragraphs).Count -gt 0) {
-      if (-not $contentAdded) {
-        [void]$paragraphs.Add('二. 实验内容')
-        $contentAdded = $true
-      }
-      foreach ($paragraph in @($SectionsById["theory"].paragraphs)) {
-        if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
-          [void]$paragraphs.Add([string]$paragraph)
+        $sectionInfo = $SectionsById[[string]$sectionId]
+        if ($null -eq $sectionInfo -or @($sectionInfo.paragraphs).Count -eq 0) {
+          continue
         }
+
+        if (-not $blockAdded -and -not [string]::IsNullOrWhiteSpace([string]$block.heading)) {
+          [void]$paragraphs.Add([string]$block.heading)
+          $blockAdded = $true
+        }
+
+        foreach ($paragraph in @($sectionInfo.paragraphs)) {
+          if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
+            [void]$paragraphs.Add([string]$paragraph)
+          }
+        }
+        [void]$mappedSectionIds.Add([string]$sectionId)
       }
-      [void]$mappedSectionIds.Add("theory")
+    }
+
+    if ($paragraphs.Count -gt 0 -and $mappedSectionIds.Count -gt 0) {
+      return [pscustomobject]@{
+        Paragraphs = @($paragraphs)
+        MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
+      }
     }
   }
 
-  if (($normalizedCellText -match '实验步骤') -and ($normalizedCellText -match '实验小结')) {
-    foreach ($entry in @(
-        @{ id = "steps"; heading = "三. 实验步骤" },
-        @{ id = "result"; heading = "四. 实验结果" },
-        @{ id = "analysis"; heading = "五. 问题分析" },
-        @{ id = "summary"; heading = "六.实验小结" }
-      )) {
-      if (Add-SectionParagraphBlock -Target $paragraphs -Heading $entry.heading -SectionInfo $SectionsById[$entry.id]) {
-        [void]$mappedSectionIds.Add($entry.id)
-      }
-    }
-  }
-
-  if ($paragraphs.Count -eq 0 -or $mappedSectionIds.Count -eq 0) {
-    return $null
-  }
-
-  return [pscustomobject]@{
-    Paragraphs = @($paragraphs)
-    MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
-  }
+  return $null
 }
 
 function Get-CompositeTableBodyFillSpec {

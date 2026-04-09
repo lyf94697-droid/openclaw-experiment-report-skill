@@ -530,6 +530,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $reportProfile) -contains '课程名称') -Message 'Report profile metadata prefixes are missing 课程名称.'
   Assert-True -Condition ((Get-ReportProfileExtraSectionHeadings -Profile $reportProfile) -contains '实验内容') -Message 'Report profile extra section headings are missing 实验内容.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId 'steps' -BaseName 'setup-step') -eq '实验步骤截图') -Message 'Report profile image caption defaults are missing the steps caption.'
+  Assert-True -Condition (@(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile).Count -ge 2) -Message 'Report profile field-map composite rules are missing.'
   $results.Add('report profile loader OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
@@ -820,6 +821,75 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '三. 实验步骤' }).Count) -ge 1) -Message 'Cover-body fill did not insert the procedure heading after the table.'
   Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -match '实验结果表明，两台主机能够正常互通' }).Count) -ge 1) -Message 'Cover-body fill did not move the result content after the table.'
   $results.Add('docx cover-body fill OK') | Out-Null
+
+  $customCompositeProfilePath = Join-Path $tempRoot 'custom-field-map-composite-profile.json'
+  @'
+{
+  "name": "field-map-composite-custom-profile",
+  "displayName": "自定义模板复合规则实验报告",
+  "defaultStyleProfile": "auto",
+  "defaultExperimentProperty": "③验证性实验",
+  "metadataFields": [
+    { "key": "Name", "label": "姓名" }
+  ],
+  "extraLabels": [],
+  "sectionFields": [
+    { "key": "Purpose", "heading": "实验目的", "aliases": ["实验目的"], "minChars": { "standard": 30, "full": 60 } },
+    { "key": "Environment", "heading": "实验环境", "aliases": ["实验环境", "实验设备与环境"], "minChars": { "standard": 30, "full": 60 } },
+    { "key": "Theory", "heading": "实验原理或任务要求", "aliases": ["实验原理或任务要求", "实验原理", "任务要求"], "minChars": { "standard": 30, "full": 80 } },
+    { "key": "Steps", "heading": "实验步骤", "aliases": ["实验步骤", "实验过程"], "minChars": { "standard": 60, "full": 140 } },
+    { "key": "Results", "heading": "实验结果", "aliases": ["实验结果", "实验现象与结果记录"], "minChars": { "standard": 50, "full": 120 } },
+    { "key": "Analysis", "heading": "问题分析", "aliases": ["问题分析", "结果分析"], "minChars": { "standard": 30, "full": 80 } },
+    { "key": "Summary", "heading": "实验总结", "aliases": ["实验总结", "总结与思考", "实验小结"], "minChars": { "standard": 30, "full": 80 } }
+  ],
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["实验目的", "实验内容"],
+      "blocks": [
+        { "heading": "甲. 实验目标", "sectionIds": ["purpose"] },
+        { "heading": "乙. 环境与原理", "sectionIds": ["environment", "theory"] }
+      ]
+    },
+    {
+      "matchAll": ["实验步骤", "实验小结"],
+      "blocks": [
+        { "heading": "丙. 操作步骤", "sectionIds": ["steps"] },
+        { "heading": "丁. 实验结果", "sectionIds": ["result"] },
+        { "heading": "戊. 问题分析", "sectionIds": ["analysis"] },
+        { "heading": "己. 实验小结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": { "minChars": 700, "promptGuidance": [] },
+    "full": { "minChars": 1100, "promptGuidance": [] }
+  }
+}
+'@ | Set-Content -LiteralPath $customCompositeProfilePath -Encoding UTF8
+  $resolvedCustomCompositeProfilePath = (Resolve-Path -LiteralPath $customCompositeProfilePath).Path
+
+  $customCompositeFieldMapPath = Join-Path $tempRoot 'cover-body-field-map-custom-profile.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $coverBodyDocx `
+    -ReportPath $sampleReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -ReportProfilePath $customCompositeProfilePath `
+    -Format json `
+    -OutFile $customCompositeFieldMapPath | Out-Null
+  $customCompositeFieldMapRoot = (Get-Content -LiteralPath $customCompositeFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$customCompositeFieldMapRoot.reportProfileName -eq 'field-map-composite-custom-profile') -Message 'Custom composite field-map generator is missing the expected report profile name.'
+  Assert-True -Condition ([string]$customCompositeFieldMapRoot.reportProfilePath -eq $resolvedCustomCompositeProfilePath) -Message 'Custom composite field-map generator is missing the expected report profile path.'
+  Assert-True -Condition ([string]$customCompositeFieldMapRoot.fieldMap.T1R5C1.paragraphs[0] -eq '甲. 实验目标') -Message 'Custom composite field-map generator did not use the profile-defined first composite heading.'
+  Assert-True -Condition (@($customCompositeFieldMapRoot.fieldMap.T1R5C1.paragraphs | Where-Object { $_ -eq '乙. 环境与原理' }).Count -ge 1) -Message 'Custom composite field-map generator did not use the profile-defined merged content heading.'
+  Assert-True -Condition (@($customCompositeFieldMapRoot.fieldMap.T1R5C1.paragraphs | Where-Object { $_ -eq '丙. 操作步骤' }).Count -ge 1) -Message 'Custom composite field-map generator did not use the profile-defined procedure heading.'
+
+  $customCompositeFilledDocx = Join-Path $tempRoot 'cover-body-template.custom-composite.filled.docx'
+  & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $coverBodyDocx -MappingPath $customCompositeFieldMapPath -OutPath $customCompositeFilledDocx | Out-Null
+  $customCompositeOutlineJson = (& (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $customCompositeFilledDocx -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ((@($customCompositeOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '甲. 实验目标' }).Count) -ge 1) -Message 'Custom composite field-map fill did not insert the custom first heading after the table.'
+  Assert-True -Condition ((@($customCompositeOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '乙. 环境与原理' }).Count) -ge 1) -Message 'Custom composite field-map fill did not insert the custom merged heading after the table.'
+  Assert-True -Condition ((@($customCompositeOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '丙. 操作步骤' }).Count) -ge 1) -Message 'Custom composite field-map fill did not insert the custom procedure heading after the table.'
+  $results.Add('docx cover-body field-map custom profile OK') | Out-Null
 
   $sampleImageOne = Join-Path $tempRoot 'sample-image-1.png'
   $sampleImageTwo = Join-Path $tempRoot 'sample-image-2.png'
