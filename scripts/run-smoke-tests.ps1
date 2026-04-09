@@ -442,6 +442,7 @@ try {
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
       (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1'),
       (Join-Path $repoRoot 'scripts\build-report-from-url.ps1'),
+      (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1'),
       (Join-Path $repoRoot 'scripts\check-docx-layout.ps1'),
       (Join-Path $repoRoot 'scripts\extract-docx-template.ps1'),
       (Join-Path $repoRoot 'scripts\fetch-csdn-article.ps1'),
@@ -1004,6 +1005,35 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((@($diagnosticFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'unmatched_composite_template_cell' -and $_.context.location -eq 'T1R1C1' }).Count) -ge 1) -Message 'Field-map diagnostics should identify unmatched composite template cells.'
   Assert-True -Condition ((@($diagnosticFieldMapRoot.notes | Where-Object { $_ -match '实验台号' }).Count) -ge 1) -Message 'Field-map diagnostics should continue mirroring messages into notes.'
   $results.Add('docx field-map diagnostics OK') | Out-Null
+
+  $templateFitCheckPath = Join-Path $tempRoot 'template-fit-check.json'
+  & (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
+    -TemplatePath $diagnosticTemplateDocx `
+    -ReportPath $diagnosticReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format json `
+    -OutFile $templateFitCheckPath | Out-Null
+  $templateFitCheckRoot = (Get-Content -LiteralPath $templateFitCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$templateFitCheckRoot.reportProfileName -eq 'experiment-report') -Message 'Template-fit checker is missing the expected report profile name.'
+  Assert-True -Condition ([int]$templateFitCheckRoot.summary.profileChangeSuggestionCount -ge 3) -Message 'Template-fit checker should suggest profile changes for metadata, sections, and composite rules.'
+  Assert-True -Condition ([int]$templateFitCheckRoot.summary.inputGapCount -ge 2) -Message 'Template-fit checker should report both metadata and report-content input gaps.'
+  Assert-True -Condition ((@($templateFitCheckRoot.suggestions.metadataFieldsToAdd | Where-Object { $_.label -eq '实验台号' }).Count) -ge 1) -Message 'Template-fit checker should suggest adding the 实验台号 metadata field.'
+  Assert-True -Condition ((@($templateFitCheckRoot.inputGaps.missingMetadataValues | Where-Object { $_.label -eq '实验地点' }).Count) -ge 1) -Message 'Template-fit checker should surface the missing 实验地点 metadata value.'
+  Assert-True -Condition ((@($templateFitCheckRoot.suggestions.sectionAliasesToAdd | Where-Object { $_.heading -eq '实验器材与拓扑' -and $_.suggestedSectionId -eq 'environment' }).Count) -ge 1) -Message 'Template-fit checker should suggest mapping 实验器材与拓扑 to the environment section.'
+  Assert-True -Condition ((@($templateFitCheckRoot.inputGaps.missingReportSections | Where-Object { $_.heading -eq '问题分析' }).Count) -ge 1) -Message 'Template-fit checker should surface the missing 问题分析 report section.'
+  Assert-True -Condition ((@($templateFitCheckRoot.suggestions.compositeRulesToAdd | Where-Object { $_.cellText -eq '实验目的 / 实验结果' }).Count) -ge 1) -Message 'Template-fit checker should suggest a composite rule for the unmatched cover/body cell.'
+  Assert-True -Condition ((@($templateFitCheckRoot.suggestions.compositeRulesToAdd | Where-Object { $_.cellText -eq '实验目的 / 实验结果' -and @($_.suggestedProfilePatch.matchAll).Count -ge 2 }).Count) -ge 1) -Message 'Template-fit checker should emit a scaffolded matchAll array for composite-rule suggestions.'
+
+  $templateFitMarkdown = & (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
+    -TemplatePath $diagnosticTemplateDocx `
+    -ReportPath $diagnosticReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format markdown | Out-String
+  Assert-True -Condition ($templateFitMarkdown -match 'Report Profile Template Fit') -Message 'Template-fit checker markdown output is missing the title.'
+  Assert-True -Condition ($templateFitMarkdown -match 'Profile Changes') -Message 'Template-fit checker markdown output is missing the profile-change section.'
+  Assert-True -Condition ($templateFitMarkdown -match '实验台号') -Message 'Template-fit checker markdown output is missing the unrecognized metadata label.'
+  Assert-True -Condition ($templateFitMarkdown -match '实验器材与拓扑') -Message 'Template-fit checker markdown output is missing the unrecognized section heading.'
+  $results.Add('docx template-fit checker OK') | Out-Null
 
   $sampleImageOne = Join-Path $tempRoot 'sample-image-1.png'
   $sampleImageTwo = Join-Path $tempRoot 'sample-image-2.png'
@@ -1721,6 +1751,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report.ps1')) -Message 'Install script did not copy build-report script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-feishu.ps1')) -Message 'Install script did not copy Feishu wrapper script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-url.ps1')) -Message 'Install script did not copy build-report-from-url script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\check-report-profile-template-fit.ps1')) -Message 'Install script did not copy the template-fit checker script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\check-docx-layout.ps1')) -Message 'Install script did not copy layout check script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\fetch-web-article.ps1')) -Message 'Install script did not copy web fetch script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\format-docx-report-style.ps1')) -Message 'Install script did not copy style formatter script.'
