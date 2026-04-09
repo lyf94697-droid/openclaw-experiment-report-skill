@@ -11,6 +11,10 @@ param(
 
   [string]$MetadataJson,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [ValidateSet("json", "markdown")]
   [string]$Format = "json",
 
@@ -19,6 +23,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 
 $labelPattern = '^(?<label>[^:\uFF1A]{1,60})[:\uFF1A]\s*(?<rest>.*)$'
 $placeholderPattern = '[_\uFF3F]{2,}|\.{3,}|\uFF08\s*\uFF09|\(\s*\)|\u25A1|\u25A0'
@@ -260,6 +269,34 @@ function New-SectionRule {
   }
 }
 
+function Get-ProfileSectionFieldMapId {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$SectionField
+  )
+
+  if ($SectionField.PSObject.Properties.Name -contains "fieldMapId" -and -not [string]::IsNullOrWhiteSpace([string]$SectionField.fieldMapId)) {
+    return [string]$SectionField.fieldMapId
+  }
+
+  $sectionKey = if ($SectionField.PSObject.Properties.Name -contains "key") { [string]$SectionField.key } else { "" }
+  switch ($sectionKey) {
+    "Purpose" { return "purpose" }
+    "Environment" { return "environment" }
+    "Theory" { return "theory" }
+    "Steps" { return "steps" }
+    "Results" { return "result" }
+    "Analysis" { return "analysis" }
+    "Summary" { return "summary" }
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($sectionKey)) {
+    return $sectionKey.ToLowerInvariant()
+  }
+
+  throw "Profile section field is missing both fieldMapId and key."
+}
+
 $metadataRules = @(
   (New-MetadataRule -Id "course_name" -Aliases @("课程名称", "课程名", "课程", "course", "coursename")),
   (New-MetadataRule -Id "experiment_name" -Aliases @("实验名称", "实验名", "实验题目", "题目", "experiment", "experimentname", "experimenttitle", "labreporttitle")),
@@ -276,13 +313,14 @@ $metadataRules = @(
 )
 
 $sectionRules = @(
-  (New-SectionRule -Id "purpose" -Aliases @("实验目的")),
-  (New-SectionRule -Id "environment" -Aliases @("实验环境", "实验设备与环境")),
-  (New-SectionRule -Id "theory" -Aliases @("实验原理或任务要求", "实验原理", "任务要求")),
-  (New-SectionRule -Id "steps" -Aliases @("实验步骤", "实验过程", "关键代码说明")),
-  (New-SectionRule -Id "result" -Aliases @("实验结果", "实验现象与结果记录")),
-  (New-SectionRule -Id "analysis" -Aliases @("问题分析", "结果分析")),
-  (New-SectionRule -Id "summary" -Aliases @("实验总结", "总结与思考"))
+  foreach ($sectionField in @($reportProfile.sectionFields)) {
+    $aliases = @($sectionField.aliases)
+    if ($aliases.Count -eq 0 -and $sectionField.PSObject.Properties.Name -contains "heading") {
+      $aliases = @([string]$sectionField.heading)
+    }
+
+    New-SectionRule -Id (Get-ProfileSectionFieldMapId -SectionField $sectionField) -Aliases $aliases
+  }
 )
 
 $metadataAliasLookup = @{}
@@ -593,7 +631,6 @@ function Get-TemplateAnalysis {
     [string]$DocxPath
   )
 
-  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
   $analysisText = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $DocxPath -Format json | Out-String
   $analysis = $analysisText | ConvertFrom-Json
   if ($null -eq $analysis) {
@@ -975,6 +1012,8 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
 $result = [ordered]@{
   templatePath = $resolvedTemplatePath
   reportSource = $reportInfo.Source
+  reportProfileName = [string]$reportProfile.name
+  reportProfilePath = [string]$reportProfile.resolvedProfilePath
   summary = [ordered]@{
     metadataValueCount = $metadataValues.Count
     reportSectionCount = $reportAnalysis.SectionsById.Count
