@@ -2180,6 +2180,26 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([string]$courseDesignWrapperSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Course-design Feishu wrapper summary is missing the expected display name.'
     Assert-True -Condition ((Split-Path -Leaf ([string]$courseDesignWrapperSummary.defaultsPath)) -eq 'course-design-report.defaults.json') -Message 'Course-design Feishu wrapper should persist defaults under the profile-specific defaults file.'
     Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignWrapperSummary.finalDocxPath)) -Message 'Course-design Feishu wrapper final docx path does not exist.'
+
+    $courseDesignReplayWrapperOutputDir = Join-Path $tempRoot 'course-design-feishu-replay-output'
+    & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
+      -TemplatePath $courseDesignTemplateDocx `
+      -CourseName '软件工程综合实践' `
+      -ExperimentName '校园导览小程序设计' `
+      -ImageSpecsPath $courseDesignImageSpecsPath `
+      -OutputDir $courseDesignReplayWrapperOutputDir `
+      -StyleProfile auto `
+      -ReportProfileName 'course-design-report' `
+      -PreGeneratedReportPath $preparedSummaryMockReportPath `
+      -SkipSessionReset | Out-Null
+    $courseDesignReplayWrapperSummaryPath = Join-Path $courseDesignReplayWrapperOutputDir 'feishu-build-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $courseDesignReplayWrapperSummaryPath) -Message 'Course-design Feishu replay wrapper did not create the wrapper summary.'
+    $courseDesignReplayWrapperSummary = (Get-Content -LiteralPath $courseDesignReplayWrapperSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.mode -eq 'generated-report') -Message 'Course-design Feishu replay wrapper should record generated-report mode.'
+    Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.reportProfileName -eq 'course-design-report') -Message 'Course-design Feishu replay wrapper summary is missing the expected profile name.'
+    Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.preGeneratedReportPath -eq $preparedSummaryMockReportPath) -Message 'Course-design Feishu replay wrapper summary is missing the explicit replay report path.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignReplayWrapperSummary.reportPath)) -Message 'Course-design Feishu replay wrapper did not copy the replayed report body.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignReplayWrapperSummary.finalDocxPath)) -Message 'Course-design Feishu replay wrapper final docx path does not exist.'
   } finally {
     $env:AGENTS_HOME = $originalWrapperAgentsHome
   }

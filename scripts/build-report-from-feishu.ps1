@@ -69,6 +69,8 @@ param(
 
   [string]$BrowserProfile = $env:OPENCLAW_BROWSER_PROFILE,
 
+  [string]$PreGeneratedReportPath,
+
   [int]$ReferenceMaxChars = 30000,
 
   [string]$SessionKey = "agent:gpt:main",
@@ -197,6 +199,7 @@ $resolvedReportPath = Resolve-AbsolutePathIfProvided -Path $ReportPath
 $resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
+$resolvedPreGeneratedReportPath = Resolve-AbsolutePathIfProvided -Path $PreGeneratedReportPath
 $resolvedReportProfilePath = Resolve-AbsolutePathIfProvided -Path $ReportProfilePath
 $resolvedImageSpecsPath = Resolve-AbsolutePathIfProvided -Path $ImageSpecsPath
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
@@ -225,6 +228,9 @@ $resolvedExperimentName = [string]$resolvedNames.experimentName
 
 if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath) -and $generationInputsProvided) {
   throw "Provide either -ReportPath or generation inputs such as -ReferenceUrls / -ReferenceTextPaths / -PromptText, but not both."
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath) -and -not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+  throw "Provide either -ReportPath or -PreGeneratedReportPath, but not both."
 }
 
 if ([string]::IsNullOrWhiteSpace($resolvedReportPath)) {
@@ -399,6 +405,9 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+    $buildParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
+  }
 
   if ($SkipSessionReset) {
     $buildParams.SkipSessionReset = $true
@@ -502,6 +511,7 @@ $wrapperSummary = [pscustomobject]@{
   referenceTextPaths = $referenceTextPathList
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
+  preGeneratedReportPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "preGeneratedReportPath" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.preGeneratedReportPath)) { [string]$innerSummary.preGeneratedReportPath } else { $resolvedPreGeneratedReportPath })
 }
 [System.IO.File]::WriteAllText($resolvedSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
 
