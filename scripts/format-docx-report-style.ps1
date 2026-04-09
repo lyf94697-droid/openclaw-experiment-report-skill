@@ -8,9 +8,13 @@ param(
   [switch]$Overwrite,
 
   [ValidateSet("auto", "default", "compact", "school")]
-  [string]$Profile = "default",
+  [string]$Profile = "auto",
 
   [string]$ProfilePath,
+
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
 
   [int]$BodyFirstLineTwips = 420,
 
@@ -59,18 +63,21 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
+$script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $script:RepoRoot
 $wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 $sectionHeadingRules = @(
-  [pscustomobject]@{ aliases = @("实验目的") },
-  [pscustomobject]@{ aliases = @("实验环境", "实验设备与环境") },
-  [pscustomobject]@{ aliases = @("实验原理或任务要求", "实验原理", "任务要求") },
-  [pscustomobject]@{ aliases = @("实验步骤", "实验过程") },
-  [pscustomobject]@{ aliases = @("实验结果", "实验现象与结果记录") },
-  [pscustomobject]@{ aliases = @("问题分析", "结果分析") },
-  [pscustomobject]@{ aliases = @("实验总结", "总结与思考", "实验小结") },
-  [pscustomobject]@{ aliases = @("实验内容") }
+  @(Get-ReportProfileSectionRules -Profile $reportProfile) |
+    ForEach-Object {
+      [pscustomobject]@{ aliases = @($_.headingAliases) }
+    }
 )
-$metadataPrefixes = @("课程名称", "实验名称", "学号", "姓名", "班级", "实验性质", "实验时间", "实验地点", "指导教师", "日期")
+foreach ($extraHeading in (Get-ReportProfileExtraSectionHeadings -Profile $reportProfile)) {
+  $sectionHeadingRules += [pscustomobject]@{ aliases = @([string]$extraHeading) }
+}
+$metadataPrefixes = @(Get-ReportProfileMetadataPrefixes -Profile $reportProfile)
 $styleSettingNames = @(
   "BodyFirstLineTwips",
   "BodyLineTwips",
@@ -930,7 +937,10 @@ function Resolve-StyleProfileDecision {
     [string]$RequestedProfile,
 
     [Parameter(Mandatory = $true)]
-    [System.Xml.XmlNode]$Body
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$ReportProfile
   )
 
   if ($RequestedProfile -ne "auto") {
@@ -938,6 +948,15 @@ function Resolve-StyleProfileDecision {
       RequestedProfile = $RequestedProfile
       ResolvedProfile = $RequestedProfile
       Reason = "Profile explicitly requested."
+    }
+  }
+
+  $profileDefaultStyleProfile = Get-ReportProfileDefaultStyleProfile -Profile $ReportProfile
+  if ($profileDefaultStyleProfile -ne "auto") {
+    return [pscustomobject]@{
+      RequestedProfile = $RequestedProfile
+      ResolvedProfile = $profileDefaultStyleProfile
+      Reason = "Resolved from report profile defaultStyleProfile."
     }
   }
 
@@ -1075,7 +1094,7 @@ try {
     $Profile
   }
 
-  $profileDecision = Resolve-StyleProfileDecision -RequestedProfile $requestedProfile -Body $body
+  $profileDecision = Resolve-StyleProfileDecision -RequestedProfile $requestedProfile -Body $body -ReportProfile $reportProfile
   $profileSettings = Get-StyleProfileSettings -ProfileName $profileDecision.ResolvedProfile
   $effectiveStyleSettings = [ordered]@{}
   foreach ($settingName in (Get-StyleSettingNames)) {
@@ -1225,6 +1244,8 @@ try {
   [pscustomobject]@{
     docxPath = $resolvedDocxPath
     outPath = $resolvedOutPath
+    reportProfileName = [string]$reportProfile.name
+    reportProfilePath = [string]$reportProfile.resolvedProfilePath
     profilePath = $(if ($null -ne $fileProfile) { [string]$fileProfile.path } else { $null })
     requestedProfile = $profileDecision.RequestedProfile
     resolvedProfile = $profileDecision.ResolvedProfile

@@ -268,24 +268,6 @@ function Normalize-FieldKey {
   return $normalized
 }
 
-function Get-ProfileImageSectionId {
-  param(
-    [Parameter(Mandatory = $true)]
-    [psobject]$SectionField
-  )
-
-  switch ([string]$SectionField.key) {
-    "Purpose" { return "purpose" }
-    "Environment" { return "environment" }
-    "Theory" { return "theory" }
-    "Steps" { return "steps" }
-    "Results" { return "result" }
-    "Analysis" { return "analysis" }
-    "Summary" { return "summary" }
-    default { return ([string]$SectionField.key).Trim().ToLowerInvariant() }
-  }
-}
-
 function Normalize-TargetSelector {
   param(
     [AllowNull()]
@@ -356,33 +338,7 @@ function Initialize-SectionRules {
     [psobject]$ReportProfile
   )
 
-  $script:sectionRules = @(
-    @(Get-ReportProfileSectionFields -Profile $ReportProfile) |
-      ForEach-Object {
-        $sectionId = Get-ProfileImageSectionId -SectionField $_
-        $heading = [string]$_.heading
-        $headingAliases = @(
-          @($_.aliases) |
-            ForEach-Object { [string]$_ } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        )
-        if ($headingAliases.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($heading)) {
-          $headingAliases = @($heading)
-        }
-
-        $inputAliases = @(
-          @($headingAliases + @($heading, [string]$_.key, $sectionId)) |
-            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
-            Select-Object -Unique
-        )
-
-        [pscustomobject]@{
-          id = $sectionId
-          headingAliases = $headingAliases
-          inputAliases = $inputAliases
-        }
-      }
-  )
+  $script:sectionRules = @(Get-ReportProfileSectionRules -Profile $ReportProfile)
 
   $script:sectionInputAliasLookup = @{}
   foreach ($rule in $script:sectionRules) {

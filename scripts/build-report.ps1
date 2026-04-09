@@ -41,7 +41,7 @@ param(
   [switch]$StyleFinalDocx,
 
   [ValidateSet("auto", "default", "compact", "school")]
-  [string]$StyleProfile = "default",
+  [string]$StyleProfile = "auto",
 
   [string]$StyleProfilePath
 )
@@ -77,7 +77,13 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath)) {
   $resolvedRequirementsPath = (Resolve-Path -LiteralPath $RequirementsPath).Path
 }
 
-$resolvedReportProfilePath = Resolve-ReportProfilePath -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$resolvedReportProfilePath = [string]$reportProfile.resolvedProfilePath
+$effectiveStyleProfile = if ($PSBoundParameters.ContainsKey("StyleProfile")) {
+  $StyleProfile
+} else {
+  Get-ReportProfileDefaultStyleProfile -Profile $reportProfile
+}
 
 $imageInputModes = 0
 if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) { $imageInputModes++ }
@@ -263,7 +269,9 @@ if ($styleOutputRequested) {
     DocxPath = $styleInputPath
     OutPath = $resolvedStyledDocxOutPath
     Overwrite = $true
-    Profile = $StyleProfile
+    Profile = $effectiveStyleProfile
+    ReportProfileName = [string]$reportProfile.name
+    ReportProfilePath = [string]$reportProfile.resolvedProfilePath
   }
   if (-not [string]::IsNullOrWhiteSpace($StyleProfilePath)) {
     $styleParams.ProfilePath = (Resolve-Path -LiteralPath $StyleProfilePath).Path
@@ -306,7 +314,7 @@ $layoutCheckResult = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding U
 
 $summary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
-  reportProfileName = $ReportProfileName
+  reportProfileName = [string]$reportProfile.name
   reportProfilePath = $resolvedReportProfilePath
   templatePath = $resolvedTemplatePath
   reportPath = $resolvedReportPath
@@ -329,7 +337,7 @@ $summary = [pscustomobject]@{
   layoutCheckWarningCount = $(if ($null -ne $layoutCheckResult) { [int]$layoutCheckResult.summary.warningCount } else { $null })
   expectedLayoutImageCount = $(if ($expectedLayoutImageCount -ge 0) { $expectedLayoutImageCount } else { $null })
   expectedLayoutCaptionCount = $(if ($expectedLayoutCaptionCount -ge 0) { $expectedLayoutCaptionCount } else { $null })
-  requestedStyleProfile = $(if ($styleOutputRequested) { $StyleProfile } else { $null })
+  requestedStyleProfile = $(if ($styleOutputRequested) { $effectiveStyleProfile } else { $null })
   styleProfilePath = $(if ($null -ne $styleResult) { [string]$styleResult.profilePath } elseif (-not [string]::IsNullOrWhiteSpace($StyleProfilePath)) { (Resolve-Path -LiteralPath $StyleProfilePath).Path } else { $null })
   styleProfile = $(if ($null -ne $styleResult) { [string]$styleResult.styleProfile } else { $null })
   resolvedStyleProfile = $(if ($null -ne $styleResult) { [string]$styleResult.resolvedProfile } else { $null })

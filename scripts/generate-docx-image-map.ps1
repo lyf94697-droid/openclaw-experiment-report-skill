@@ -183,24 +183,6 @@ function Normalize-FieldKey {
   return $normalized
 }
 
-function Get-ProfileImageSectionId {
-  param(
-    [Parameter(Mandatory = $true)]
-    [psobject]$SectionField
-  )
-
-  switch ([string]$SectionField.key) {
-    "Purpose" { return "purpose" }
-    "Environment" { return "environment" }
-    "Theory" { return "theory" }
-    "Steps" { return "steps" }
-    "Results" { return "result" }
-    "Analysis" { return "analysis" }
-    "Summary" { return "summary" }
-    default { return ([string]$SectionField.key).Trim().ToLowerInvariant() }
-  }
-}
-
 function Normalize-TargetSelector {
   param(
     [AllowNull()]
@@ -227,34 +209,7 @@ function Normalize-TargetSelector {
   return $trimmed
 }
 
-$sectionRules = @(
-  @(Get-ReportProfileSectionFields -Profile $reportProfile) |
-    ForEach-Object {
-      $sectionId = Get-ProfileImageSectionId -SectionField $_
-      $heading = [string]$_.heading
-      $headingAliases = @(
-        @($_.aliases) |
-          ForEach-Object { [string]$_ } |
-          Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-      )
-      if ($headingAliases.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($heading)) {
-        $headingAliases = @($heading)
-      }
-
-      $inputAliases = @(
-        @($headingAliases + @($heading, [string]$_.key, $sectionId)) |
-          Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
-          Select-Object -Unique
-      )
-
-      [pscustomobject]@{
-        id = $sectionId
-        canonicalLabel = $heading
-        headingAliases = $headingAliases
-        inputAliases = $inputAliases
-      }
-    }
-)
+$sectionRules = @(Get-ReportProfileSectionRules -Profile $reportProfile)
 
 foreach ($rule in $sectionRules) {
   $sectionRuleLookup[$rule.id] = $rule
@@ -914,18 +869,26 @@ function Get-FallbackSectionId {
   )
 
   $stepResultSplitIndex = [int][Math]::Ceiling($Total / 2.0)
+  $fallbackSectionOrder = @(Get-ReportProfileImageFallbackSectionOrder -Profile $reportProfile)
+  $preferredOrder = New-Object System.Collections.Generic.List[string]
 
   foreach ($preferred in @(
       $(if ($Total -eq 1) { "steps" } else { $null }),
       $(if ($Total -gt 1 -and $Index -le $stepResultSplitIndex) { "steps" } else { $null }),
-      $(if ($Total -gt 1 -and $Index -gt $stepResultSplitIndex) { "result" } else { $null }),
-      "steps",
-      "result",
-      "environment",
-      "analysis",
-      "summary",
-      "purpose"
+      $(if ($Total -gt 1 -and $Index -gt $stepResultSplitIndex) { "result" } else { $null })
     )) {
+    if (-not [string]::IsNullOrWhiteSpace($preferred) -and -not $preferredOrder.Contains($preferred)) {
+      $preferredOrder.Add($preferred) | Out-Null
+    }
+  }
+
+  foreach ($preferred in $fallbackSectionOrder) {
+    if (-not [string]::IsNullOrWhiteSpace($preferred) -and -not $preferredOrder.Contains($preferred)) {
+      $preferredOrder.Add($preferred) | Out-Null
+    }
+  }
+
+  foreach ($preferred in $preferredOrder) {
     if (-not [string]::IsNullOrWhiteSpace($preferred) -and ($AvailableSectionIds -contains $preferred)) {
       return $preferred
     }
@@ -946,26 +909,7 @@ function Get-DefaultCaption {
     [string]$BaseName
   )
 
-  $normalized = Normalize-FieldKey -Text $BaseName
-  $body = switch -Regex ($normalized) {
-    'ping' { "ping 连通性测试结果"; break }
-    'arp' { "arp 邻居缓存查看结果"; break }
-    'ipconfig' { "ipconfig 网络参数结果"; break }
-    'config|setup|install|步骤|command|cmd|命令' { "实验步骤截图"; break }
-    '拓扑|environment|vmware|server|环境|network' { "实验环境截图"; break }
-    'analysis|error|problem|异常' { "问题分析截图"; break }
-    default {
-      switch ($SectionId) {
-        "environment" { "实验环境截图" }
-        "steps" { "实验步骤截图" }
-        "result" { "实验结果截图" }
-        "analysis" { "问题分析截图" }
-        "summary" { "实验总结截图" }
-        default { "实验过程截图" }
-      }
-    }
-  }
-
+  $body = Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId $SectionId -BaseName $BaseName
   return ("图{0} {1}" -f $Index, $body)
 }
 
