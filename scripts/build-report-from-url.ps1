@@ -44,6 +44,8 @@ param(
 
   [string]$ImageSpecsJson,
 
+  [string]$ImagePlanOutPath,
+
   [string]$OutputDir,
 
   [string]$FinalDocxPath,
@@ -481,6 +483,7 @@ $resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
+$resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
 
 $basePromptText = if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
@@ -591,6 +594,9 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedStyleProfilePath)) {
     $buildParams.StyleProfilePath = $resolvedStyleProfilePath
   }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
+    $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
+  }
 
   & (Join-Path $repoRoot "scripts\build-report.ps1") @buildParams | Out-Null
   $buildSummaryPath = Join-Path $resolvedOutputDir "summary.json"
@@ -653,6 +659,9 @@ $wrapperSummary = [pscustomobject]@{
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
   buildSummaryPath = $buildSummaryPath
+  imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
+  imagePlanLowConfidenceCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanLowConfidenceCount") { $buildSummary.imagePlanLowConfidenceCount } else { $null })
+  imagePlanNeedsReview = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanNeedsReview") { $buildSummary.imagePlanNeedsReview } else { $null })
   layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
   layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
   layoutCheckMessage = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckMessage") { [string]$buildSummary.layoutCheckMessage } else { $null })
