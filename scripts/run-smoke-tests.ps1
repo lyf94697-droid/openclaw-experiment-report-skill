@@ -2103,6 +2103,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileName -eq 'course-design-report') -Message 'Prepared-summary URL wrapper should inherit the course-design profile.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Prepared-summary URL wrapper should inherit the course-design display name.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.detailLevel -eq 'full') -Message 'Prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.generationMode -eq 'replay') -Message 'Prepared-summary URL wrapper should mark the report generation mode as replay.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportInputsSummaryPath -eq $reportInputsSummaryPath) -Message 'Prepared-summary URL wrapper should keep the original input summary path.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedCourseName -eq '软件工程综合实践') -Message 'Prepared-summary URL wrapper lost the requested course name from the prepared summary.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedExperimentName -eq '校园导览小程序设计') -Message 'Prepared-summary URL wrapper lost the requested title from the prepared summary.'
@@ -2126,6 +2127,7 @@ URL: https://example.com/network-lab
   $guidedReplaySummary = (Get-Content -LiteralPath $guidedReplaySummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([bool]$guidedReplaySummary.passed) -Message 'Guided replay E2E summary reported a failed validation result.'
   Assert-True -Condition ([string]$guidedReplaySummary.responseFormat -eq 'gateway-chat') -Message 'Guided replay E2E should still report the guided-chat response format.'
+  Assert-True -Condition ([string]$guidedReplaySummary.generationMode -eq 'replay') -Message 'Guided replay E2E should mark the report generation mode as replay.'
   Assert-True -Condition ([string]$guidedReplaySummary.preGeneratedReportPath -eq $sampleReportPath) -Message 'Guided replay E2E summary is missing the explicit replay report path.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$guidedReplaySummary.reportPath)) -Message 'Guided replay E2E report path does not exist.'
   $results.Add('run-e2e-sample guided replay OK') | Out-Null
@@ -2147,6 +2149,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $feishuBuildOutputDir 'artifacts\generated-field-map.json')) -Message 'Feishu wrapper did not keep generated artifacts under artifacts.'
   $feishuBuildSummary = (Get-Content -LiteralPath $feishuBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$feishuBuildSummary.mode -eq 'local-report') -Message 'Feishu wrapper summary did not record the local-report mode.'
+  Assert-True -Condition ([string]$feishuBuildSummary.generationMode -eq 'none') -Message 'Feishu wrapper summary should mark local-report runs as generationMode=none.'
   Assert-True -Condition ([string]$feishuBuildSummary.detailLevel -eq 'full') -Message 'Feishu wrapper summary did not preserve the default full detail level.'
   Assert-True -Condition ((Split-Path -Parent $feishuBuildSummary.finalDocxPath) -eq $feishuBuildOutputDir) -Message 'Feishu wrapper should copy the final docx to the output root.'
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
@@ -2178,6 +2181,7 @@ URL: https://example.com/network-lab
     $courseDesignWrapperSummary = (Get-Content -LiteralPath $courseDesignWrapperSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition ([string]$courseDesignWrapperSummary.reportProfileName -eq 'course-design-report') -Message 'Course-design Feishu wrapper summary is missing the expected report profile name.'
     Assert-True -Condition ([string]$courseDesignWrapperSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Course-design Feishu wrapper summary is missing the expected display name.'
+    Assert-True -Condition ([string]$courseDesignWrapperSummary.generationMode -eq 'none') -Message 'Course-design Feishu local-report wrapper should mark generationMode=none.'
     Assert-True -Condition ((Split-Path -Leaf ([string]$courseDesignWrapperSummary.defaultsPath)) -eq 'course-design-report.defaults.json') -Message 'Course-design Feishu wrapper should persist defaults under the profile-specific defaults file.'
     Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignWrapperSummary.finalDocxPath)) -Message 'Course-design Feishu wrapper final docx path does not exist.'
 
@@ -2196,6 +2200,7 @@ URL: https://example.com/network-lab
     Assert-True -Condition (Test-Path -LiteralPath $courseDesignReplayWrapperSummaryPath) -Message 'Course-design Feishu replay wrapper did not create the wrapper summary.'
     $courseDesignReplayWrapperSummary = (Get-Content -LiteralPath $courseDesignReplayWrapperSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.mode -eq 'generated-report') -Message 'Course-design Feishu replay wrapper should record generated-report mode.'
+    Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.generationMode -eq 'replay') -Message 'Course-design Feishu replay wrapper should mark generationMode=replay.'
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.reportProfileName -eq 'course-design-report') -Message 'Course-design Feishu replay wrapper summary is missing the expected profile name.'
     Assert-True -Condition ([string]$courseDesignReplayWrapperSummary.preGeneratedReportPath -eq $preparedSummaryMockReportPath) -Message 'Course-design Feishu replay wrapper summary is missing the explicit replay report path.'
     Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignReplayWrapperSummary.reportPath)) -Message 'Course-design Feishu replay wrapper did not copy the replayed report body.'

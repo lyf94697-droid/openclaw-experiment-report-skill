@@ -428,6 +428,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   }
 }
 
+$generationMode = if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) { "replay" } else { "live" }
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -444,6 +445,7 @@ $wrapperSummary = [pscustomobject]@{
   usedStoredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredExperimentName") { [bool]$inputSummary.usedStoredExperimentName } else { $false })
   usedInferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedInferredExperimentName") { [bool]$inputSummary.usedInferredExperimentName } else { $false })
   detailLevel = $effectiveDetailLevel
+  generationMode = $generationMode
   promptPath = $promptPathOut
   requestedReferenceUrls = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedReferenceUrls") { @($inputSummary.requestedReferenceUrls) } else { @() })
   referenceUrls = $effectiveReferenceUrlList

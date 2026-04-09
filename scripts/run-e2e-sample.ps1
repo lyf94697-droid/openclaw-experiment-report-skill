@@ -283,6 +283,7 @@ if ($Mode -eq "guided-chat") {
   [System.IO.File]::WriteAllText($reportPath, $reportText, (New-Object System.Text.UTF8Encoding($true)))
 }
 
+$generationMode = if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) { "replay" } else { "live" }
 $validationJson = & (Join-Path $repoRoot "scripts\validate-report-draft.ps1") -Path $reportPath -RequirementsPath $resolvedRequirementsPath -Format json | Out-String
 [System.IO.File]::WriteAllText($validationPath, $validationJson, (New-Object System.Text.UTF8Encoding($true)))
 $validationResult = $validationJson | ConvertFrom-Json
@@ -376,6 +377,7 @@ if ($null -ne $resolvedTemplatePath) {
 $summary = [pscustomobject]@{
   passed = [bool]$validationResult.passed
   mode = $Mode
+  generationMode = $generationMode
   responseFormat = $responseFormat
   agent = $Agent
   skillCommand = $SkillCommand

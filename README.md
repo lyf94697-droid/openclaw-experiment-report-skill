@@ -160,6 +160,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 最近一次保存的 `CourseName` / `ExperimentName` 默认值现在会按 report profile 隔离保存，`course-design-report` 不会再复用 `experiment-report` 的最近一次题目
 - 如果你只想先拿到自动生成的输入物，不想立刻跑 OpenClaw 或 `docx` 流水线，可以先运行 `scripts/generate-report-inputs.ps1`，它会单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json` 和一份 summary
 - 如果你已经有一份可复用的正文，想离线回放后续 validation / 模板填充 / 插图流程，`build-report-from-feishu.ps1`、`build-report-from-url.ps1`、`run-e2e-sample.ps1` 和 `generate-report-chat.ps1` 现在都支持显式 `-PreGeneratedReportPath`
+- 相关 summary JSON 现在会额外写出 `generationMode`，用于区分 `live`、`replay` 和 `none`（直接传本地正文）的运行路径
 - `generate-docx-field-map.ps1` 的 JSON 输出现在会额外带 `diagnostics` 和 `summary.diagnosticCountsByCode`，用于解释模板里哪些章节标题、metadata 标签或复合正文单元格没有命中自动映射规则
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`

@@ -464,12 +464,22 @@ if ($null -ne $innerSummary) {
     $innerUsedInferredExperimentName = [bool]$innerSummary.usedInferredExperimentName
   }
 }
+$generationMode = if ($wrapperMode -eq "local-report") {
+  "none"
+} elseif ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "generationMode" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.generationMode)) {
+  [string]$innerSummary.generationMode
+} elseif (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+  "replay"
+} else {
+  "live"
+}
 
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
   artifactsDir = $resolvedArtifactsDir
   templatePath = $resolvedTemplatePath
   mode = $wrapperMode
+  generationMode = $generationMode
   reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { [string]$reportProfile.name })
   reportProfilePath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfilePath") { [string]$innerSummary.reportProfilePath } else { [string]$reportProfile.resolvedProfilePath })
   reportProfileDisplayName = $documentLabel
