@@ -501,6 +501,35 @@ $buildImageInputMode = if ($null -ne $innerSummary -and $innerSummary.PSObject.P
 } else {
   $null
 }
+$pipelineTracePath = Join-Path $resolvedOutputDir "pipeline-trace.json"
+$pipelineTrace = [pscustomobject]@{
+  wrapper = [pscustomobject]@{
+    script = "build-report-from-feishu.ps1"
+    mode = $wrapperMode
+    generationMode = $generationMode
+    reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { [string]$reportProfile.name })
+    reportProfileDisplayName = $documentLabel
+    detailLevel = $DetailLevel
+  }
+  build = [pscustomobject]@{
+    summaryPath = $innerSummaryPath
+    reportInputMode = $buildReportInputMode
+    metadataInputMode = $buildMetadataInputMode
+    requirementsInputMode = $buildRequirementsInputMode
+    imageInputMode = $buildImageInputMode
+    imagePlanPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$innerSummary.imagePlanPath } else { $null })
+    layoutCheckPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$innerSummary.layoutCheckPath } else { $null })
+    layoutCheckPassed = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $innerSummary.layoutCheckPassed } else { $null })
+  }
+  artifacts = [pscustomobject]@{
+    reportPath = $resolvedCopiedReportPath
+    finalDocxPath = $resolvedFinalDocxDestination
+    summaryPath = $resolvedSummaryPath
+    innerSummaryPath = $innerSummaryPath
+    preGeneratedReportPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "preGeneratedReportPath" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.preGeneratedReportPath)) { [string]$innerSummary.preGeneratedReportPath } else { $resolvedPreGeneratedReportPath })
+  }
+}
+[System.IO.File]::WriteAllText($pipelineTracePath, ($pipelineTrace | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
 
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -537,6 +566,7 @@ $wrapperSummary = [pscustomobject]@{
   archivedImagePaths = $archivedImagePaths
   summaryPath = $resolvedSummaryPath
   innerSummaryPath = $innerSummaryPath
+  pipelineTracePath = $pipelineTracePath
   buildReportInputMode = $buildReportInputMode
   buildMetadataInputMode = $buildMetadataInputMode
   buildRequirementsInputMode = $buildRequirementsInputMode

@@ -433,6 +433,36 @@ $buildReportInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObjec
 $buildMetadataInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "metadataInputMode") { [string]$buildSummary.metadataInputMode } else { $null })
 $buildRequirementsInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "requirementsInputMode") { [string]$buildSummary.requirementsInputMode } else { $null })
 $buildImageInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imageInputMode") { [string]$buildSummary.imageInputMode } else { $null })
+$pipelineTracePath = Join-Path $resolvedOutputDir "pipeline-trace.json"
+$pipelineTrace = [pscustomobject]@{
+  wrapper = [pscustomobject]@{
+    script = "build-report-from-url.ps1"
+    mode = "generated-report"
+    generationMode = $generationMode
+    reportProfileName = [string]$reportProfile.name
+    reportProfileDisplayName = $documentLabel
+    detailLevel = $effectiveDetailLevel
+  }
+  build = [pscustomobject]@{
+    summaryPath = $buildSummaryPath
+    reportInputMode = $buildReportInputMode
+    metadataInputMode = $buildMetadataInputMode
+    requirementsInputMode = $buildRequirementsInputMode
+    imageInputMode = $buildImageInputMode
+    imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
+    layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
+    layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
+  }
+  artifacts = [pscustomobject]@{
+    reportInputsSummaryPath = $inputSummaryPath
+    promptPath = $promptPathOut
+    rawReportPath = $rawReportPath
+    cleanedReportPath = $cleanedReportPath
+    finalDocxPath = $finalDocxPath
+    preGeneratedReportPath = $resolvedPreGeneratedReportPath
+  }
+}
+[System.IO.File]::WriteAllText($pipelineTracePath, ($pipelineTrace | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -463,6 +493,7 @@ $wrapperSummary = [pscustomobject]@{
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
   preGeneratedReportPath = $resolvedPreGeneratedReportPath
+  pipelineTracePath = $pipelineTracePath
   buildSummaryPath = $buildSummaryPath
   buildReportInputMode = $buildReportInputMode
   buildMetadataInputMode = $buildMetadataInputMode
