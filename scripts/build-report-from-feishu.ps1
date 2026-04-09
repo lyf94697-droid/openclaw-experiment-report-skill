@@ -321,10 +321,46 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   $sourceReportPath = $resolvedReportPath
 } else {
   $wrapperMode = "generated-report"
+  $preparedInputsSummaryPath = Join-Path $resolvedArtifactsDir "report-inputs-summary.json"
+  $inputParams = @{
+    OutputDir = $resolvedArtifactsDir
+    SummaryPath = $preparedInputsSummaryPath
+    DetailLevel = $DetailLevel
+    OpenClawCmd = $OpenClawCmd
+    BrowserProfile = $BrowserProfile
+    ReferenceMaxChars = $ReferenceMaxChars
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
+    $inputParams.PromptPath = $resolvedPromptPath
+  } elseif (-not [string]::IsNullOrWhiteSpace($PromptText)) {
+    $inputParams.PromptText = $PromptText
+  }
+
+  if (@($referenceUrlList).Count -gt 0) {
+    $inputParams.ReferenceUrls = $referenceUrlList
+  }
+  if (@($referenceTextPathList).Count -gt 0) {
+    $inputParams.ReferenceTextPaths = $referenceTextPathList
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($CourseName)) { $inputParams.CourseName = $CourseName }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentName)) { $inputParams.ExperimentName = $ExperimentName }
+  if (-not [string]::IsNullOrWhiteSpace($StudentName)) { $inputParams.StudentName = $StudentName }
+  if (-not [string]::IsNullOrWhiteSpace($StudentId)) { $inputParams.StudentId = $StudentId }
+  if (-not [string]::IsNullOrWhiteSpace($ClassName)) { $inputParams.ClassName = $ClassName }
+  if (-not [string]::IsNullOrWhiteSpace($TeacherName)) { $inputParams.TeacherName = $TeacherName }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentProperty)) { $inputParams.ExperimentProperty = $ExperimentProperty }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentDate)) { $inputParams.ExperimentDate = $ExperimentDate }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentLocation)) { $inputParams.ExperimentLocation = $ExperimentLocation }
+  if ($null -ne $RequiredKeywords -and @($RequiredKeywords).Count -gt 0) { $inputParams.RequiredKeywords = $RequiredKeywords }
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) { $inputParams.ReportProfileName = [string]$reportProfile.name }
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) { $inputParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath }
+
+  & (Join-Path $repoRoot "scripts\generate-report-inputs.ps1") @inputParams | Out-Null
+
   $buildParams = @{
     TemplatePath = $resolvedTemplatePath
-    CourseName = $resolvedCourseName
-    ExperimentName = $resolvedExperimentName
     OutputDir = $resolvedArtifactsDir
     StyleProfile = $StyleProfile
     DetailLevel = $DetailLevel
@@ -332,19 +368,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     BrowserProfile = $BrowserProfile
     ReferenceMaxChars = $ReferenceMaxChars
     SessionKey = $SessionKey
-  }
-
-  if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
-    $buildParams.PromptPath = $resolvedPromptPath
-  } elseif (-not [string]::IsNullOrWhiteSpace($PromptText)) {
-    $buildParams.PromptText = $PromptText
-  }
-
-  if (@($referenceUrlList).Count -gt 0) {
-    $buildParams.ReferenceUrls = $referenceUrlList
-  }
-  if (@($referenceTextPathList).Count -gt 0) {
-    $buildParams.ReferenceTextPaths = $referenceTextPathList
+    PreparedInputsSummaryPath = $preparedInputsSummaryPath
   }
 
   if (-not [string]::IsNullOrWhiteSpace($resolvedMetadataPath)) {
@@ -353,21 +377,10 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     $buildParams.MetadataJson = $MetadataJson
   }
 
-  if (-not [string]::IsNullOrWhiteSpace($StudentName)) { $buildParams.StudentName = $StudentName }
-  if (-not [string]::IsNullOrWhiteSpace($StudentId)) { $buildParams.StudentId = $StudentId }
-  if (-not [string]::IsNullOrWhiteSpace($ClassName)) { $buildParams.ClassName = $ClassName }
-  if (-not [string]::IsNullOrWhiteSpace($TeacherName)) { $buildParams.TeacherName = $TeacherName }
-  if (-not [string]::IsNullOrWhiteSpace($ExperimentProperty)) { $buildParams.ExperimentProperty = $ExperimentProperty }
-  if (-not [string]::IsNullOrWhiteSpace($ExperimentDate)) { $buildParams.ExperimentDate = $ExperimentDate }
-  if (-not [string]::IsNullOrWhiteSpace($ExperimentLocation)) { $buildParams.ExperimentLocation = $ExperimentLocation }
-
   if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath)) {
     $buildParams.RequirementsPath = $resolvedRequirementsPath
   } elseif (-not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
     $buildParams.RequirementsJson = $RequirementsJson
-  }
-  if ($null -ne $RequiredKeywords -and @($RequiredKeywords).Count -gt 0) {
-    $buildParams.RequiredKeywords = $RequiredKeywords
   }
 
   if (-not [string]::IsNullOrWhiteSpace($resolvedImageSpecsPath)) {

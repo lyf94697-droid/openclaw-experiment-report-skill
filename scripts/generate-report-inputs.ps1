@@ -109,6 +109,7 @@ if (-not [string]::IsNullOrWhiteSpace($summaryParent)) {
 $resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
 $referenceUrlList = Get-NonEmptyList -Values $ReferenceUrls
 $referenceTextPathList = Get-NonEmptyList -Values $ReferenceTextPaths
+$effectiveReferenceUrlList = $referenceUrlList
 $inferredExperimentName = Resolve-InferredExperimentName `
   -PromptText $PromptText `
   -PromptPath $resolvedPromptPath `
@@ -138,6 +139,7 @@ if ([string]::IsNullOrWhiteSpace($ExperimentName) -and [string]::IsNullOrWhiteSp
     }
   }
 
+  $effectiveReferenceUrlList = @()
   $effectiveReferenceTextPathList = @($referenceTextPathList + $fetchedReferenceTextPathList)
 }
 
@@ -217,7 +219,8 @@ $summary = [pscustomobject]@{
   promptPath = $promptPathOut
   metadataPath = $metadataPathOut
   requirementsPath = $requirementsPathOut
-  referenceUrls = $referenceUrlList
+  requestedReferenceUrls = $referenceUrlList
+  referenceUrls = $effectiveReferenceUrlList
   referenceTextPaths = $effectiveReferenceTextPathList
   fetchedReferenceTextPaths = $fetchedReferenceTextPathList
 }

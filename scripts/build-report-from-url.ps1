@@ -70,7 +70,9 @@ param(
   [int]$ReferenceMaxChars = 30000,
 
   [ValidateSet("standard", "full")]
-  [string]$DetailLevel = "full"
+  [string]$DetailLevel = "full",
+
+  [string]$PreparedInputsSummaryPath
 )
 
 Set-StrictMode -Version Latest
@@ -190,6 +192,25 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath) -and -not [string]::IsN
   throw "Provide at most one of -RequirementsPath or -RequirementsJson."
 }
 
+$generationInputsProvided = (-not [string]::IsNullOrWhiteSpace($PromptText)) -or `
+  (-not [string]::IsNullOrWhiteSpace($PromptPath)) -or `
+  (@($ReferenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) -or `
+  (@($ReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) -or `
+  (-not [string]::IsNullOrWhiteSpace($CourseName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($StudentName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($StudentId)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ClassName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($TeacherName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentProperty)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentDate)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentLocation)) -or `
+  (@($RequiredKeywords | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0)
+
+if (-not [string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath) -and $generationInputsProvided) {
+  throw "Provide either -PreparedInputsSummaryPath or generation inputs such as -ReferenceUrls / -PromptText / -CourseName, but not both."
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 $labels = Get-ReportProfileLabels -Profile $reportProfile
@@ -207,55 +228,6 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 
-$resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
-$referenceUrlList = @($ReferenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-$referenceTextPathList = @($ReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-$inferredExperimentName = Resolve-InferredExperimentName `
-  -PromptText $PromptText `
-  -PromptPath $resolvedPromptPath `
-  -ReferenceTextPaths $referenceTextPathList `
-  -ReferenceUrls $referenceUrlList
-
-$fetchedReferenceTextPathList = @()
-$effectiveReferenceUrlList = $referenceUrlList
-$effectiveReferenceTextPathList = $referenceTextPathList
-if ([string]::IsNullOrWhiteSpace($ExperimentName) -and [string]::IsNullOrWhiteSpace($inferredExperimentName) -and $referenceUrlList.Count -gt 0) {
-  $fetchedReferenceDir = Join-Path $resolvedOutputDir "references"
-  New-Item -ItemType Directory -Path $fetchedReferenceDir -Force | Out-Null
-
-  for ($referenceIndex = 0; $referenceIndex -lt $referenceUrlList.Count; $referenceIndex++) {
-    $referenceUrl = [string]$referenceUrlList[$referenceIndex]
-    $fetchedReferencePath = Join-Path $fetchedReferenceDir ("reference-{0:D2}.txt" -f ($referenceIndex + 1))
-    $fetchedReference = & (Join-Path $repoRoot "scripts\fetch-web-article.ps1") `
-      -Url $referenceUrl `
-      -BrowserProfile $BrowserProfile `
-      -OpenClawCmd $OpenClawCmd `
-      -MaxChars $ReferenceMaxChars
-    $fetchedReferenceText = (($fetchedReference | Out-String).Trim() + [Environment]::NewLine)
-    [System.IO.File]::WriteAllText($fetchedReferencePath, $fetchedReferenceText, (New-Object System.Text.UTF8Encoding($true)))
-    $fetchedReferenceTextPathList += $fetchedReferencePath
-
-    if ([string]::IsNullOrWhiteSpace($inferredExperimentName)) {
-      $inferredExperimentName = Get-ExperimentNameCandidateFromText -Text $fetchedReferenceText
-    }
-  }
-
-  $effectiveReferenceUrlList = @()
-  $effectiveReferenceTextPathList = @($referenceTextPathList + $fetchedReferenceTextPathList)
-}
-
-$resolvedNames = Resolve-ExperimentReportNames `
-  -CourseName $CourseName `
-  -ExperimentName $ExperimentName `
-  -InferredExperimentName $inferredExperimentName `
-  -ReportProfileName ([string]$reportProfile.name) `
-  -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)
-$resolvedCourseName = [string]$resolvedNames.courseName
-$resolvedExperimentName = [string]$resolvedNames.experimentName
-if ([string]::IsNullOrWhiteSpace($resolvedCourseName) -or [string]::IsNullOrWhiteSpace($resolvedExperimentName)) {
-  throw "$courseNameLabel and $titleNameLabel are required unless $titleNameLabel can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls. After you set them once for $documentLabel, later runs can omit them."
-}
-
 $resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
@@ -263,44 +235,66 @@ $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePa
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
 
-$basePromptText = if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
-  Get-Content -LiteralPath $resolvedPromptPath -Raw -Encoding UTF8
-} elseif (-not [string]::IsNullOrWhiteSpace($PromptText)) {
-  $PromptText
+$resolvedPreparedInputsSummaryPath = Resolve-AbsolutePathIfProvided -Path $PreparedInputsSummaryPath
+$inputSummaryPath = if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
+  Join-Path $resolvedOutputDir "report-inputs-summary.json"
 } else {
-  New-ReportProfileAutoPromptText -ResolvedCourseName $resolvedCourseName -ResolvedExperimentName $resolvedExperimentName -Profile $reportProfile -DetailLevel $DetailLevel
+  $resolvedPreparedInputsSummaryPath
 }
 
-$promptPathOut = Join-Path $resolvedOutputDir "prompt.txt"
-[System.IO.File]::WriteAllText($promptPathOut, $basePromptText, (New-Object System.Text.UTF8Encoding($true)))
+if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
+  $inputParams = @{
+    OutputDir = $resolvedOutputDir
+    SummaryPath = $inputSummaryPath
+    OpenClawCmd = $OpenClawCmd
+    BrowserProfile = $BrowserProfile
+    ReferenceMaxChars = $ReferenceMaxChars
+    DetailLevel = $DetailLevel
+    ReportProfileName = [string]$reportProfile.name
+    ReportProfilePath = [string]$reportProfile.resolvedProfilePath
+  }
 
-$effectiveMetadataPath = $resolvedMetadataPath
-if ([string]::IsNullOrWhiteSpace($effectiveMetadataPath) -and [string]::IsNullOrWhiteSpace($MetadataJson)) {
-  $effectiveMetadataPath = Join-Path $resolvedOutputDir "metadata.auto.json"
-  $autoMetadataJson = New-ReportProfileAutoMetadataJson `
-    -ResolvedCourseName $resolvedCourseName `
-    -ResolvedExperimentName $resolvedExperimentName `
-    -Profile $reportProfile `
-    -ResolvedStudentName $StudentName `
-    -ResolvedStudentId $StudentId `
-    -ResolvedClassName $ClassName `
-    -ResolvedTeacherName $TeacherName `
-    -ResolvedExperimentProperty $ExperimentProperty `
-    -ResolvedExperimentDate $ExperimentDate `
-    -ResolvedExperimentLocation $ExperimentLocation
-  [System.IO.File]::WriteAllText($effectiveMetadataPath, $autoMetadataJson, (New-Object System.Text.UTF8Encoding($true)))
+  if (-not [string]::IsNullOrWhiteSpace($PromptPath)) { $inputParams.PromptPath = $PromptPath }
+  if (-not [string]::IsNullOrWhiteSpace($PromptText)) { $inputParams.PromptText = $PromptText }
+  if ($null -ne $ReferenceUrls -and @($ReferenceUrls).Count -gt 0) { $inputParams.ReferenceUrls = $ReferenceUrls }
+  if ($null -ne $ReferenceTextPaths -and @($ReferenceTextPaths).Count -gt 0) { $inputParams.ReferenceTextPaths = $ReferenceTextPaths }
+  if (-not [string]::IsNullOrWhiteSpace($CourseName)) { $inputParams.CourseName = $CourseName }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentName)) { $inputParams.ExperimentName = $ExperimentName }
+  if (-not [string]::IsNullOrWhiteSpace($StudentName)) { $inputParams.StudentName = $StudentName }
+  if (-not [string]::IsNullOrWhiteSpace($StudentId)) { $inputParams.StudentId = $StudentId }
+  if (-not [string]::IsNullOrWhiteSpace($ClassName)) { $inputParams.ClassName = $ClassName }
+  if (-not [string]::IsNullOrWhiteSpace($TeacherName)) { $inputParams.TeacherName = $TeacherName }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentProperty)) { $inputParams.ExperimentProperty = $ExperimentProperty }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentDate)) { $inputParams.ExperimentDate = $ExperimentDate }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentLocation)) { $inputParams.ExperimentLocation = $ExperimentLocation }
+  if ($null -ne $RequiredKeywords -and @($RequiredKeywords).Count -gt 0) { $inputParams.RequiredKeywords = $RequiredKeywords }
+
+  & (Join-Path $repoRoot "scripts\generate-report-inputs.ps1") @inputParams | Out-Null
 }
 
-$effectiveRequirementsPath = $resolvedRequirementsPath
-if ([string]::IsNullOrWhiteSpace($effectiveRequirementsPath) -and [string]::IsNullOrWhiteSpace($RequirementsJson)) {
-  $effectiveRequirementsPath = Join-Path $resolvedOutputDir "requirements.auto.json"
-  $autoRequirementsJson = New-ReportProfileAutoRequirementsJson `
-    -ResolvedCourseName $resolvedCourseName `
-    -ResolvedExperimentName $resolvedExperimentName `
-    -Profile $reportProfile `
-    -ExtraKeywords $RequiredKeywords `
-    -DetailLevel $DetailLevel
-  [System.IO.File]::WriteAllText($effectiveRequirementsPath, $autoRequirementsJson, (New-Object System.Text.UTF8Encoding($true)))
+$inputSummary = (Get-Content -LiteralPath $inputSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+$resolvedCourseName = [string]$inputSummary.courseName
+$resolvedExperimentName = [string]$inputSummary.experimentName
+$promptPathOut = [string]$inputSummary.promptPath
+$effectiveReferenceUrlList = @($inputSummary.referenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+$effectiveReferenceTextPathList = @($inputSummary.referenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+$fetchedReferenceTextPathList = @($inputSummary.fetchedReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+$savedDefaultsPath = [string]$inputSummary.defaultsPath
+
+$effectiveMetadataPath = if (-not [string]::IsNullOrWhiteSpace($resolvedMetadataPath)) {
+  $resolvedMetadataPath
+} elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
+  $null
+} else {
+  [string]$inputSummary.metadataPath
+}
+
+$effectiveRequirementsPath = if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath)) {
+  $resolvedRequirementsPath
+} elseif (-not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
+  $null
+} else {
+  [string]$inputSummary.requirementsPath
 }
 
 $metadataDocument = Read-MetadataDocument -ResolvedMetadataPath $effectiveMetadataPath -InlineMetadataJson $MetadataJson
@@ -416,13 +410,6 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   }
 }
 
-$savedDefaultsPath = Save-ExperimentReportDefaults `
-  -CourseName $resolvedCourseName `
-  -ExperimentName $resolvedExperimentName `
-  -DefaultsPath ([string]$resolvedNames.defaultsPath) `
-  -ReportProfileName ([string]$reportProfile.name) `
-  -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)
-
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -431,18 +418,20 @@ $wrapperSummary = [pscustomobject]@{
   reportProfileDisplayName = $documentLabel
   courseName = $resolvedCourseName
   experimentName = $resolvedExperimentName
-  requestedCourseName = $CourseName
-  requestedExperimentName = $ExperimentName
-  inferredExperimentName = [string]$resolvedNames.inferredExperimentName
+  requestedCourseName = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedCourseName") { [string]$inputSummary.requestedCourseName } else { $CourseName })
+  requestedExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedExperimentName") { [string]$inputSummary.requestedExperimentName } else { $ExperimentName })
+  inferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "inferredExperimentName") { [string]$inputSummary.inferredExperimentName } else { $null })
   defaultsPath = $savedDefaultsPath
-  usedStoredCourseName = [bool]$resolvedNames.usedStoredCourseName
-  usedStoredExperimentName = [bool]$resolvedNames.usedStoredExperimentName
-  usedInferredExperimentName = [bool]$resolvedNames.usedInferredExperimentName
+  usedStoredCourseName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredCourseName") { [bool]$inputSummary.usedStoredCourseName } else { $false })
+  usedStoredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredExperimentName") { [bool]$inputSummary.usedStoredExperimentName } else { $false })
+  usedInferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedInferredExperimentName") { [bool]$inputSummary.usedInferredExperimentName } else { $false })
   detailLevel = $DetailLevel
   promptPath = $promptPathOut
-  referenceUrls = $referenceUrlList
+  requestedReferenceUrls = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedReferenceUrls") { @($inputSummary.requestedReferenceUrls) } else { @() })
+  referenceUrls = $effectiveReferenceUrlList
   referenceTextPaths = $effectiveReferenceTextPathList
   fetchedReferenceTextPaths = $fetchedReferenceTextPathList
+  reportInputsSummaryPath = $inputSummaryPath
   rawReportPath = $rawReportPath
   cleanedReportPath = $cleanedReportPath
   metadataPath = $effectiveMetadataPath
