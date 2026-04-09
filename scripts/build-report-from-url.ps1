@@ -32,6 +32,10 @@ param(
 
   [string]$ExperimentLocation,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [string]$RequirementsPath,
 
   [string]$RequirementsJson,
@@ -73,67 +77,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "report-defaults.ps1")
-
-function New-TextFromCodePoints {
-  param(
-    [Parameter(Mandatory = $true)]
-    [int[]]$CodePoints
-  )
-
-  $builder = New-Object System.Text.StringBuilder
-  foreach ($codePoint in $CodePoints) {
-    [void]$builder.Append([char]$codePoint)
-  }
-
-  return $builder.ToString()
-}
-
-function Get-ReportLabels {
-  return [ordered]@{
-    Name = (New-TextFromCodePoints -CodePoints @(0x59D3, 0x540D))
-    StudentId = (New-TextFromCodePoints -CodePoints @(0x5B66, 0x53F7))
-    ClassName = (New-TextFromCodePoints -CodePoints @(0x73ED, 0x7EA7))
-    TeacherName = (New-TextFromCodePoints -CodePoints @(0x6307, 0x5BFC, 0x6559, 0x5E08))
-    CourseName = (New-TextFromCodePoints -CodePoints @(0x8BFE, 0x7A0B, 0x540D, 0x79F0))
-    ExperimentName = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x540D, 0x79F0))
-    ExperimentProperty = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x6027, 0x8D28))
-    ExperimentDate = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x65F6, 0x95F4))
-    ExperimentLocation = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x5730, 0x70B9))
-    Date = (New-TextFromCodePoints -CodePoints @(0x65E5, 0x671F))
-    Purpose = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x76EE, 0x7684))
-    Environment = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x73AF, 0x5883))
-    EnvAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x8BBE, 0x5907, 0x4E0E, 0x73AF, 0x5883))
-    Theory = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x539F, 0x7406, 0x6216, 0x4EFB, 0x52A1, 0x8981, 0x6C42))
-    TheoryAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x539F, 0x7406))
-    TaskAlias = (New-TextFromCodePoints -CodePoints @(0x4EFB, 0x52A1, 0x8981, 0x6C42))
-    Steps = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x6B65, 0x9AA4))
-    StepsAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x8FC7, 0x7A0B))
-    Results = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x7ED3, 0x679C))
-    ResultsAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x73B0, 0x8C61, 0x4E0E, 0x7ED3, 0x679C, 0x8BB0, 0x5F55))
-    Analysis = (New-TextFromCodePoints -CodePoints @(0x95EE, 0x9898, 0x5206, 0x6790))
-    AnalysisAlias = (New-TextFromCodePoints -CodePoints @(0x7ED3, 0x679C, 0x5206, 0x6790))
-    Summary = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x603B, 0x7ED3))
-    SummaryAlias = (New-TextFromCodePoints -CodePoints @(0x603B, 0x7ED3, 0x4E0E, 0x601D, 0x8003))
-    SummaryAlias2 = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x5C0F, 0x7ED3))
-    FinalEdition = (New-TextFromCodePoints -CodePoints @(0x6700, 0x7EC8, 0x7248))
-  }
-}
-
-function Get-DefaultExperimentProperty {
-  return (New-TextFromCodePoints -CodePoints @(0x2462, 0x9A8C, 0x8BC1, 0x6027, 0x5B9E, 0x9A8C))
-}
-
-function Get-DefaultForbiddenPatterns {
-  return @(
-    "TODO",
-    (New-TextFromCodePoints -CodePoints @(0x5F85, 0x8865, 0x5145)),
-    (New-TextFromCodePoints -CodePoints @(0x81EA, 0x884C, 0x586B, 0x5199)),
-    (New-TextFromCodePoints -CodePoints @(0x53EF, 0x6839, 0x636E, 0x5B9E, 0x9645, 0x60C5, 0x51B5, 0x4FEE, 0x6539)),
-    (New-TextFromCodePoints -CodePoints @(0x4EE5, 0x4E0B, 0x662F, 0x4E00, 0x4EFD)),
-    (New-TextFromCodePoints -CodePoints @(0x6559, 0x5E08, 0x70B9, 0x8BC4)),
-    (New-TextFromCodePoints -CodePoints @(0x6293, 0x5305, 0x7ED3, 0x679C))
-  )
-}
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
 
 function New-AutoPromptText {
   param(
@@ -144,36 +88,21 @@ function New-AutoPromptText {
     [string]$ResolvedExperimentName,
 
     [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [Parameter(Mandatory = $true)]
     [hashtable]$Labels,
 
     [ValidateSet("standard", "full")]
     [string]$DetailLevel = "full"
   )
 
-  $requiredHeadings = @(
-    $Labels.Purpose,
-    $Labels.Environment,
-    $Labels.Theory,
-    $Labels.Steps,
-    $Labels.Results,
-    $Labels.Analysis,
-    $Labels.Summary
-  ) -join ", "
-
-  $detailRequirements = if ($DetailLevel -eq "full") {
-@"
-- Prefer a submit-ready report with substantial section content instead of a terse outline.
-- Unless the reference material is very sparse, aim for roughly 1200 to 1800 Chinese characters.
-- The purpose, environment, theory, analysis, and summary sections should each contain multiple complete sentences rather than a single short statement.
-- The steps and results sections should be the most detailed parts. Explain the setup order, key operations, command or configuration intent, observed outcomes, and why those outcomes support completion of the experiment.
-- If the webpages do not provide screenshots or exact measured values, keep the language concrete and validation-oriented instead of filling space with generic filler.
-"@
-  } else {
-@"
-- Prefer a complete submit-ready report instead of a terse outline.
-- Keep each required section concrete and useful, especially the steps and results sections.
-"@
-  }
+  $requiredHeadings = (Get-ReportProfileRequiredHeadings -Profile $Profile) -join ", "
+  $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
+  $detailRequirements = @(
+    @($detailProfile.promptGuidance | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) |
+      ForEach-Object { "- {0}" -f [string]$_ }
+  ) -join [Environment]::NewLine
 
   return @"
 Write a formal Chinese university lab report body based on the reference webpages.
@@ -201,6 +130,9 @@ function New-AutoRequirementsJson {
     [string]$ResolvedExperimentName,
 
     [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [Parameter(Mandatory = $true)]
     [hashtable]$Labels,
 
     [string[]]$ExtraKeywords,
@@ -219,45 +151,27 @@ function New-AutoRequirementsJson {
     }
   }
 
-  $requirementProfile = if ($DetailLevel -eq "full") {
-    [ordered]@{
-      MinChars = 1100
-      PurposeMinChars = 60
-      EnvironmentMinChars = 60
-      TheoryMinChars = 80
-      StepsMinChars = 140
-      ResultsMinChars = 120
-      AnalysisMinChars = 80
-      SummaryMinChars = 80
+  $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
+  $sectionRequirements = foreach ($sectionField in (Get-ReportProfileSectionFields -Profile $Profile)) {
+    $minChars = 0
+    if ($null -ne $sectionField.minChars -and $sectionField.minChars.PSObject.Properties.Name -contains $DetailLevel) {
+      $minChars = [int]$sectionField.minChars.$DetailLevel
     }
-  } else {
-    [ordered]@{
-      MinChars = 700
-      PurposeMinChars = 30
-      EnvironmentMinChars = 30
-      TheoryMinChars = 30
-      StepsMinChars = 60
-      ResultsMinChars = 50
-      AnalysisMinChars = 30
-      SummaryMinChars = 30
+
+    [pscustomobject]@{
+      name = [string]$sectionField.heading
+      aliases = @($sectionField.aliases | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+      minChars = $minChars
     }
   }
 
   $requirements = [pscustomobject]@{
     courseName = $ResolvedCourseName
     experimentName = $ResolvedExperimentName
-    minChars = $requirementProfile.MinChars
-    sections = @(
-      [pscustomobject]@{ name = $Labels.Purpose; aliases = @($Labels.Purpose); minChars = $requirementProfile.PurposeMinChars },
-      [pscustomobject]@{ name = $Labels.Environment; aliases = @($Labels.Environment, $Labels.EnvAlias); minChars = $requirementProfile.EnvironmentMinChars },
-      [pscustomobject]@{ name = $Labels.Theory; aliases = @($Labels.Theory, $Labels.TheoryAlias, $Labels.TaskAlias); minChars = $requirementProfile.TheoryMinChars },
-      [pscustomobject]@{ name = $Labels.Steps; aliases = @($Labels.Steps, $Labels.StepsAlias); minChars = $requirementProfile.StepsMinChars },
-      [pscustomobject]@{ name = $Labels.Results; aliases = @($Labels.Results, $Labels.ResultsAlias); minChars = $requirementProfile.ResultsMinChars },
-      [pscustomobject]@{ name = $Labels.Analysis; aliases = @($Labels.Analysis, $Labels.AnalysisAlias); minChars = $requirementProfile.AnalysisMinChars },
-      [pscustomobject]@{ name = $Labels.Summary; aliases = @($Labels.Summary, $Labels.SummaryAlias, $Labels.SummaryAlias2); minChars = $requirementProfile.SummaryMinChars }
-    )
+    minChars = [int]$detailProfile.minChars
+    sections = @($sectionRequirements)
     requiredKeywords = @($keywordList)
-    forbiddenPatterns = @(Get-DefaultForbiddenPatterns)
+    forbiddenPatterns = @($Profile.forbiddenPatterns)
   }
 
   return ($requirements | ConvertTo-Json -Depth 6)
@@ -270,6 +184,9 @@ function New-AutoMetadataJson {
 
     [Parameter(Mandatory = $true)]
     [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
 
     [Parameter(Mandatory = $true)]
     [hashtable]$Labels,
@@ -296,17 +213,28 @@ function New-AutoMetadataJson {
     [string]$ResolvedExperimentLocation
   )
 
+  $metadataValues = @{
+    Name = $ResolvedStudentName
+    StudentId = $ResolvedStudentId
+    ClassName = $ResolvedClassName
+    TeacherName = $ResolvedTeacherName
+    CourseName = $ResolvedCourseName
+    ExperimentName = $ResolvedExperimentName
+    ExperimentProperty = $ResolvedExperimentProperty
+    ExperimentDate = $ResolvedExperimentDate
+    ExperimentLocation = $ResolvedExperimentLocation
+  }
+
   $metadata = [ordered]@{}
-  $metadata[$Labels.Name] = $ResolvedStudentName
-  $metadata[$Labels.StudentId] = $ResolvedStudentId
-  $metadata[$Labels.ClassName] = $ResolvedClassName
-  $metadata[$Labels.TeacherName] = $ResolvedTeacherName
-  $metadata[$Labels.CourseName] = $ResolvedCourseName
-  $metadata[$Labels.ExperimentName] = $ResolvedExperimentName
-  $metadata[$Labels.ExperimentProperty] = $ResolvedExperimentProperty
-  $metadata[$Labels.ExperimentDate] = $ResolvedExperimentDate
-  $metadata[$Labels.ExperimentLocation] = $ResolvedExperimentLocation
-  $metadata[$Labels.Date] = $ResolvedExperimentDate
+  foreach ($field in @($Profile.metadataFields)) {
+    $key = [string]$field.key
+    if (-not [string]::IsNullOrWhiteSpace($key) -and $metadataValues.ContainsKey($key)) {
+      $metadata[[string]$field.label] = $metadataValues[$key]
+    }
+  }
+  if ($Labels.Contains("Date")) {
+    $metadata[[string]$Labels["Date"]] = $ResolvedExperimentDate
+  }
 
   return ($metadata | ConvertTo-Json -Depth 4)
 }
@@ -422,12 +350,13 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath) -and -not [string]::IsN
   throw "Provide at most one of -RequirementsPath or -RequirementsJson."
 }
 
-$labels = Get-ReportLabels
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$labels = Get-ReportProfileLabels -Profile $reportProfile
 if ([string]::IsNullOrWhiteSpace($ExperimentProperty)) {
-  $ExperimentProperty = Get-DefaultExperimentProperty
+  $ExperimentProperty = [string]$reportProfile.defaultExperimentProperty
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $OutputDir = Join-Path $repoRoot ("tests-output\url-build-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
@@ -491,7 +420,7 @@ $basePromptText = if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
 } elseif (-not [string]::IsNullOrWhiteSpace($PromptText)) {
   $PromptText
 } else {
-  New-AutoPromptText -ResolvedCourseName $resolvedCourseName -ResolvedExperimentName $resolvedExperimentName -Labels $labels -DetailLevel $DetailLevel
+  New-AutoPromptText -ResolvedCourseName $resolvedCourseName -ResolvedExperimentName $resolvedExperimentName -Profile $reportProfile -Labels $labels -DetailLevel $DetailLevel
 }
 
 $promptPathOut = Join-Path $resolvedOutputDir "prompt.txt"
@@ -503,6 +432,7 @@ if ([string]::IsNullOrWhiteSpace($effectiveMetadataPath) -and [string]::IsNullOr
   $autoMetadataJson = New-AutoMetadataJson `
     -ResolvedCourseName $resolvedCourseName `
     -ResolvedExperimentName $resolvedExperimentName `
+    -Profile $reportProfile `
     -Labels $labels `
     -ResolvedStudentName $StudentName `
     -ResolvedStudentId $StudentId `
@@ -520,6 +450,7 @@ if ([string]::IsNullOrWhiteSpace($effectiveRequirementsPath) -and [string]::IsNu
   $autoRequirementsJson = New-AutoRequirementsJson `
     -ResolvedCourseName $resolvedCourseName `
     -ResolvedExperimentName $resolvedExperimentName `
+    -Profile $reportProfile `
     -Labels $labels `
     -ExtraKeywords $RequiredKeywords `
     -DetailLevel $DetailLevel
@@ -638,6 +569,8 @@ $savedDefaultsPath = Save-ExperimentReportDefaults -CourseName $resolvedCourseNa
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
+  reportProfileName = [string]$reportProfile.name
+  reportProfilePath = [string]$reportProfile.resolvedProfilePath
   courseName = $resolvedCourseName
   experimentName = $resolvedExperimentName
   requestedCourseName = $CourseName
