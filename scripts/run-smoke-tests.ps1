@@ -930,6 +930,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $generatedImageMapPath) -Message 'Image-map generator did not write the output file.'
   $generatedImageMapRoot = (Get-Content -LiteralPath $generatedImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition (@($generatedImageMapRoot.images).Count -eq 2) -Message 'Image-map generator produced an unexpected number of images.'
+  Assert-True -Condition ([string]$generatedImageMapRoot.summary.reportProfileName -eq 'experiment-report') -Message 'Image-map generator is missing the expected report profile name.'
   Assert-True -Condition ([string]$generatedImageMapRoot.images[0].section -eq '实验步骤') -Message 'Image-map generator did not keep the first section.'
   Assert-True -Condition ([string]$generatedImageMapRoot.images[1].section -eq '实验结果') -Message 'Image-map generator did not keep the second section.'
   Assert-True -Condition ([string]$generatedImageMapRoot.images[0].caption -match '^图1 ') -Message 'Image-map generator did not create the first caption.'
@@ -951,6 +952,7 @@ URL: https://example.com/network-lab
       -Format json `
       -PlanOnly | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$imagePlanJson.summary.planOnly) -Message 'Image-map planner JSON should mark planOnly output.'
+  Assert-True -Condition ([string]$imagePlanJson.summary.reportProfileName -eq 'experiment-report') -Message 'Image-map planner JSON is missing the expected report profile name.'
   Assert-True -Condition (@($imagePlanJson.plan).Count -eq 2) -Message 'Image-map planner JSON produced an unexpected number of plan rows.'
   Assert-True -Condition ([string]$imagePlanJson.plan[0].proposedSection -eq '实验步骤') -Message 'Image-map planner should place the first fallback image in the procedure section.'
   Assert-True -Condition ([string]$imagePlanJson.plan[1].proposedSection -eq '实验结果') -Message 'Image-map planner should place the second fallback image in the result section.'

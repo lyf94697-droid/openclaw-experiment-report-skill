@@ -9,6 +9,10 @@ param(
 
   [string[]]$ImagePaths,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [ValidateSet("json", "markdown")]
   [string]$Format = "json",
 
@@ -23,18 +27,13 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $script:RepoRoot
 $wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 $defaultImageWidthCm = 10.5
-$sectionRules = @(
-  [pscustomobject]@{ id = "purpose"; canonicalLabel = "实验目的"; headingAliases = @("实验目的"); inputAliases = @("purpose", "实验目的") },
-  [pscustomobject]@{ id = "environment"; canonicalLabel = "实验环境"; headingAliases = @("实验环境", "实验设备与环境"); inputAliases = @("environment", "实验环境", "实验设备与环境") },
-  [pscustomobject]@{ id = "theory"; canonicalLabel = "实验原理或任务要求"; headingAliases = @("实验原理或任务要求", "实验原理", "任务要求"); inputAliases = @("theory", "实验原理或任务要求", "实验原理", "任务要求") },
-  [pscustomobject]@{ id = "steps"; canonicalLabel = "实验步骤"; headingAliases = @("实验步骤", "实验过程"); inputAliases = @("steps", "step", "实验步骤", "实验过程") },
-  [pscustomobject]@{ id = "result"; canonicalLabel = "实验结果"; headingAliases = @("实验结果", "实验现象与结果记录"); inputAliases = @("result", "results", "实验结果", "实验现象与结果记录") },
-  [pscustomobject]@{ id = "analysis"; canonicalLabel = "问题分析"; headingAliases = @("问题分析", "结果分析"); inputAliases = @("analysis", "问题分析", "结果分析") },
-  [pscustomobject]@{ id = "summary"; canonicalLabel = "实验总结"; headingAliases = @("实验总结", "总结与思考", "实验小结"); inputAliases = @("summary", "实验总结", "总结与思考", "实验小结") }
-)
+$sectionRules = @()
 $sectionInputAliasLookup = @{}
 $sectionRuleLookup = @{}
 $script:ImagePathProbeRoots = @()
@@ -184,6 +183,24 @@ function Normalize-FieldKey {
   return $normalized
 }
 
+function Get-ProfileImageSectionId {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$SectionField
+  )
+
+  switch ([string]$SectionField.key) {
+    "Purpose" { return "purpose" }
+    "Environment" { return "environment" }
+    "Theory" { return "theory" }
+    "Steps" { return "steps" }
+    "Results" { return "result" }
+    "Analysis" { return "analysis" }
+    "Summary" { return "summary" }
+    default { return ([string]$SectionField.key).Trim().ToLowerInvariant() }
+  }
+}
+
 function Normalize-TargetSelector {
   param(
     [AllowNull()]
@@ -209,6 +226,35 @@ function Normalize-TargetSelector {
 
   return $trimmed
 }
+
+$sectionRules = @(
+  @(Get-ReportProfileSectionFields -Profile $reportProfile) |
+    ForEach-Object {
+      $sectionId = Get-ProfileImageSectionId -SectionField $_
+      $heading = [string]$_.heading
+      $headingAliases = @(
+        @($_.aliases) |
+          ForEach-Object { [string]$_ } |
+          Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+      )
+      if ($headingAliases.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($heading)) {
+        $headingAliases = @($heading)
+      }
+
+      $inputAliases = @(
+        @($headingAliases + @($heading, [string]$_.key, $sectionId)) |
+          Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+          Select-Object -Unique
+      )
+
+      [pscustomobject]@{
+        id = $sectionId
+        canonicalLabel = $heading
+        headingAliases = $headingAliases
+        inputAliases = $inputAliases
+      }
+    }
+)
 
 foreach ($rule in $sectionRules) {
   $sectionRuleLookup[$rule.id] = $rule
@@ -1061,6 +1107,8 @@ for ($planIndex = 0; $planIndex -lt $resolvedImageEntries.Count; $planIndex++) {
 $result = [pscustomobject]@{
   summary = [pscustomobject]@{
     docxPath = $resolvedDocxPath
+    reportProfileName = [string]$reportProfile.name
+    reportProfilePath = [string]$reportProfile.resolvedProfilePath
     imageCount = $resultImages.Count
     availableSections = @($discoveredSections | ForEach-Object { $_.headingText } | Select-Object -Unique)
     planOnly = [bool]$PlanOnly
