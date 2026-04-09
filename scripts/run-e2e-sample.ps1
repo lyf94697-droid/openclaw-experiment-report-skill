@@ -18,6 +18,8 @@ param(
 
   [int]$ReferenceMaxChars = 30000,
 
+  [string]$PreGeneratedReportPath,
+
   [string]$TemplatePath,
 
   [string]$MetadataPath,
@@ -153,6 +155,9 @@ if ($Mode -eq "native-agent") {
 $resolvedRequirementsPath = (Resolve-Path -LiteralPath $RequirementsPath).Path
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+if ($Mode -ne "guided-chat" -and -not [string]::IsNullOrWhiteSpace($PreGeneratedReportPath)) {
+  throw "PreGeneratedReportPath is only supported in guided-chat mode."
+}
 if ($useDefaultPromptText) {
   $PromptPath = Join-Path $resolvedOutputDir "e2e-sample-prompt.txt"
   Set-Content -LiteralPath $PromptPath -Value (Get-DefaultPromptText) -Encoding UTF8
@@ -160,11 +165,15 @@ if ($useDefaultPromptText) {
 $resolvedPromptPath = (Resolve-Path -LiteralPath $PromptPath).Path
 $resolvedTemplatePath = $null
 $resolvedMetadataPath = $null
+$resolvedPreGeneratedReportPath = $null
 if (-not [string]::IsNullOrWhiteSpace($TemplatePath)) {
   $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 }
 if (-not [string]::IsNullOrWhiteSpace($MetadataPath)) {
   $resolvedMetadataPath = (Resolve-Path -LiteralPath $MetadataPath).Path
+}
+if (-not [string]::IsNullOrWhiteSpace($PreGeneratedReportPath)) {
+  $resolvedPreGeneratedReportPath = (Resolve-Path -LiteralPath $PreGeneratedReportPath).Path
 }
 $styleOutputRequested = $StyleFinalDocx -or (-not [string]::IsNullOrWhiteSpace($StyledDocxOutPath))
 
@@ -226,6 +235,9 @@ if ($Mode -eq "guided-chat") {
     PromptPath = $promptOutPath
     SessionKey = $SessionKey
     OutFile = $reportPath
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+    $generateChatParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
   }
   if ($SkipSessionReset) {
     $generateChatParams.SkipSessionReset = $true
@@ -377,6 +389,7 @@ $summary = [pscustomobject]@{
   promptPath = $promptOutPath
   rawOutputPath = $agentOutputPath
   agentJsonPath = $(if ($responseFormat -eq 'json') { $agentJsonPath } else { $null })
+  preGeneratedReportPath = $resolvedPreGeneratedReportPath
   reportPath = $reportPath
   validationPath = $validationPath
   templatePath = $resolvedTemplatePath

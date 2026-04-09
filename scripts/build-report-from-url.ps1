@@ -58,6 +58,8 @@ param(
 
   [string]$BrowserProfile = $env:OPENCLAW_BROWSER_PROFILE,
 
+  [string]$PreGeneratedReportPath,
+
   [string]$SessionKey = "agent:gpt:main",
 
   [switch]$SkipSessionReset,
@@ -241,6 +243,7 @@ $resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
+$resolvedPreGeneratedReportPath = Resolve-AbsolutePathIfProvided -Path $PreGeneratedReportPath
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
 $inputSummaryPath = if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
@@ -332,6 +335,9 @@ $generateChatParams = @{
   ReferenceMaxChars = $ReferenceMaxChars
   SessionKey = $SessionKey
   OutFile = $rawReportPath
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+  $generateChatParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
 }
 if ($SkipSessionReset) {
   $generateChatParams.SkipSessionReset = $true
@@ -450,6 +456,7 @@ $wrapperSummary = [pscustomobject]@{
   requirementsPath = $effectiveRequirementsPath
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
+  preGeneratedReportPath = $resolvedPreGeneratedReportPath
   buildSummaryPath = $buildSummaryPath
   imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
   imagePlanLowConfidenceCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanLowConfidenceCount") { $buildSummary.imagePlanLowConfidenceCount } else { $null })

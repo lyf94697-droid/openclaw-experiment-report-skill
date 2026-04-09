@@ -16,6 +16,8 @@ param(
 
   [string]$OpenClawCmd = $env:OPENCLAW_CMD,
 
+  [string]$PreGeneratedReportPath,
+
   [int]$ReferenceMaxChars = 30000,
 
   [switch]$SkipSessionReset
@@ -77,9 +79,14 @@ $preparedPromptResult = & (Join-Path $repoRoot "scripts\prepare-report-prompt.ps
   -ReferenceMaxChars $ReferenceMaxChars
 $userPrompt = Get-Content -LiteralPath $preparedPromptPath -Raw -Encoding UTF8
 
-$preGeneratedReportPath = $env:OPENCLAW_PREGENERATED_REPORT_PATH
-if (-not [string]::IsNullOrWhiteSpace($preGeneratedReportPath)) {
-  $resolvedPreGeneratedReportPath = (Resolve-Path -LiteralPath $preGeneratedReportPath).Path
+$resolvedPreGeneratedReportPath = if (-not [string]::IsNullOrWhiteSpace($PreGeneratedReportPath)) {
+  (Resolve-Path -LiteralPath $PreGeneratedReportPath).Path
+} elseif (-not [string]::IsNullOrWhiteSpace($env:OPENCLAW_PREGENERATED_REPORT_PATH)) {
+  (Resolve-Path -LiteralPath $env:OPENCLAW_PREGENERATED_REPORT_PATH).Path
+} else {
+  $null
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
   $preGeneratedReportText = Get-Content -LiteralPath $resolvedPreGeneratedReportPath -Raw -Encoding UTF8
   [System.IO.File]::WriteAllText($resolvedOutFile, $preGeneratedReportText, (New-Object System.Text.UTF8Encoding($false)))
   Write-Output $preGeneratedReportText

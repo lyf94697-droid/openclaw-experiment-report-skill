@@ -2088,35 +2088,47 @@ URL: https://example.com/network-lab
 通过本次课程设计，进一步理解了从需求分析、页面拆分、数据建模、接口模拟到联调演示的完整实现流程，也更加明确了“以用户任务链路为中心”对小程序设计的重要性。校园导览场景看似简单，但真正落地时需要同时处理搜索效率、信息组织、交互连续性、演示稳定性和后续扩展性等多方面问题，因此课程设计过程不仅锻炼了编码能力，也训练了围绕目标场景拆解需求和验证结果的能力。最终完成的校园导览小程序虽然仍有改进空间，但已经形成了一套结构清晰、功能闭环明确、适合课堂展示和后续迭代的实现方案。整个过程最大的收获，是学会了把课程设计报告中的分析、设计、实现、结果和改进真正对应到一个可运行的小程序系统上，而不是停留在概念层面的描述。
 '@ | Set-Content -LiteralPath $preparedSummaryMockReportPath -Encoding UTF8
 
-  $originalPreGeneratedReportPath = $env:OPENCLAW_PREGENERATED_REPORT_PATH
-  try {
-    $env:OPENCLAW_PREGENERATED_REPORT_PATH = $preparedSummaryMockReportPath
-    $preparedSummaryBuildOutputDir = Join-Path $tempRoot 'prepared-summary-url-build-output'
-    & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
-      -TemplatePath $courseDesignTemplateDocx `
-      -PreparedInputsSummaryPath $reportInputsSummaryPath `
-      -ImageSpecsPath $courseDesignImageSpecsPath `
-      -OutputDir $preparedSummaryBuildOutputDir `
-      -StyleProfile auto `
-      -SkipSessionReset | Out-Null
-    $preparedSummaryBuildSummaryPath = Join-Path $preparedSummaryBuildOutputDir 'url-build-summary.json'
-    Assert-True -Condition (Test-Path -LiteralPath $preparedSummaryBuildSummaryPath) -Message 'Prepared-summary URL wrapper did not create the wrapper summary.'
-    $preparedSummaryBuildSummary = (Get-Content -LiteralPath $preparedSummaryBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
-    Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileName -eq 'course-design-report') -Message 'Prepared-summary URL wrapper should inherit the course-design profile.'
-    Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Prepared-summary URL wrapper should inherit the course-design display name.'
-    Assert-True -Condition ([string]$preparedSummaryBuildSummary.detailLevel -eq 'full') -Message 'Prepared-summary URL wrapper should preserve the prepared-summary detail level.'
-    Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportInputsSummaryPath -eq $reportInputsSummaryPath) -Message 'Prepared-summary URL wrapper should keep the original input summary path.'
-    Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedCourseName -eq '软件工程综合实践') -Message 'Prepared-summary URL wrapper lost the requested course name from the prepared summary.'
-    Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedExperimentName -eq '校园导览小程序设计') -Message 'Prepared-summary URL wrapper lost the requested title from the prepared summary.'
-    Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.rawReportPath)) -Message 'Prepared-summary URL wrapper did not write the raw report file.'
-    Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath)) -Message 'Prepared-summary URL wrapper did not write the cleaned report file.'
-    Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.finalDocxPath)) -Message 'Prepared-summary URL wrapper final docx path does not exist.'
-    $preparedSummaryCleanedReport = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
-    Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
-  } finally {
-    $env:OPENCLAW_PREGENERATED_REPORT_PATH = $originalPreGeneratedReportPath
-  }
+  $preparedSummaryBuildOutputDir = Join-Path $tempRoot 'prepared-summary-url-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $courseDesignTemplateDocx `
+    -PreparedInputsSummaryPath $reportInputsSummaryPath `
+    -ImageSpecsPath $courseDesignImageSpecsPath `
+    -OutputDir $preparedSummaryBuildOutputDir `
+    -StyleProfile auto `
+    -PreGeneratedReportPath $preparedSummaryMockReportPath `
+    -SkipSessionReset | Out-Null
+  $preparedSummaryBuildSummaryPath = Join-Path $preparedSummaryBuildOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $preparedSummaryBuildSummaryPath) -Message 'Prepared-summary URL wrapper did not create the wrapper summary.'
+  $preparedSummaryBuildSummary = (Get-Content -LiteralPath $preparedSummaryBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileName -eq 'course-design-report') -Message 'Prepared-summary URL wrapper should inherit the course-design profile.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportProfileDisplayName -eq '课程设计报告') -Message 'Prepared-summary URL wrapper should inherit the course-design display name.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.detailLevel -eq 'full') -Message 'Prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.reportInputsSummaryPath -eq $reportInputsSummaryPath) -Message 'Prepared-summary URL wrapper should keep the original input summary path.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedCourseName -eq '软件工程综合实践') -Message 'Prepared-summary URL wrapper lost the requested course name from the prepared summary.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedExperimentName -eq '校园导览小程序设计') -Message 'Prepared-summary URL wrapper lost the requested title from the prepared summary.'
+  Assert-True -Condition ([string]$preparedSummaryBuildSummary.preGeneratedReportPath -eq $preparedSummaryMockReportPath) -Message 'Prepared-summary URL wrapper summary is missing the explicit replay report path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.rawReportPath)) -Message 'Prepared-summary URL wrapper did not write the raw report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath)) -Message 'Prepared-summary URL wrapper did not write the cleaned report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.finalDocxPath)) -Message 'Prepared-summary URL wrapper final docx path does not exist.'
+  $preparedSummaryCleanedReport = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
   $results.Add('build-report-from-url prepared summary OK') | Out-Null
+
+  $guidedReplayOutputDir = Join-Path $tempRoot 'guided-replay-e2e-output'
+  & (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1') `
+    -OutputDir $guidedReplayOutputDir `
+    -PreGeneratedReportPath $sampleReportPath `
+    -Mode guided-chat `
+    -SkipInstall `
+    -SkipSessionReset | Out-Null
+  $guidedReplaySummaryPath = Join-Path $guidedReplayOutputDir 'summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $guidedReplaySummaryPath) -Message 'Guided replay E2E did not create its summary.'
+  $guidedReplaySummary = (Get-Content -LiteralPath $guidedReplaySummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$guidedReplaySummary.passed) -Message 'Guided replay E2E summary reported a failed validation result.'
+  Assert-True -Condition ([string]$guidedReplaySummary.responseFormat -eq 'gateway-chat') -Message 'Guided replay E2E should still report the guided-chat response format.'
+  Assert-True -Condition ([string]$guidedReplaySummary.preGeneratedReportPath -eq $sampleReportPath) -Message 'Guided replay E2E summary is missing the explicit replay report path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$guidedReplaySummary.reportPath)) -Message 'Guided replay E2E report path does not exist.'
+  $results.Add('run-e2e-sample guided replay OK') | Out-Null
 
   $feishuBuildOutputDir = Join-Path $tempRoot 'feishu-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
