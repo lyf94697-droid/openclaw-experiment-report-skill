@@ -84,6 +84,24 @@
       { "pattern": "analysis|error|problem|异常", "caption": "问题分析截图" }
     ]
   },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["实验目的", "实验内容"],
+      "blocks": [
+        { "heading": "一. 实验目的", "sectionIds": ["purpose"] },
+        { "heading": "二. 实验内容", "sectionIds": ["environment", "theory"] }
+      ]
+    },
+    {
+      "matchAll": ["实验步骤", "实验小结"],
+      "blocks": [
+        { "heading": "三. 实验步骤", "sectionIds": ["steps"] },
+        { "heading": "四. 实验结果", "sectionIds": ["result"] },
+        { "heading": "五. 问题分析", "sectionIds": ["analysis"] },
+        { "heading": "六.实验小结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
   "detailProfiles": {
     "standard": {
       "minChars": 700,

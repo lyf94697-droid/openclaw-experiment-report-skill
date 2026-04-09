@@ -93,7 +93,8 @@ function Get-ReportProfileLabels {
     }
   }
 
-  foreach ($field in @(Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels")) {
+  $extraLabelFields = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels"
+  foreach ($field in $(if ($null -eq $extraLabelFields) { @() } else { @($extraLabelFields) })) {
     $key = [string]$field.key
     if (-not [string]::IsNullOrWhiteSpace($key)) {
       $labels[$key] = [string]$field.label
@@ -249,8 +250,9 @@ function Get-ReportProfileMetadataPrefixes {
     [psobject]$Profile
   )
 
+  $extraLabelFields = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels"
   return @(
-    @($Profile.metadataFields + @(Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels")) |
+    @($Profile.metadataFields + $(if ($null -eq $extraLabelFields) { @() } else { @($extraLabelFields) })) |
       ForEach-Object { [string]$_.label } |
       Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
       Select-Object -Unique
@@ -263,8 +265,9 @@ function Get-ReportProfileExtraSectionHeadings {
     [psobject]$Profile
   )
 
+  $extraHeadings = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraSectionHeadings"
   return @(
-    ConvertTo-ReportProfileStringArray -Value (Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraSectionHeadings") |
+    ConvertTo-ReportProfileStringArray -Value $extraHeadings |
       Select-Object -Unique
   )
 }
@@ -310,6 +313,72 @@ function Get-ReportProfileImagePlacementDefaults {
     defaultCaptions = $defaultCaptions
     filenameCaptionRules = @($imagePlacementDefaults["filenameCaptionRules"])
   }
+}
+
+function Get-ReportProfileFieldMapCompositeRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $rawRulesValue = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "fieldMapCompositeRules"
+  $rawRules = if ($null -eq $rawRulesValue) { @() } else { @($rawRulesValue) }
+  if ($rawRules.Count -eq 0) {
+    return @()
+  }
+
+  return @(
+    foreach ($rawRule in $rawRules) {
+      $ruleTable = ConvertTo-ReportProfilePlainHashtable -InputObject $rawRule
+      $matchAll = @(
+        ConvertTo-ReportProfileStringArray -Value $ruleTable["matchAll"] |
+          Select-Object -Unique
+      )
+      if ($matchAll.Count -eq 0) {
+        throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without matchAll."
+      }
+
+      $rawBlocks = @($ruleTable["blocks"])
+      if ($rawBlocks.Count -eq 0) {
+        throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without blocks."
+      }
+
+      $blocks = @(
+        foreach ($rawBlock in $rawBlocks) {
+          $blockTable = ConvertTo-ReportProfilePlainHashtable -InputObject $rawBlock
+          $sectionIds = New-Object System.Collections.Generic.List[string]
+
+          foreach ($sectionId in (ConvertTo-ReportProfileStringArray -Value $blockTable["sectionIds"])) {
+            $normalizedSectionId = Get-ReportProfileSectionIdFromKey -Key ([string]$sectionId)
+            if (-not [string]::IsNullOrWhiteSpace($normalizedSectionId) -and -not $sectionIds.Contains($normalizedSectionId)) {
+              $sectionIds.Add($normalizedSectionId) | Out-Null
+            }
+          }
+
+          foreach ($sectionKey in (ConvertTo-ReportProfileStringArray -Value $blockTable["sectionKeys"])) {
+            $normalizedSectionId = Get-ReportProfileSectionIdFromKey -Key ([string]$sectionKey)
+            if (-not [string]::IsNullOrWhiteSpace($normalizedSectionId) -and -not $sectionIds.Contains($normalizedSectionId)) {
+              $sectionIds.Add($normalizedSectionId) | Out-Null
+            }
+          }
+
+          if ($sectionIds.Count -eq 0) {
+            throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule block without sectionIds/sectionKeys."
+          }
+
+          [pscustomobject]@{
+            heading = [string]$blockTable["heading"]
+            sectionIds = @($sectionIds)
+          }
+        }
+      )
+
+      [pscustomobject]@{
+        matchAll = $matchAll
+        blocks = $blocks
+      }
+    }
+  )
 }
 
 function Normalize-ReportProfileLookupKey {
