@@ -335,6 +335,30 @@ if ($expectedLayoutCaptionCount -ge 0) {
 & (Join-Path $repoRoot "scripts\check-docx-layout.ps1") @layoutCheckParams | Out-Null
 $layoutCheckResult = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
 
+$validationWarningSummary = @()
+$validationErrorCodes = @()
+$validationWarningCodes = @()
+if ($null -ne $validationResult -and $validationResult.PSObject.Properties.Name -contains "findings") {
+  $validationWarningSummary = @(
+    $validationResult.findings |
+      Where-Object { [string]$_.severity -eq "warning" } |
+      ForEach-Object {
+        [pscustomobject]@{
+          severity = [string]$_.severity
+          code = [string]$_.code
+          category = $(if ($_.PSObject.Properties.Name -contains "category") { [string]$_.category } else { $null })
+          message = [string]$_.message
+        }
+      }
+  )
+}
+if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properties.Name -contains "errorCodes") {
+  $validationErrorCodes = @($validationResult.summary.errorCodes)
+}
+if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properties.Name -contains "warningCodes") {
+  $validationWarningCodes = @($validationResult.summary.warningCodes)
+}
+
 $summary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
   reportProfileName = [string]$reportProfile.name
@@ -375,8 +399,15 @@ $summary = [pscustomobject]@{
   validationPassed = $(if ($null -ne $validationResult) { [bool]$validationResult.passed } else { $null })
   validationErrorCount = $(if ($null -ne $validationResult) { [int]$validationResult.summary.errorCount } else { $null })
   validationWarningCount = $(if ($null -ne $validationResult) { [int]$validationResult.summary.warningCount } else { $null })
+  validationPaginationRiskCount = $(if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properties.Name -contains "paginationRiskCount") { [int]$validationResult.summary.paginationRiskCount } else { $null })
+  validationStructuralIssueCount = $(if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properties.Name -contains "structuralIssueCount") { [int]$validationResult.summary.structuralIssueCount } else { $null })
+  validationFindingCountsByCode = $(if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properties.Name -contains "findingCountsByCode") { $validationResult.summary.findingCountsByCode } else { $null })
+  validationFindingCountsByCategory = $(if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properties.Name -contains "findingCountsByCategory") { $validationResult.summary.findingCountsByCategory } else { $null })
+  validationErrorCodes = $validationErrorCodes
+  validationWarningCodes = $validationWarningCodes
+  validationWarningSummary = $validationWarningSummary
 }
-[System.IO.File]::WriteAllText($summaryPath, ($summary | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText($summaryPath, ($summary | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
 
 Write-Output ("Field-map path: {0}" -f $resolvedFieldMapOutPath)
 Write-Output ("Filled docx path: {0}" -f $resolvedFilledDocxOutPath)

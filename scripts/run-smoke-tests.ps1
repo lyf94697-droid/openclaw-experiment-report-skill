@@ -1080,6 +1080,49 @@ arp -a
   Assert-True -Condition ([int]$defaultValidationResult.summary.sectionCount -ge 7) -Message 'Default report validation did not load the profile section rules.'
   $results.Add('report validation OK') | Out-Null
 
+  $experimentDenseResults = ((@(
+        '实验结果表明网络参数检查、ping 连通验证和 arp 缓存比对保持一致，交换机链路状态与主机地址配置保持稳定，因此可以持续确认局域网搭建过程满足实验目标并具备重复验证条件。'
+      ) * 18) -join '')
+  $experimentStructureRiskReportPath = Join-Path $tempRoot 'experiment-structure-risk-report.md'
+  @(
+    '计算机网络实验报告',
+    '',
+    '课程名称：计算机网络',
+    '实验名称：局域网搭建与常用 DOS 命令使用',
+    '',
+    '一、实验目的',
+    '本节说明局域网搭建实验的验证目标，并明确需要通过命令观察网络参数、地址规划和主机连通状态之间的对应关系。',
+    '为了保证后续分析有依据，报告还需要把网络配置目的与命令验证思路联系起来，而不是只给出结论。',
+    '',
+    '二、实验环境',
+    '实验环境包括两台处于同一网段的虚拟机、一台二层交换设备以及用于查看网络参数的 DOS 命令窗口，所有节点都保持固定地址配置。',
+    '在操作前先确认虚拟机网卡模式、交换连接关系和主机名设置一致，以便后续步骤能够稳定复现。',
+    '',
+    '三、实验结果',
+    $experimentDenseResults,
+    '',
+    '四、实验步骤',
+    '先配置两台主机的静态地址和子网掩码，再分别执行 ipconfig、ping 与 arp -a，对照输出结果检查网络参数、邻居缓存和主机互通状态是否符合预期。',
+    '',
+    '五、实验总结',
+    '__________',
+    '',
+    '六、实验目的',
+    '重复标题段落仅用于触发结构校验。'
+  ) | Set-Content -LiteralPath $experimentStructureRiskReportPath -Encoding UTF8
+  $experimentStructureRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $experimentStructureRiskReportPath -Format json | Out-String) | ConvertFrom-Json
+  $experimentStructureRiskCodes = @($experimentStructureRiskValidation.findings | ForEach-Object { [string]$_.code })
+  $experimentStructureRiskWarningCodes = @($experimentStructureRiskValidation.summary.warningCodes)
+  Assert-True -Condition (-not [bool]$experimentStructureRiskValidation.passed) -Message 'Experiment structural-risk fixture should not pass validation.'
+  Assert-True -Condition ([string]$experimentStructureRiskValidation.reportProfileName -eq 'experiment-report') -Message 'Experiment structural-risk fixture should use the default experiment profile.'
+  Assert-True -Condition ($experimentStructureRiskCodes -contains 'missing-profile-required-heading') -Message 'Experiment structural-risk fixture should report missing-profile-required-heading.'
+  Assert-True -Condition ($experimentStructureRiskCodes -contains 'duplicate-section-heading') -Message 'Experiment structural-risk fixture should report duplicate-section-heading.'
+  Assert-True -Condition ($experimentStructureRiskCodes -contains 'section-order-anomaly') -Message 'Experiment structural-risk fixture should report section-order-anomaly.'
+  Assert-True -Condition ($experimentStructureRiskCodes -contains 'placeholder-only-section') -Message 'Experiment structural-risk fixture should report placeholder-only-section.'
+  Assert-True -Condition (([int]$experimentStructureRiskValidation.summary.paginationRiskCount) -ge 1) -Message 'Experiment structural-risk fixture should surface at least one pagination risk warning.'
+  Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Experiment structural-risk fixture should report pagination-risk-dense-section-block.'
+  $results.Add('experiment structural validation OK') | Out-Null
+
   $referenceTextPath = Join-Path $tempRoot 'tutorial-reference.txt'
   @'
 TITLE: 局域网实验参考流程
@@ -1440,6 +1483,39 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([bool]$courseDesignValidation.passed) -Message 'Course-design report validation should pass for the course-design profile.'
   Assert-True -Condition ([string]$courseDesignValidation.reportProfileName -eq 'course-design-report') -Message 'Course-design report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$courseDesignValidation.summary.sectionCount -ge 7) -Message 'Course-design report validation did not load the expected section rules.'
+
+  $courseDesignStructureRiskReportPath = Join-Path $tempRoot 'course-design-structure-risk-report.md'
+  @(
+    '软件工程课程设计报告',
+    '',
+    '课程名称：软件工程综合实践',
+    '课题名称：校园导览小程序设计',
+    '',
+    '一、设计目标',
+    '本次课程设计希望完成一个能够展示校园地点、支持搜索和路线提示的小程序，并把课程中的需求分析、页面设计和接口联调过程串成完整作品。',
+    '为了保证成品具备演示价值，还需要在交互流程中覆盖首页分类、地点详情和结果回跳等关键场景。',
+    '',
+    '二、开发环境',
+    '项目开发环境包括 Windows 11、Node.js、微信开发者工具和 SQLite，本地还提供模拟接口数据用于联调和演示。',
+    '通过统一前后端调试环境，可以减少页面逻辑、接口字段和测试结果之间的不一致。',
+    '',
+    '三、需求分析',
+    '系统需要支持地点分类浏览、关键字搜索、详情展示和推荐路线提示，并兼顾页面响应速度、信息完整度和移动端交互流畅性。',
+    '在分析阶段还梳理了教学区、生活区和服务区等典型使用场景，为后续方案设计提供依据。',
+    '',
+    '四、运行结果',
+    '系统启动后能够展示首页分类卡片，输入地点关键字后可以返回匹配结果，并支持点击查看地点详情和路线提示信息。',
+    '在演示测试中，页面跳转、搜索流程和收藏状态更新保持稳定，没有出现明显的白屏或异常回退。',
+    '',
+    '五、设计总结'
+  ) | Set-Content -LiteralPath $courseDesignStructureRiskReportPath -Encoding UTF8
+  $courseDesignStructureRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $courseDesignStructureRiskReportPath -ReportProfileName 'course-design-report' -Format json | Out-String) | ConvertFrom-Json
+  $courseDesignStructureRiskCodes = @($courseDesignStructureRiskValidation.findings | ForEach-Object { [string]$_.code })
+  Assert-True -Condition (-not [bool]$courseDesignStructureRiskValidation.passed) -Message 'Course-design structural-risk fixture should not pass validation.'
+  Assert-True -Condition ([string]$courseDesignStructureRiskValidation.reportProfileName -eq 'course-design-report') -Message 'Course-design structural-risk fixture should keep the course-design profile.'
+  Assert-True -Condition ($courseDesignStructureRiskCodes -contains 'missing-profile-required-heading') -Message 'Course-design structural-risk fixture should report missing-profile-required-heading.'
+  Assert-True -Condition ($courseDesignStructureRiskCodes -contains 'empty-section') -Message 'Course-design structural-risk fixture should report empty-section.'
+  $results.Add('course-design structural validation OK') | Out-Null
 
   $courseDesignTemplateDocx = Join-Path $tempRoot 'course-design-template.docx'
   New-CourseDesignTemplateDocx -Path $courseDesignTemplateDocx
@@ -2367,6 +2443,15 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'layout-check.json')) -Message 'build-report did not create the layout check JSON.'
   $buildReportSummary = (Get-Content -LiteralPath (Join-Path $buildReportOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([bool]$buildReportSummary.validationPassed) -Message 'build-report summary reported a failed validation result.'
+  Assert-True -Condition ($buildReportSummary.PSObject.Properties.Name -contains 'validationFindingCountsByCode') -Message 'build-report summary is missing validationFindingCountsByCode.'
+  Assert-True -Condition ($buildReportSummary.PSObject.Properties.Name -contains 'validationWarningCodes') -Message 'build-report summary is missing validationWarningCodes.'
+  Assert-True -Condition ($buildReportSummary.PSObject.Properties.Name -contains 'validationWarningSummary') -Message 'build-report summary is missing validationWarningSummary.'
+  Assert-True -Condition ($buildReportSummary.PSObject.Properties.Name -contains 'validationPaginationRiskCount') -Message 'build-report summary is missing validationPaginationRiskCount.'
+  Assert-True -Condition ($buildReportSummary.PSObject.Properties.Name -contains 'validationStructuralIssueCount') -Message 'build-report summary is missing validationStructuralIssueCount.'
+  Assert-True -Condition ([int]$buildReportSummary.validationPaginationRiskCount -eq 0) -Message 'build-report summary should report zero pagination risks for the passing sample.'
+  Assert-True -Condition ([int]$buildReportSummary.validationStructuralIssueCount -eq 0) -Message 'build-report summary should report zero structural issues for the passing sample.'
+  Assert-True -Condition (@($buildReportSummary.validationWarningCodes).Count -eq 0) -Message 'build-report summary should not report warning codes for the passing sample.'
+  Assert-True -Condition (@($buildReportSummary.validationWarningSummary).Count -eq 0) -Message 'build-report summary should not report warning details for the passing sample.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportSummary.imagePlanPath)) -Message 'build-report summary is missing a readable image-plan path.'
   Assert-True -Condition ([int]$buildReportSummary.imagePlanLowConfidenceCount -eq 0) -Message 'build-report summary reported an unexpected low-confidence image-plan count.'
   Assert-True -Condition (-not [bool]$buildReportSummary.imagePlanNeedsReview) -Message 'build-report summary should not mark explicit image specs for manual review.'
@@ -2408,6 +2493,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$buildReportInlineSummary.requirementsInputMode -eq 'inline') -Message 'Inline build-report should record requirementsInputMode=inline for inline requirements JSON.'
   Assert-True -Condition ([string]$buildReportInlineSummary.imageInputMode -eq 'specs-json') -Message 'Inline build-report should record imageInputMode=specs-json for inline image specs JSON.'
   Assert-True -Condition ([bool]$buildReportInlineSummary.validationPassed) -Message 'Inline build-report summary reported a failed validation result.'
+  Assert-True -Condition ($buildReportInlineSummary.PSObject.Properties.Name -contains 'validationFindingCountsByCode') -Message 'Inline build-report summary is missing validationFindingCountsByCode.'
+  Assert-True -Condition ($buildReportInlineSummary.PSObject.Properties.Name -contains 'validationWarningSummary') -Message 'Inline build-report summary is missing validationWarningSummary.'
   Assert-True -Condition ([bool]$buildReportInlineSummary.layoutCheckPassed) -Message 'Inline build-report summary reported a failed layout check.'
   Assert-True -Condition ([int]$buildReportInlineSummary.expectedLayoutImageCount -eq 4) -Message 'Inline build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportInlineSummary.expectedLayoutCaptionCount -eq 4) -Message 'Inline build-report summary is missing the expected layout caption count.'
