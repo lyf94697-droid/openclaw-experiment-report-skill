@@ -155,6 +155,8 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath) -or -not [strin
 $fieldMapParams = @{
   TemplatePath = $resolvedTemplatePath
   ReportPath = $resolvedReportPath
+  ReportProfileName = $ReportProfileName
+  ReportProfilePath = $resolvedReportProfilePath
   Format = "json"
   OutFile = $resolvedFieldMapOutPath
 }

@@ -742,6 +742,7 @@ URL: https://example.com/network-lab
     -OutFile $generatedFieldMapPath | Out-Null
   Assert-True -Condition (Test-Path -LiteralPath $generatedFieldMapPath) -Message 'Field-map generator did not write the output file.'
   $generatedFieldMapRoot = (Get-Content -LiteralPath $generatedFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$generatedFieldMapRoot.reportProfileName -eq 'experiment-report') -Message 'Field-map generator is missing the expected report profile name.'
   Assert-True -Condition ($generatedFieldMapRoot.summary.fieldCount -ge 7) -Message 'Field-map generator produced too few fields.'
   Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '课程名称') -Message 'Field-map generator did not map the course name.'
   Assert-True -Condition ($generatedFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '班级') -Message 'Field-map generator did not map the class field.'
