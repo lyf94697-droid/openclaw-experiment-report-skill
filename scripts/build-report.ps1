@@ -197,6 +197,8 @@ if ($imageInputsProvided) {
 
   $imageInputParams = @{
     DocxPath = $resolvedFilledDocxOutPath
+    ReportProfileName = $ReportProfileName
+    ReportProfilePath = $resolvedReportProfilePath
   }
   if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
     $imageInputParams.ImageSpecsPath = (Resolve-Path -LiteralPath $ImageSpecsPath).Path
