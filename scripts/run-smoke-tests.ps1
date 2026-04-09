@@ -1025,6 +1025,7 @@ URL: https://example.com/network-lab
   $sectionImageFilledDocx = Join-Path $tempRoot 'sample-template.section-images.docx'
   $sectionImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $generatedImageMapPath -OutPath $sectionImageFilledDocx
   Assert-True -Condition (Test-Path -LiteralPath $sectionImageFilledDocx) -Message 'Section-based image insertion did not create the filled docx.'
+  Assert-True -Condition ([string]$sectionImageInsertResult.reportProfileName -eq 'experiment-report') -Message 'Section-based image insertion is missing the expected report profile name.'
   Assert-True -Condition ($sectionImageInsertResult.insertedImageCount -eq 2) -Message 'Section-based image insertion inserted an unexpected number of images.'
   $sectionImageTemp = Join-Path $tempRoot 'section-image-inspect'
   [System.IO.Compression.ZipFile]::ExtractToDirectory($sectionImageFilledDocx, $sectionImageTemp)
@@ -1037,6 +1038,104 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($sectionImageDocumentXml.OuterXml -match '图2 实验结果截图') -Message 'Section-based image insertion is missing the second caption.'
   Remove-Item -LiteralPath $sectionImageTemp -Recurse -Force
   $results.Add('docx image insertion by section OK') | Out-Null
+
+  $customImageProfilePath = Join-Path $tempRoot 'custom-image-insert-profile.json'
+  @'
+{
+  "name": "image-insert-custom-profile",
+  "displayName": "自定义插图实验报告",
+  "defaultStyleProfile": "auto",
+  "defaultExperimentProperty": "③验证性实验",
+  "metadataFields": [
+    { "key": "Name", "label": "姓名" }
+  ],
+  "extraLabels": [],
+  "sectionFields": [
+    { "key": "Purpose", "heading": "实验目的", "aliases": ["实验目的"], "minChars": { "standard": 30, "full": 60 } },
+    { "key": "Environment", "heading": "实验环境", "aliases": ["实验环境"], "minChars": { "standard": 30, "full": 60 } },
+    { "key": "Theory", "heading": "实验原理或任务要求", "aliases": ["实验原理或任务要求"], "minChars": { "standard": 30, "full": 80 } },
+    { "key": "Steps", "heading": "实验过程记录", "aliases": ["实验过程记录"], "minChars": { "standard": 60, "full": 140 } },
+    { "key": "Results", "heading": "实验现象记录", "aliases": ["实验现象记录"], "minChars": { "standard": 50, "full": 120 } },
+    { "key": "Analysis", "heading": "问题分析", "aliases": ["问题分析"], "minChars": { "standard": 30, "full": 80 } },
+    { "key": "Summary", "heading": "实验总结", "aliases": ["实验总结"], "minChars": { "standard": 30, "full": 80 } }
+  ],
+  "detailProfiles": {
+    "standard": { "minChars": 700, "promptGuidance": [] },
+    "full": { "minChars": 1100, "promptGuidance": [] }
+  }
+}
+'@ | Set-Content -LiteralPath $customImageProfilePath -Encoding UTF8
+  $resolvedCustomImageProfilePath = (Resolve-Path -LiteralPath $customImageProfilePath).Path
+
+  $customSectionDocx = Join-Path $tempRoot 'sample-template.custom-profile-sections.docx'
+  Copy-Item -LiteralPath $sampleDocx -Destination $customSectionDocx -Force
+  $customSectionArchive = [System.IO.Compression.ZipFile]::Open($customSectionDocx, [System.IO.Compression.ZipArchiveMode]::Update)
+  try {
+    $customSectionEntry = $customSectionArchive.GetEntry('word/document.xml')
+    Assert-True -Condition ($null -ne $customSectionEntry) -Message 'Custom section fixture is missing word/document.xml before mutation.'
+    $customSectionReader = New-Object System.IO.StreamReader($customSectionEntry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+    try {
+      $customSectionDocumentText = $customSectionReader.ReadToEnd()
+    } finally {
+      $customSectionReader.Dispose()
+    }
+    $customSectionEntry.Delete()
+    $customSectionDocumentText = $customSectionDocumentText -replace '实验步骤', '实验过程记录'
+    $customSectionDocumentText = $customSectionDocumentText -replace '实验结果', '实验现象记录'
+    $customSectionEntry = $customSectionArchive.CreateEntry('word/document.xml')
+    $customSectionWriter = New-Object System.IO.StreamWriter($customSectionEntry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+    try {
+      $customSectionWriter.Write($customSectionDocumentText)
+    } finally {
+      $customSectionWriter.Dispose()
+    }
+  } finally {
+    $customSectionArchive.Dispose()
+  }
+
+  $customProfileImageSpecsPath = Join-Path $tempRoot 'custom-profile-image-specs.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "section": "实验过程记录",
+      "caption": "图1 自定义过程截图"
+    },
+    {
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "section": "实验现象记录",
+      "caption": "图2 自定义结果截图"
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $customProfileImageSpecsPath -Encoding UTF8
+
+  $customProfileImageMapPath = Join-Path $tempRoot 'custom-profile-image-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $customSectionDocx -ImageSpecsPath $customProfileImageSpecsPath -ReportProfilePath $customImageProfilePath -Format json -OutFile $customProfileImageMapPath | Out-Null
+  $customProfileImageMapRoot = (Get-Content -LiteralPath $customProfileImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$customProfileImageMapRoot.summary.reportProfileName -eq 'image-insert-custom-profile') -Message 'Custom-profile image-map generator is missing the expected report profile name.'
+  Assert-True -Condition ([string]$customProfileImageMapRoot.summary.reportProfilePath -eq $resolvedCustomImageProfilePath) -Message 'Custom-profile image-map generator is missing the expected report profile path.'
+
+  $customProfileFilledDocx = Join-Path $tempRoot 'sample-template.custom-profile-images.docx'
+  $customProfileInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $customSectionDocx -MappingPath $customProfileImageMapPath -OutPath $customProfileFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $customProfileFilledDocx) -Message 'Custom-profile image insertion did not create the filled docx.'
+  Assert-True -Condition ([string]$customProfileInsertResult.reportProfileName -eq 'image-insert-custom-profile') -Message 'Custom-profile image insertion did not inherit the expected report profile name from the image-map summary.'
+  Assert-True -Condition ([string]$customProfileInsertResult.reportProfilePath -eq $resolvedCustomImageProfilePath) -Message 'Custom-profile image insertion did not inherit the expected report profile path from the image-map summary.'
+  Assert-True -Condition ($customProfileInsertResult.insertedImageCount -eq 2) -Message 'Custom-profile image insertion inserted an unexpected number of images.'
+  $customProfileInspect = Join-Path $tempRoot 'custom-profile-image-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($customProfileFilledDocx, $customProfileInspect)
+  [xml]$customProfileDocumentXml = [System.IO.File]::ReadAllText((Join-Path $customProfileInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $customProfileDocumentText = $customProfileDocumentXml.OuterXml
+  $customStepsHeadingIndex = $customProfileDocumentText.IndexOf('实验过程记录')
+  $customResultsHeadingIndex = $customProfileDocumentText.IndexOf('实验现象记录')
+  $customStepsCaptionIndex = $customProfileDocumentText.IndexOf('图1 自定义过程截图')
+  $customResultsCaptionIndex = $customProfileDocumentText.IndexOf('图2 自定义结果截图')
+  Assert-True -Condition ($customStepsHeadingIndex -ge 0 -and $customResultsHeadingIndex -gt $customStepsHeadingIndex) -Message 'Custom-profile image insertion document is missing the expected custom section headings.'
+  Assert-True -Condition ($customStepsCaptionIndex -gt $customStepsHeadingIndex -and $customStepsCaptionIndex -lt $customResultsHeadingIndex) -Message 'Custom-profile image insertion did not place the first image under 实验过程记录.'
+  Assert-True -Condition ($customResultsCaptionIndex -gt $customResultsHeadingIndex) -Message 'Custom-profile image insertion did not place the second image under 实验现象记录.'
+  Remove-Item -LiteralPath $customProfileInspect -Recurse -Force
+  $results.Add('docx image insertion custom profile OK') | Out-Null
 
   $imageMappingFile = Join-Path $tempRoot 'image-map.json'
   @"

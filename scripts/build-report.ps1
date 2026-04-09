@@ -238,7 +238,13 @@ if ($imageInputsProvided) {
       }).Count
   }
 
-  & (Join-Path $repoRoot "scripts\insert-docx-images.ps1") -DocxPath $resolvedFilledDocxOutPath -MappingPath $resolvedImageMapOutPath -OutPath $resolvedFilledDocxWithImagesOutPath -Overwrite | Out-Null
+  & (Join-Path $repoRoot "scripts\insert-docx-images.ps1") `
+    -DocxPath $resolvedFilledDocxOutPath `
+    -MappingPath $resolvedImageMapOutPath `
+    -ReportProfileName $ReportProfileName `
+    -ReportProfilePath $resolvedReportProfilePath `
+    -OutPath $resolvedFilledDocxWithImagesOutPath `
+    -Overwrite | Out-Null
 
   $filledWithImagesOutlinePath = Join-Path $resolvedOutputDir "filled-template-with-images-outline.md"
   $filledWithImagesOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedFilledDocxWithImagesOutPath -Format markdown | Out-String
