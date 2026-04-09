@@ -334,11 +334,15 @@ function Test-LooksLikeSectionHeading {
     return $false
   }
 
+  if ($normalizedText -match '报告$') {
+    return $false
+  }
+
   if ($normalizedText.Length -gt 40) {
     return $false
   }
 
-  return [bool]($normalizedText -match '^(?:#{1,6}\s*)?(?:第?[0-9一二三四五六七八九十]+(?:章|节)?[.\)\u3001]?\s*)?.*(实验|原理|目的|内容|环境|步骤|结果|分析|总结|小结|器材|设备|任务|要求).*$')
+  return [bool]($normalizedText -match '^(?:#{1,6}\s*)?(?:第?[0-9一二三四五六七八九十]+(?:章|节)?[.\)\u3001]?\s*)?.*(实验|设计|原理|目的|目标|内容|环境|开发|需求|步骤|过程|实现|运行|结果|分析|总结|小结|器材|设备|任务|要求).*$')
 }
 
 function Get-CompositeCandidateSectionIds {
@@ -475,18 +479,9 @@ function Get-ProfileSectionFieldMapId {
 }
 
 $metadataRules = @(
-  (New-MetadataRule -Id "course_name" -Aliases @("课程名称", "课程名", "课程", "course", "coursename")),
-  (New-MetadataRule -Id "experiment_name" -Aliases @("实验名称", "实验名", "实验题目", "题目", "experiment", "experimentname", "experimenttitle", "labreporttitle")),
-  (New-MetadataRule -Id "experiment_property" -Aliases @("实验性质", "实验类型", "experimentproperty", "experimenttype", "labtype")),
-  (New-MetadataRule -Id "student_name" -Aliases @("姓名", "name", "studentname")),
-  (New-MetadataRule -Id "student_id" -Aliases @("学号", "studentid", "studentnumber", "id")),
-  (New-MetadataRule -Id "class_name" -Aliases @("班级", "classname", "class")),
-  (New-MetadataRule -Id "teacher_name" -Aliases @("指导教师", "教师", "老师", "teacher", "teachername")),
-  (New-MetadataRule -Id "experiment_date" -Aliases @("实验时间", "实验日期", "实验日期时间", "experimentdate", "experimenttime")),
-  (New-MetadataRule -Id "experiment_location" -Aliases @("实验地点", "实验位置", "experimentlocation")),
-  (New-MetadataRule -Id "date" -Aliases @("日期", "实验日期", "date")),
-  (New-MetadataRule -Id "college" -Aliases @("学院", "college")),
-  (New-MetadataRule -Id "major" -Aliases @("专业", "major"))
+  foreach ($metadataRule in @(Get-ReportProfileMetadataRules -Profile $reportProfile)) {
+    New-MetadataRule -Id ([string]$metadataRule.id) -Aliases @($metadataRule.inputAliases)
+  }
 )
 
 $sectionRules = @(

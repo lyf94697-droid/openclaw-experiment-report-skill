@@ -1,0 +1,131 @@
+{
+  "name": "course-design-report",
+  "displayName": "课程设计报告",
+  "defaultStyleProfile": "school",
+  "defaultExperimentProperty": "课程设计",
+  "metadataFields": [
+    { "key": "Name", "label": "学生姓名", "aliases": ["姓名"] },
+    { "key": "StudentId", "label": "学号", "aliases": ["学生学号"] },
+    { "key": "ClassName", "label": "班级" },
+    { "key": "TeacherName", "label": "指导教师", "aliases": ["指导老师"] },
+    { "key": "CourseName", "label": "课程名称", "aliases": ["课程名"] },
+    { "key": "ExperimentName", "label": "课题名称", "aliases": ["设计题目", "题目"] },
+    { "key": "ExperimentProperty", "label": "设计类别", "aliases": ["课程设计类型"] },
+    { "key": "ExperimentDate", "label": "完成时间", "aliases": ["设计时间", "日期"] },
+    { "key": "ExperimentLocation", "label": "设计地点", "aliases": ["开发地点"] }
+  ],
+  "extraLabels": [
+    { "key": "Major", "label": "专业" },
+    { "key": "College", "label": "学院" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "设计目标",
+      "aliases": ["设计目标", "课程设计目的", "设计目的"],
+      "minChars": { "standard": 30, "full": 60 }
+    },
+    {
+      "key": "Environment",
+      "heading": "开发环境",
+      "aliases": ["开发环境", "运行环境", "设计环境"],
+      "minChars": { "standard": 30, "full": 60 }
+    },
+    {
+      "key": "Theory",
+      "heading": "需求分析",
+      "aliases": ["需求分析", "设计需求", "任务分析"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Steps",
+      "heading": "方案设计与实现",
+      "aliases": ["方案设计与实现", "方案设计", "系统设计", "详细设计", "实现过程", "设计与实现"],
+      "minChars": { "standard": 80, "full": 180 }
+    },
+    {
+      "key": "Results",
+      "heading": "运行结果",
+      "aliases": ["运行结果", "测试结果", "结果展示"],
+      "minChars": { "standard": 60, "full": 140 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题与改进",
+      "aliases": ["问题与改进", "问题分析与改进", "不足与改进", "问题及解决"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Summary",
+      "heading": "设计总结",
+      "aliases": ["设计总结", "课程设计总结", "总结体会", "总结"],
+      "minChars": { "standard": 40, "full": 90 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "系统设计",
+    "详细设计"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "开发环境截图",
+      "steps": "实现过程截图",
+      "result": "运行结果截图",
+      "analysis": "问题与改进截图",
+      "summary": "课程设计总结截图",
+      "default": "课程设计截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "ui|page|screen|界面|页面", "caption": "运行结果截图" },
+      { "pattern": "deploy|config|setup|环境|database|后端|前端", "caption": "开发环境截图" },
+      { "pattern": "flow|design|module|步骤|过程|实现", "caption": "实现过程截图" },
+      { "pattern": "analysis|bug|error|异常|问题", "caption": "问题与改进截图" }
+    ]
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["设计目标", "需求分析"],
+      "blocks": [
+        { "heading": "一. 设计目标", "sectionIds": ["purpose"] },
+        { "heading": "二. 需求分析", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["方案设计", "设计总结"],
+      "blocks": [
+        { "heading": "三. 方案设计与实现", "sectionIds": ["steps"] },
+        { "heading": "四. 运行结果", "sectionIds": ["result"] },
+        { "heading": "五. 问题与改进", "sectionIds": ["analysis"] },
+        { "heading": "六. 设计总结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 900,
+      "promptGuidance": [
+        "Prefer a submit-ready course design report instead of a short outline.",
+        "The design and implementation section should explain both the chosen solution and the concrete execution process."
+      ]
+    },
+    "full": {
+      "minChars": 1400,
+      "promptGuidance": [
+        "Prefer a submit-ready course design report with substantial detail instead of a short outline.",
+        "Unless source material is very sparse, aim for roughly 1400 to 2200 Chinese characters.",
+        "The demand analysis, design and implementation, and results sections should be the most detailed parts.",
+        "When describing the implementation, explain the module split, key design decisions, and why the final result matches the original goal."
+      ]
+    }
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评"
+  ]
+}

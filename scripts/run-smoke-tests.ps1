@@ -121,6 +121,99 @@ function New-SampleTemplateDocx {
   }
 }
 
+function New-CourseDesignTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>课程设计报告</w:t></w:r></w:p>
+    <w:p><w:r><w:t>课程名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>课题名称：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学生姓名</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>指导老师：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>完成时间：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>设计地点：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>设计目标</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>开发环境</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>需求分析</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>方案设计与实现</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>运行结果</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>问题与改进</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>设计总结</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-CoverBodyTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -437,6 +530,7 @@ try {
       (Join-Path $repoRoot 'examples\sample-report.txt'),
       (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
       (Join-Path $repoRoot 'profiles\experiment-report.json'),
+      (Join-Path $repoRoot 'profiles\course-design-report.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
@@ -602,6 +696,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileExtraSectionHeadings -Profile $reportProfile) -contains '实验内容') -Message 'Report profile extra section headings are missing 实验内容.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId 'steps' -BaseName 'setup-step') -eq '实验步骤截图') -Message 'Report profile image caption defaults are missing the steps caption.'
   Assert-True -Condition (@(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile).Count -ge 2) -Message 'Report profile field-map composite rules are missing.'
+  $courseDesignProfile = Get-ReportProfile -ProfileName 'course-design-report' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$courseDesignProfile.name -eq 'course-design-report') -Message 'Course-design profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$courseDesignProfile.displayName -eq '课程设计报告') -Message 'Course-design profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $courseDesignProfile) -eq 'school') -Message 'Course-design profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $courseDesignProfile) -contains '指导老师') -Message 'Course-design profile metadata prefixes are missing 指导老师.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $courseDesignProfile) -contains '方案设计与实现') -Message 'Course-design profile required headings are missing 方案设计与实现.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $courseDesignProfile -SectionId 'result' -BaseName 'ui-home') -eq '运行结果截图') -Message 'Course-design profile image caption defaults are missing the result caption.'
   $results.Add('report profile loader OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
@@ -1047,6 +1148,166 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $sampleImageTwo) -Message 'Failed to create the second sample image fixture.'
   Assert-True -Condition (Test-Path -LiteralPath $sampleImageThree) -Message 'Failed to create the third sample image fixture.'
   Assert-True -Condition (Test-Path -LiteralPath $sampleImageFour) -Message 'Failed to create the fourth sample image fixture.'
+
+  $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
+  @'
+软件工程课程设计报告
+
+课程名称：软件工程综合实践
+课题名称：校园导览小程序设计
+学生姓名：李四
+学号：20261234
+指导老师：王老师
+完成时间：2026-04-08
+设计地点：实验楼 A201
+
+一、设计目标
+本次课程设计的目标是完成一个面向校园访客和学生的导览小程序，使用户能够快速查看教学楼、实验室和生活服务点的位置分布。
+除了完成基础的地图展示功能，还需要在交互流程中突出搜索、路线提示和常用地点收藏等核心能力，保证项目具备完整的演示价值。
+
+二、开发环境
+项目开发使用 Windows 11、Node.js、微信开发者工具和 SQLite 作为本地调试环境，前端页面采用小程序原生组件实现。
+为了方便联调与演示，后端接口在本机启动测试服务，并通过模拟数据覆盖地点检索、分类筛选和详情展示等典型场景。
+
+三、需求分析
+系统需要支持地点分类浏览、关键字搜索、地点详情查看和推荐路线提示，保证新生在不熟悉校园环境时也能快速定位目标区域。
+在分析过程中重点梳理了教学区、宿舍区和公共服务区三类地点信息结构，并明确了页面响应速度和信息准确性两项核心约束。
+
+四、方案设计与实现
+整体方案采用前后端分层结构，前端负责地点列表、搜索页和详情页展示，后端负责地点数据组织、关键词过滤和路线推荐结果返回。
+在实现阶段先完成地点数据模型和接口约定，再逐步补齐首页分类卡片、搜索联想、详情页信息模块和收藏状态管理逻辑。
+为了让演示效果更加稳定，还为主要页面增加了空状态提示、加载占位和异常请求兜底提示，避免因为数据延迟导致界面体验不完整。
+
+五、运行结果
+系统启动后可以正常展示校园地点分类首页，输入教学楼关键字后能够即时返回匹配结果，并支持点击进入地点详情页查看开放时间和相关说明。
+在演示测试中，推荐路线和收藏功能都能按照预期更新界面状态，整体流程从搜索到查看结果再到返回首页保持稳定，没有出现明显的页面跳转错误。
+
+六、问题与改进
+当前版本在地点数据量进一步增大时，搜索结果排序仍然偏向简单匹配规则，缺少结合距离和使用频率的综合排序能力。
+后续可以引入更细致的标签体系和缓存策略，同时补充地图组件联动能力，使路线展示、地点筛选和结果高亮之间形成更自然的交互闭环。
+
+七、设计总结
+通过这次课程设计，进一步理解了从需求分析、页面拆分到接口联调的完整实现流程，也明确了前后端边界划分对项目稳定性的影响。
+项目从可运行原型逐步完善到可演示成品的过程中，最大的收获是学会了围绕用户任务链路组织设计重点，而不是只堆叠单个功能模块。
+'@ | Set-Content -LiteralPath $courseDesignReportPath -Encoding UTF8
+
+  $courseDesignMetadataPath = Join-Path $tempRoot 'course-design-metadata.json'
+  @'
+{
+  "学生姓名": "李四",
+  "学号": "20261234",
+  "班级": "软工 2302",
+  "指导老师": "王老师",
+  "课程名称": "软件工程综合实践",
+  "课题名称": "校园导览小程序设计",
+  "设计类别": "课程设计",
+  "完成时间": "2026-04-08",
+  "设计地点": "实验楼 A201"
+}
+'@ | Set-Content -LiteralPath $courseDesignMetadataPath -Encoding UTF8
+
+  $courseDesignValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $courseDesignReportPath -ReportProfileName 'course-design-report' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$courseDesignValidation.passed) -Message 'Course-design report validation should pass for the course-design profile.'
+  Assert-True -Condition ([string]$courseDesignValidation.reportProfileName -eq 'course-design-report') -Message 'Course-design report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$courseDesignValidation.summary.sectionCount -ge 7) -Message 'Course-design report validation did not load the expected section rules.'
+
+  $courseDesignTemplateDocx = Join-Path $tempRoot 'course-design-template.docx'
+  New-CourseDesignTemplateDocx -Path $courseDesignTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $courseDesignTemplateDocx) -Message 'Failed to create the course-design template fixture.'
+
+  $courseDesignTemplateFitPath = Join-Path $tempRoot 'course-design-template-fit.json'
+  & (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1') `
+    -TemplatePath $courseDesignTemplateDocx `
+    -ReportPath $courseDesignReportPath `
+    -MetadataPath $courseDesignMetadataPath `
+    -ReportProfileName 'course-design-report' `
+    -Format json `
+    -OutFile $courseDesignTemplateFitPath | Out-Null
+  $courseDesignTemplateFit = (Get-Content -LiteralPath $courseDesignTemplateFitPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$courseDesignTemplateFit.reportProfileName -eq 'course-design-report') -Message 'Course-design template-fit checker is missing the expected profile name.'
+  Assert-True -Condition ([int]$courseDesignTemplateFit.summary.profileChangeSuggestionCount -eq 0) -Message 'Course-design template-fit checker should not request profile changes for the built-in course-design profile.'
+  Assert-True -Condition ([int]$courseDesignTemplateFit.summary.inputGapCount -eq 0) -Message 'Course-design template-fit checker should not report input gaps for the complete sample inputs.'
+  Assert-True -Condition ([bool]$courseDesignTemplateFit.summary.readyForNewProfile) -Message 'Course-design template-fit checker should report that the profile is ready for reuse.'
+
+  $courseDesignFieldMapPath = Join-Path $tempRoot 'course-design-field-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $courseDesignTemplateDocx `
+    -ReportPath $courseDesignReportPath `
+    -MetadataPath $courseDesignMetadataPath `
+    -ReportProfileName 'course-design-report' `
+    -Format json `
+    -OutFile $courseDesignFieldMapPath | Out-Null
+  $courseDesignFieldMapRoot = (Get-Content -LiteralPath $courseDesignFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$courseDesignFieldMapRoot.reportProfileName -eq 'course-design-report') -Message 'Course-design field-map generator is missing the expected report profile name.'
+  Assert-True -Condition ($courseDesignFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '课题名称') -Message 'Course-design field-map generator did not map the project title field.'
+  Assert-True -Condition ($courseDesignFieldMapRoot.fieldMap.PSObject.Properties.Name -contains '学生姓名') -Message 'Course-design field-map generator did not map the student name field.'
+  Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.课题名称 -eq '校园导览小程序设计') -Message 'Course-design field-map generator did not fill the project title.'
+  Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.学生姓名 -eq '李四') -Message 'Course-design field-map generator did not fill the student name.'
+  Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.设计目标.mode -eq 'after') -Message 'Course-design field-map generator should preserve the target heading and fill after it.'
+  Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.方案设计与实现.mode -eq 'after') -Message 'Course-design field-map generator should preserve the implementation heading and fill after it.'
+  Assert-True -Condition ($courseDesignFieldMapRoot.summary.diagnosticCount -eq 0) -Message 'Course-design field-map generator should not emit diagnostics for the built-in course-design profile fixture.'
+
+  $courseDesignFilledDocx = Join-Path $tempRoot 'course-design-template.filled.docx'
+  $courseDesignFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $courseDesignTemplateDocx -MappingPath $courseDesignFieldMapPath -OutPath $courseDesignFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $courseDesignFilledDocx) -Message 'Course-design field-map fill did not create the filled docx.'
+  Assert-True -Condition ($courseDesignFillResult.labelFillCount -ge 6) -Message 'Course-design field-map fill applied too few label fields.'
+  Assert-True -Condition ($courseDesignFillResult.blockFillCount -ge 5) -Message 'Course-design field-map fill applied too few block fills.'
+  $courseDesignFilledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $courseDesignFilledDocx -Format markdown | Out-String
+  Assert-True -Condition ($courseDesignFilledOutline -match '课题名称：校园导览小程序设计') -Message 'Course-design field-map fill did not update the project title.'
+  Assert-True -Condition ($courseDesignFilledOutline -match '学生姓名：李四|T1R1C2: 李四') -Message 'Course-design field-map fill did not update the student name.'
+  Assert-True -Condition ($courseDesignFilledOutline -match '整体方案采用前后端分层结构') -Message 'Course-design field-map fill did not write the implementation section.'
+
+  $courseDesignStyledDocx = Join-Path $tempRoot 'course-design-template.styled.docx'
+  $courseDesignStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') `
+    -DocxPath $courseDesignFilledDocx `
+    -OutPath $courseDesignStyledDocx `
+    -Overwrite `
+    -Profile auto `
+    -ReportProfileName 'course-design-report'
+  Assert-True -Condition (Test-Path -LiteralPath $courseDesignStyledDocx) -Message 'Course-design style formatter did not create the styled docx.'
+  Assert-True -Condition ([string]$courseDesignStyleResult.reportProfileName -eq 'course-design-report') -Message 'Course-design style formatter is missing the expected report profile name.'
+  Assert-True -Condition ([string]$courseDesignStyleResult.resolvedProfile -eq 'school') -Message 'Course-design style formatter should resolve auto to the course-design default style profile.'
+
+  $courseDesignImageSpecsPath = Join-Path $tempRoot 'course-design-image-specs.json'
+  @"
+{
+  "images": [
+    {
+      "path": "$($sampleImageOne.Replace('\', '\\'))",
+      "section": "方案设计与实现"
+    },
+    {
+      "path": "$($sampleImageTwo.Replace('\', '\\'))",
+      "section": "运行结果"
+    }
+  ]
+}
+"@ | Set-Content -LiteralPath $courseDesignImageSpecsPath -Encoding UTF8
+
+  $courseDesignImageMapPath = Join-Path $tempRoot 'course-design-image-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') `
+    -DocxPath $courseDesignStyledDocx `
+    -ImageSpecsPath $courseDesignImageSpecsPath `
+    -ReportProfileName 'course-design-report' `
+    -Format json `
+    -OutFile $courseDesignImageMapPath | Out-Null
+  $courseDesignImageMapRoot = (Get-Content -LiteralPath $courseDesignImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$courseDesignImageMapRoot.summary.reportProfileName -eq 'course-design-report') -Message 'Course-design image-map generator is missing the expected report profile name.'
+  Assert-True -Condition ([string]$courseDesignImageMapRoot.images[0].caption -eq '图1 实现过程截图') -Message 'Course-design image-map generator did not use the profile-defined default caption for the implementation section.'
+  Assert-True -Condition ([string]$courseDesignImageMapRoot.images[1].caption -eq '图2 运行结果截图') -Message 'Course-design image-map generator did not use the profile-defined default caption for the result section.'
+
+  $courseDesignImageFilledDocx = Join-Path $tempRoot 'course-design-template.images.docx'
+  $courseDesignImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $courseDesignStyledDocx -MappingPath $courseDesignImageMapPath -OutPath $courseDesignImageFilledDocx
+  Assert-True -Condition (Test-Path -LiteralPath $courseDesignImageFilledDocx) -Message 'Course-design image insertion did not create the filled docx.'
+  Assert-True -Condition ([string]$courseDesignImageInsertResult.reportProfileName -eq 'course-design-report') -Message 'Course-design image insertion is missing the expected report profile name.'
+  Assert-True -Condition ($courseDesignImageInsertResult.insertedImageCount -eq 2) -Message 'Course-design image insertion inserted an unexpected number of images.'
+  $courseDesignImageTemp = Join-Path $tempRoot 'course-design-image-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($courseDesignImageFilledDocx, $courseDesignImageTemp)
+  [xml]$courseDesignImageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $courseDesignImageTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($courseDesignImageDocumentXml.OuterXml -match '图1 实现过程截图') -Message 'Course-design image insertion is missing the implementation caption.'
+  Assert-True -Condition ($courseDesignImageDocumentXml.OuterXml -match '图2 运行结果截图') -Message 'Course-design image insertion is missing the result caption.'
+  Remove-Item -LiteralPath $courseDesignImageTemp -Recurse -Force
+  $results.Add('course-design profile pipeline OK') | Out-Null
 
   $mixedGroupImageSpecsPath = Join-Path $tempRoot 'image-specs-mixed-group.json'
   @"
@@ -1765,6 +2026,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\experiment-report.json')) -Message 'Install script did not copy the experiment-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\course-design-report.json')) -Message 'Install script did not copy the course-design-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
