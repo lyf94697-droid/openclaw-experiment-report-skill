@@ -615,3 +615,117 @@ $($detailRequirements.Trim())
 - Return only the final Chinese $documentLabel body.
 "@
 }
+
+function New-ReportProfileAutoRequirementsJson {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [string[]]$ExtraKeywords,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full"
+  )
+
+  $keywordList = New-Object System.Collections.Generic.List[string]
+  [void]$keywordList.Add($ResolvedCourseName)
+  [void]$keywordList.Add($ResolvedExperimentName)
+
+  foreach ($keyword in @($ExtraKeywords)) {
+    if (-not [string]::IsNullOrWhiteSpace($keyword) -and -not $keywordList.Contains($keyword)) {
+      [void]$keywordList.Add($keyword)
+    }
+  }
+
+  $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
+  $sectionRequirements = foreach ($sectionField in (Get-ReportProfileSectionFields -Profile $Profile)) {
+    $minChars = 0
+    if ($null -ne $sectionField.minChars -and $sectionField.minChars.PSObject.Properties.Name -contains $DetailLevel) {
+      $minChars = [int]$sectionField.minChars.$DetailLevel
+    }
+
+    [pscustomobject]@{
+      name = [string]$sectionField.heading
+      aliases = @($sectionField.aliases | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+      minChars = $minChars
+    }
+  }
+
+  $requirements = [pscustomobject]@{
+    courseName = $ResolvedCourseName
+    experimentName = $ResolvedExperimentName
+    minChars = [int]$detailProfile.minChars
+    sections = @($sectionRequirements)
+    requiredKeywords = @($keywordList)
+    forbiddenPatterns = @($Profile.forbiddenPatterns)
+  }
+
+  return ($requirements | ConvertTo-Json -Depth 6)
+}
+
+function New-ReportProfileAutoMetadataJson {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [AllowNull()]
+    [string]$ResolvedStudentName,
+
+    [AllowNull()]
+    [string]$ResolvedStudentId,
+
+    [AllowNull()]
+    [string]$ResolvedClassName,
+
+    [AllowNull()]
+    [string]$ResolvedTeacherName,
+
+    [AllowNull()]
+    [string]$ResolvedExperimentProperty,
+
+    [AllowNull()]
+    [string]$ResolvedExperimentDate,
+
+    [AllowNull()]
+    [string]$ResolvedExperimentLocation
+  )
+
+  $labels = Get-ReportProfileLabels -Profile $Profile
+  $metadataValues = @{
+    Name = $ResolvedStudentName
+    StudentId = $ResolvedStudentId
+    ClassName = $ResolvedClassName
+    TeacherName = $ResolvedTeacherName
+    CourseName = $ResolvedCourseName
+    ExperimentName = $ResolvedExperimentName
+    ExperimentProperty = $ResolvedExperimentProperty
+    ExperimentDate = $ResolvedExperimentDate
+    ExperimentLocation = $ResolvedExperimentLocation
+  }
+
+  $metadata = [ordered]@{}
+  foreach ($field in @($Profile.metadataFields)) {
+    $key = [string]$field.key
+    if (-not [string]::IsNullOrWhiteSpace($key) -and $metadataValues.ContainsKey($key)) {
+      $metadata[[string]$field.label] = $metadataValues[$key]
+    }
+  }
+
+  if ($labels.Contains("Date")) {
+    $metadata[[string]$labels["Date"]] = $ResolvedExperimentDate
+  }
+
+  return ($metadata | ConvertTo-Json -Depth 4)
+}

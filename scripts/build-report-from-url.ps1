@@ -456,7 +456,7 @@ $basePromptText = if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
 } elseif (-not [string]::IsNullOrWhiteSpace($PromptText)) {
   $PromptText
 } else {
-  New-AutoPromptText -ResolvedCourseName $resolvedCourseName -ResolvedExperimentName $resolvedExperimentName -Profile $reportProfile -Labels $labels -DetailLevel $DetailLevel
+  New-ReportProfileAutoPromptText -ResolvedCourseName $resolvedCourseName -ResolvedExperimentName $resolvedExperimentName -Profile $reportProfile -DetailLevel $DetailLevel
 }
 
 $promptPathOut = Join-Path $resolvedOutputDir "prompt.txt"
@@ -465,11 +465,10 @@ $promptPathOut = Join-Path $resolvedOutputDir "prompt.txt"
 $effectiveMetadataPath = $resolvedMetadataPath
 if ([string]::IsNullOrWhiteSpace($effectiveMetadataPath) -and [string]::IsNullOrWhiteSpace($MetadataJson)) {
   $effectiveMetadataPath = Join-Path $resolvedOutputDir "metadata.auto.json"
-  $autoMetadataJson = New-AutoMetadataJson `
+  $autoMetadataJson = New-ReportProfileAutoMetadataJson `
     -ResolvedCourseName $resolvedCourseName `
     -ResolvedExperimentName $resolvedExperimentName `
     -Profile $reportProfile `
-    -Labels $labels `
     -ResolvedStudentName $StudentName `
     -ResolvedStudentId $StudentId `
     -ResolvedClassName $ClassName `
@@ -483,11 +482,10 @@ if ([string]::IsNullOrWhiteSpace($effectiveMetadataPath) -and [string]::IsNullOr
 $effectiveRequirementsPath = $resolvedRequirementsPath
 if ([string]::IsNullOrWhiteSpace($effectiveRequirementsPath) -and [string]::IsNullOrWhiteSpace($RequirementsJson)) {
   $effectiveRequirementsPath = Join-Path $resolvedOutputDir "requirements.auto.json"
-  $autoRequirementsJson = New-AutoRequirementsJson `
+  $autoRequirementsJson = New-ReportProfileAutoRequirementsJson `
     -ResolvedCourseName $resolvedCourseName `
     -ResolvedExperimentName $resolvedExperimentName `
     -Profile $reportProfile `
-    -Labels $labels `
     -ExtraKeywords $RequiredKeywords `
     -DetailLevel $DetailLevel
   [System.IO.File]::WriteAllText($effectiveRequirementsPath, $autoRequirementsJson, (New-Object System.Text.UTF8Encoding($true)))

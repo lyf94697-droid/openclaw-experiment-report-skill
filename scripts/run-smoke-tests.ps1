@@ -724,11 +724,24 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
   Assert-True -Condition ($experimentPromptText -match '实验名称: 交换机 VLAN 配置实验') -Message 'Auto prompt helper did not emit the experiment-report title label.'
+  $experimentRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -ExtraKeywords @('VLAN', '交换机 VLAN 配置实验') -DetailLevel 'standard') | ConvertFrom-Json
+  Assert-True -Condition ([string]$experimentRequirements.courseName -eq '计算机网络') -Message 'Auto requirements helper did not preserve the experiment-report course name.'
+  Assert-True -Condition ([int]$experimentRequirements.minChars -eq 700) -Message 'Auto requirements helper did not use the experiment-report standard minChars.'
+  Assert-True -Condition (@($experimentRequirements.requiredKeywords).Count -eq 3) -Message 'Auto requirements helper should keep unique course/title/extra keywords.'
+  $experimentMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -ResolvedStudentName '张三' -ResolvedStudentId '20260001' -ResolvedClassName '计科 2201' -ResolvedTeacherName '李老师' -ResolvedExperimentProperty '③验证性实验' -ResolvedExperimentDate '2026-04-09' -ResolvedExperimentLocation '实验楼 A201') | ConvertFrom-Json
+  Assert-True -Condition ([string]$experimentMetadata.姓名 -eq '张三') -Message 'Auto metadata helper did not emit the experiment-report student label.'
+  Assert-True -Condition ([string]$experimentMetadata.日期 -eq '2026-04-09') -Message 'Auto metadata helper did not emit the experiment-report extra date label.'
   $courseDesignPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -DetailLevel 'full'
   Assert-True -Condition ($courseDesignPromptText -match '课程设计报告 body') -Message 'Auto prompt helper did not use the course-design display name.'
   Assert-True -Condition ($courseDesignPromptText -match '课程名称: 软件工程综合实践') -Message 'Auto prompt helper did not emit the course-design course-name label.'
   Assert-True -Condition ($courseDesignPromptText -match '课题名称: 校园导览小程序设计') -Message 'Auto prompt helper did not emit the course-design title label.'
   Assert-True -Condition ($courseDesignPromptText -match '方案设计与实现') -Message 'Auto prompt helper did not include course-design required headings.'
+  $courseDesignRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -ExtraKeywords @('小程序', '校园导览小程序设计') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$courseDesignRequirements.minChars -eq 1400) -Message 'Auto requirements helper did not use the course-design full minChars.'
+  Assert-True -Condition (@($courseDesignRequirements.sections | Where-Object { $_.name -eq '方案设计与实现' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the course-design implementation section heading.'
+  $courseDesignMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '课程设计' -ResolvedExperimentDate '2026-04-08' -ResolvedExperimentLocation '实验楼 A201') | ConvertFrom-Json
+  Assert-True -Condition ([string]$courseDesignMetadata.学生姓名 -eq '李四') -Message 'Auto metadata helper did not emit the course-design student label.'
+  Assert-True -Condition ([string]$courseDesignMetadata.课题名称 -eq '校园导览小程序设计') -Message 'Auto metadata helper did not emit the course-design title label.'
   $results.Add('report profile loader OK') | Out-Null
 
   foreach ($scriptPath in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 | Select-Object -ExpandProperty FullName) {
