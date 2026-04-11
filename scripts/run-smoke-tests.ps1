@@ -2556,6 +2556,11 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Prepared-summary URL wrapper should expose buildMetadataInputMode=path from the downstream build summary.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Prepared-summary URL wrapper should expose buildRequirementsInputMode=path from the downstream build summary.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.buildImageInputMode -eq 'specs-path') -Message 'Prepared-summary URL wrapper should expose buildImageInputMode=specs-path from the downstream build summary.'
+  Assert-True -Condition ([bool]$preparedSummaryBuildSummary.validationPassed) -Message 'Prepared-summary URL wrapper should expose validationPassed from the downstream build summary.'
+  Assert-True -Condition ([int]$preparedSummaryBuildSummary.validationWarningCount -eq 0) -Message 'Prepared-summary URL wrapper should expose zero validation warnings for the passing fixture.'
+  Assert-True -Condition ([int]$preparedSummaryBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Prepared-summary URL wrapper should expose zero pagination risks for the passing fixture.'
+  Assert-True -Condition ([int]$preparedSummaryBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Prepared-summary URL wrapper should expose zero structural issues for the passing fixture.'
+  Assert-True -Condition (@($preparedSummaryBuildSummary.validationWarningCodes).Count -eq 0) -Message 'Prepared-summary URL wrapper should expose an empty validationWarningCodes array for the passing fixture.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTracePath)) -Message 'Prepared-summary URL wrapper should create a pipeline-trace JSON.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTraceMarkdownPath)) -Message 'Prepared-summary URL wrapper should create a pipeline-trace markdown file.'
   Assert-True -Condition ([string]$preparedSummaryBuildSummary.requestedCourseName -eq '软件工程综合实践') -Message 'Prepared-summary URL wrapper lost the requested course name from the prepared summary.'
@@ -2568,9 +2573,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$preparedSummaryTrace.wrapper.generationMode -eq 'replay') -Message 'Prepared-summary URL pipeline trace should keep generationMode=replay.'
   Assert-True -Condition ([string]$preparedSummaryTrace.build.reportInputMode -eq 'path') -Message 'Prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
   Assert-True -Condition ([string]$preparedSummaryTrace.build.imageInputMode -eq 'specs-path') -Message 'Prepared-summary URL pipeline trace should keep build.imageInputMode=specs-path.'
+  Assert-True -Condition ([bool]$preparedSummaryTrace.build.validationPassed) -Message 'Prepared-summary URL pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$preparedSummaryTrace.build.validationPaginationRiskCount -eq 0) -Message 'Prepared-summary URL pipeline trace should expose zero pagination risks.'
   $preparedSummaryTraceMarkdown = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($preparedSummaryTraceMarkdown -match 'Generation mode: replay') -Message 'Prepared-summary URL pipeline markdown should include the replay generation mode.'
   Assert-True -Condition ($preparedSummaryTraceMarkdown -match 'Image input mode: specs-path') -Message 'Prepared-summary URL pipeline markdown should include the build image input mode.'
+  Assert-True -Condition ($preparedSummaryTraceMarkdown -match 'Validation passed: True') -Message 'Prepared-summary URL pipeline markdown should include validation status.'
+  Assert-True -Condition ($preparedSummaryTraceMarkdown -match 'Pagination risks: 0') -Message 'Prepared-summary URL pipeline markdown should include pagination risk count.'
   $preparedSummaryCleanedReport = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
   Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
   $results.Add('build-report-from-url prepared summary OK') | Out-Null
@@ -2620,6 +2629,11 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Feishu wrapper summary should expose buildMetadataInputMode=path from the downstream build summary.'
   Assert-True -Condition ([string]$feishuBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Feishu wrapper summary should expose buildRequirementsInputMode=path from the downstream build summary.'
   Assert-True -Condition ([string]$feishuBuildSummary.buildImageInputMode -eq 'specs-path') -Message 'Feishu wrapper summary should expose buildImageInputMode=specs-path from the downstream build summary.'
+  Assert-True -Condition ([bool]$feishuBuildSummary.validationPassed) -Message 'Feishu wrapper summary should expose validationPassed from the downstream build summary.'
+  Assert-True -Condition ([int]$feishuBuildSummary.validationWarningCount -eq 0) -Message 'Feishu wrapper summary should expose zero validation warnings for the passing fixture.'
+  Assert-True -Condition ([int]$feishuBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Feishu wrapper summary should expose zero pagination risks for the passing fixture.'
+  Assert-True -Condition ([int]$feishuBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Feishu wrapper summary should expose zero structural issues for the passing fixture.'
+  Assert-True -Condition (@($feishuBuildSummary.validationWarningCodes).Count -eq 0) -Message 'Feishu wrapper summary should expose an empty validationWarningCodes array for the passing fixture.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.pipelineTracePath)) -Message 'Feishu wrapper summary should point to a pipeline-trace JSON.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.pipelineTraceMarkdownPath)) -Message 'Feishu wrapper summary should point to a pipeline-trace markdown file.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuBuildSummary.imagePlanPath)) -Message 'Feishu wrapper summary image-plan path does not exist.'
@@ -2632,9 +2646,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuPipelineTrace.wrapper.mode -eq 'local-report') -Message 'Feishu pipeline trace should keep wrapper.mode=local-report.'
   Assert-True -Condition ([string]$feishuPipelineTrace.wrapper.generationMode -eq 'none') -Message 'Feishu pipeline trace should keep wrapper.generationMode=none.'
   Assert-True -Condition ([string]$feishuPipelineTrace.build.requirementsInputMode -eq 'path') -Message 'Feishu pipeline trace should keep build.requirementsInputMode=path.'
+  Assert-True -Condition ([bool]$feishuPipelineTrace.build.validationPassed) -Message 'Feishu pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$feishuPipelineTrace.build.validationPaginationRiskCount -eq 0) -Message 'Feishu pipeline trace should expose zero pagination risks.'
   $feishuPipelineTraceMarkdown = Get-Content -LiteralPath ([string]$feishuBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Mode: local-report') -Message 'Feishu pipeline markdown should include wrapper mode.'
   Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Requirements input mode: path') -Message 'Feishu pipeline markdown should include build requirements input mode.'
+  Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Validation passed: True') -Message 'Feishu pipeline markdown should include validation status.'
+  Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Pagination risks: 0') -Message 'Feishu pipeline markdown should include pagination risk count.'
   $results.Add('Feishu wrapper pipeline OK') | Out-Null
 
   $originalWrapperAgentsHome = $env:AGENTS_HOME

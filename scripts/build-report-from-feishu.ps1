@@ -501,6 +501,18 @@ $buildImageInputMode = if ($null -ne $innerSummary -and $innerSummary.PSObject.P
 } else {
   $null
 }
+$innerValidationErrorCodes = @()
+$innerValidationWarningCodes = @()
+$innerValidationWarningSummary = @()
+if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationErrorCodes") {
+  $innerValidationErrorCodes = @($innerSummary.validationErrorCodes)
+}
+if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationWarningCodes") {
+  $innerValidationWarningCodes = @($innerSummary.validationWarningCodes)
+}
+if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationWarningSummary") {
+  $innerValidationWarningSummary = @($innerSummary.validationWarningSummary)
+}
 $pipelineTracePath = Join-Path $resolvedOutputDir "pipeline-trace.json"
 $pipelineTraceMarkdownPath = Join-Path $resolvedOutputDir "pipeline-trace.md"
 $pipelineTrace = [pscustomobject]@{
@@ -521,6 +533,13 @@ $pipelineTrace = [pscustomobject]@{
     imagePlanPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$innerSummary.imagePlanPath } else { $null })
     layoutCheckPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$innerSummary.layoutCheckPath } else { $null })
     layoutCheckPassed = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $innerSummary.layoutCheckPassed } else { $null })
+    validationPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPath") { [string]$innerSummary.validationPath } else { $null })
+    validationPassed = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPassed") { $innerSummary.validationPassed } else { $null })
+    validationErrorCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationErrorCount") { $innerSummary.validationErrorCount } else { $null })
+    validationWarningCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationWarningCount") { $innerSummary.validationWarningCount } else { $null })
+    validationPaginationRiskCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPaginationRiskCount") { $innerSummary.validationPaginationRiskCount } else { $null })
+    validationStructuralIssueCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $innerSummary.validationStructuralIssueCount } else { $null })
+    validationWarningCodes = $innerValidationWarningCodes
   }
   artifacts = [pscustomobject]@{
     reportPath = $resolvedCopiedReportPath
@@ -530,7 +549,7 @@ $pipelineTrace = [pscustomobject]@{
     preGeneratedReportPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "preGeneratedReportPath" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.preGeneratedReportPath)) { [string]$innerSummary.preGeneratedReportPath } else { $resolvedPreGeneratedReportPath })
   }
 }
-[System.IO.File]::WriteAllText($pipelineTracePath, ($pipelineTrace | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText($pipelineTracePath, ($pipelineTrace | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
 $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("# Pipeline Trace")
 [void]$pipelineTraceMarkdownLines.Add("")
@@ -553,6 +572,10 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("- Image plan path: $($pipelineTrace.build.imagePlanPath)")
 [void]$pipelineTraceMarkdownLines.Add("- Layout check path: $($pipelineTrace.build.layoutCheckPath)")
 [void]$pipelineTraceMarkdownLines.Add("- Layout check passed: $($pipelineTrace.build.layoutCheckPassed)")
+[void]$pipelineTraceMarkdownLines.Add("- Validation path: $($pipelineTrace.build.validationPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Validation passed: $($pipelineTrace.build.validationPassed)")
+[void]$pipelineTraceMarkdownLines.Add("- Validation warnings: $($pipelineTrace.build.validationWarningCount)")
+[void]$pipelineTraceMarkdownLines.Add("- Pagination risks: $($pipelineTrace.build.validationPaginationRiskCount)")
 [void]$pipelineTraceMarkdownLines.Add("")
 [void]$pipelineTraceMarkdownLines.Add("## Artifacts")
 [void]$pipelineTraceMarkdownLines.Add("")
@@ -612,13 +635,24 @@ $wrapperSummary = [pscustomobject]@{
   layoutCheckMessage = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckMessage") { [string]$innerSummary.layoutCheckMessage } else { $null })
   layoutCheckErrorCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckErrorCount") { $innerSummary.layoutCheckErrorCount } else { $null })
   layoutCheckWarningCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckWarningCount") { $innerSummary.layoutCheckWarningCount } else { $null })
+  validationPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPath") { [string]$innerSummary.validationPath } else { $null })
+  validationPassed = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPassed") { $innerSummary.validationPassed } else { $null })
+  validationErrorCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationErrorCount") { $innerSummary.validationErrorCount } else { $null })
+  validationWarningCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationWarningCount") { $innerSummary.validationWarningCount } else { $null })
+  validationPaginationRiskCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPaginationRiskCount") { $innerSummary.validationPaginationRiskCount } else { $null })
+  validationStructuralIssueCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $innerSummary.validationStructuralIssueCount } else { $null })
+  validationFindingCountsByCode = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationFindingCountsByCode") { $innerSummary.validationFindingCountsByCode } else { $null })
+  validationFindingCountsByCategory = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationFindingCountsByCategory") { $innerSummary.validationFindingCountsByCategory } else { $null })
+  validationErrorCodes = $innerValidationErrorCodes
+  validationWarningCodes = $innerValidationWarningCodes
+  validationWarningSummary = $innerValidationWarningSummary
   referenceUrls = $referenceUrlList
   referenceTextPaths = $referenceTextPathList
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
   preGeneratedReportPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "preGeneratedReportPath" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.preGeneratedReportPath)) { [string]$innerSummary.preGeneratedReportPath } else { $resolvedPreGeneratedReportPath })
 }
-[System.IO.File]::WriteAllText($resolvedSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText($resolvedSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
 
 if (-not [string]::IsNullOrWhiteSpace($resolvedCopiedReportPath)) {
   Write-Output ("Report path: {0}" -f $resolvedCopiedReportPath)
