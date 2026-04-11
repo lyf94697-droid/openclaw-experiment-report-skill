@@ -24,6 +24,31 @@ function Assert-True {
   }
 }
 
+function Assert-ValidationPaginationRiskSummary {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Summary,
+
+    [Parameter(Mandatory = $true)]
+    [string]$MessagePrefix
+  )
+
+  $warningCodes = @($Summary.validationWarningCodes | ForEach-Object { [string]$_ })
+  $warningSummaryCodes = @($Summary.validationWarningSummary | ForEach-Object { [string]$_.code })
+
+  Assert-True -Condition ([bool]$Summary.validationPassed) -Message "$MessagePrefix should keep validationPassed=true when only pagination warnings are present."
+  Assert-True -Condition ([int]$Summary.validationErrorCount -eq 0) -Message "$MessagePrefix should not report validation errors for the pagination-warning fixture."
+  Assert-True -Condition ([int]$Summary.validationStructuralIssueCount -eq 0) -Message "$MessagePrefix should not report structural issues for the pagination-warning fixture."
+  Assert-True -Condition ([int]$Summary.validationWarningCount -ge 3) -Message "$MessagePrefix should report pagination warning findings."
+  Assert-True -Condition ([int]$Summary.validationPaginationRiskCount -ge 3) -Message "$MessagePrefix should report pagination risk findings."
+  Assert-True -Condition ($warningCodes -contains 'pagination-risk-long-section') -Message "$MessagePrefix should expose pagination-risk-long-section."
+  Assert-True -Condition ($warningCodes -contains 'pagination-risk-dense-section-block') -Message "$MessagePrefix should expose pagination-risk-dense-section-block."
+  Assert-True -Condition ($warningCodes -contains 'pagination-risk-figure-cluster') -Message "$MessagePrefix should expose pagination-risk-figure-cluster."
+  Assert-True -Condition ($warningSummaryCodes -contains 'pagination-risk-long-section') -Message "$MessagePrefix should include pagination-risk-long-section in validationWarningSummary."
+  Assert-True -Condition ($warningSummaryCodes -contains 'pagination-risk-dense-section-block') -Message "$MessagePrefix should include pagination-risk-dense-section-block in validationWarningSummary."
+  Assert-True -Condition ($warningSummaryCodes -contains 'pagination-risk-figure-cluster') -Message "$MessagePrefix should include pagination-risk-figure-cluster in validationWarningSummary."
+}
+
 function Normalize-OutlineForComparison {
   param(
     [Parameter(Mandatory = $true)]
@@ -2520,6 +2545,78 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
   $results.Add('build-report pipeline OK') | Out-Null
 
+  $paginationRiskDenseResult = ((@(
+        '实验结果表明主机 A 与主机 B 的地址配置、连通测试、ARP 缓存和截图记录均保持一致，图1 展示主机 A 的 ipconfig 输出，图2 展示主机 B 的 ping 测试输出，图3 展示 ARP 缓存核对过程，因此本段故意保持为较长密集文本以触发分页风险 warning。'
+      ) * 18) -join '')
+  $paginationRiskReportPath = Join-Path $tempRoot 'build-pagination-risk-report.md'
+  @(
+    '计算机网络实验报告',
+    '',
+    '课程名称：计算机网络',
+    '实验名称：局域网搭建与常用 DOS 命令使用',
+    '',
+    '一、实验目的',
+    '本实验的目的是掌握局域网中静态地址配置、基础连通性检查和 DOS 网络命令使用方法，理解地址规划、命令输出和通信结果之间的对应关系。',
+    '通过记录 ipconfig、ping 和 arp 等命令结果，可以把网络配置过程与验证结论连接起来，形成可复查的实验证据。',
+    '',
+    '二、实验环境',
+    '实验环境包括 Windows 11 主机、两台 Windows Server 虚拟机、VMware 虚拟网络和 DOS 命令窗口，虚拟机均配置在同一网段并保持固定地址。',
+    '实验前确认网络适配器启用、虚拟网络模式一致、主机名和 IP 地址记录清晰，避免由于环境差异影响连通性判断。',
+    '',
+    '三、实验原理或任务要求',
+    '同一局域网内的主机需要具备一致的网络号和正确的子网掩码，通信过程中可以通过 ICMP 回显和 ARP 地址解析观察链路是否正常。',
+    '任务要求依次完成地址配置、ipconfig 参数检查、ping 连通验证和 arp 缓存查看，并结合输出解释局域网通信是否建立。',
+    '',
+    '四、实验步骤',
+    '先为主机 A 配置 192.168.10.11 地址，为主机 B 配置 192.168.10.12 地址，并确认两台主机子网掩码均为 255.255.255.0。',
+    '随后在两台主机上分别执行 ipconfig、ping 和 arp -a 命令，记录关键输出并对比地址、网关、连通状态和缓存项是否符合预期。',
+    '',
+    '五、实验结果',
+    $paginationRiskDenseResult,
+    '',
+    '六、问题分析',
+    '如果 ping 不通，应优先检查 IP 地址、子网掩码、虚拟网卡模式和防火墙策略，再结合 arp 输出判断是否已经完成地址解析。',
+    '如果只观察单次 ping 结果而忽略 ipconfig 和 arp 信息，可能遗漏网卡选错、地址冲突或缓存未更新等问题。',
+    '',
+    '七、实验总结',
+    '本次实验完成了局域网搭建和常用 DOS 命令验证，能够从地址配置、连通测试和缓存记录三个角度说明实验结果。',
+    '通过把命令输出与配置步骤逐项对应，进一步理解了局域网通信中地址规划、协议验证和故障定位之间的关系。'
+  ) | Set-Content -LiteralPath $paginationRiskReportPath -Encoding UTF8
+  $paginationRiskRequirements = [ordered]@{
+    reportProfileName = 'experiment-report'
+    courseName = '计算机网络'
+    experimentName = '局域网搭建与常用 DOS 命令使用'
+    minChars = 700
+    sections = @(
+      [ordered]@{ name = '实验目的'; aliases = @('实验目的'); minChars = 30 },
+      [ordered]@{ name = '实验环境'; aliases = @('实验环境', '实验设备与环境'); minChars = 30 },
+      [ordered]@{ name = '实验原理或任务要求'; aliases = @('实验原理或任务要求', '实验原理', '任务要求'); minChars = 30 },
+      [ordered]@{ name = '实验步骤'; aliases = @('实验步骤', '实验过程'); minChars = 60 },
+      [ordered]@{ name = '实验结果'; aliases = @('实验结果', '实验现象与结果记录'); minChars = 50 },
+      [ordered]@{ name = '问题分析'; aliases = @('问题分析', '结果分析'); minChars = 30 },
+      [ordered]@{ name = '实验总结'; aliases = @('实验总结', '总结与思考'); minChars = 30 }
+    )
+    forbiddenPatterns = @('TODO', '待补充', '自行填写')
+  }
+  $paginationRiskRequirementsJson = $paginationRiskRequirements | ConvertTo-Json -Depth 8
+
+  $buildReportWarningOutputDir = Join-Path $tempRoot 'build-report-warning-output'
+  & (Join-Path $repoRoot 'scripts\build-report.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $paginationRiskReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -ImageSpecsPath $rowImageSpecsPath `
+    -RequirementsJson $paginationRiskRequirementsJson `
+    -OutputDir $buildReportWarningOutputDir `
+    -StyleFinalDocx `
+    -StyleProfilePath $buildStyleProfilePath | Out-Null
+  $buildReportWarningSummary = (Get-Content -LiteralPath (Join-Path $buildReportWarningOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-ValidationPaginationRiskSummary -Summary $buildReportWarningSummary -MessagePrefix 'build-report warning summary'
+  Assert-True -Condition ([string]$buildReportWarningSummary.requirementsInputMode -eq 'inline') -Message 'build-report warning summary should record requirementsInputMode=inline.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportWarningSummary.validationPath)) -Message 'build-report warning summary should include a readable validation path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportWarningSummary.finalDocxPath)) -Message 'build-report warning summary final docx path should exist.'
+  $results.Add('build-report validation warning propagation OK') | Out-Null
+
   $buildReportInlineOutputDir = Join-Path $tempRoot 'build-report-inline-output'
   $buildReportInlineMetadataJson = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') -Raw -Encoding UTF8
   $buildReportInlineRequirementsJson = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') -Raw -Encoding UTF8
@@ -2632,6 +2729,39 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
   $results.Add('build-report-from-url prepared summary OK') | Out-Null
 
+  $urlWarningOutputDir = Join-Path $tempRoot 'url-warning-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $sampleDocx `
+    -PromptText '/experiment-report 生成一份局域网搭建实验报告。' `
+    -CourseName '计算机网络' `
+    -ExperimentName '局域网搭建与常用 DOS 命令使用' `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -ImageSpecsPath $rowImageSpecsPath `
+    -RequirementsJson $paginationRiskRequirementsJson `
+    -OutputDir $urlWarningOutputDir `
+    -StyleProfile auto `
+    -StyleProfilePath $buildStyleProfilePath `
+    -PreGeneratedReportPath $paginationRiskReportPath `
+    -SkipSessionReset | Out-Null
+  $urlWarningSummaryPath = Join-Path $urlWarningOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $urlWarningSummaryPath) -Message 'URL warning wrapper did not create the wrapper summary.'
+  $urlWarningSummary = (Get-Content -LiteralPath $urlWarningSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-ValidationPaginationRiskSummary -Summary $urlWarningSummary -MessagePrefix 'URL warning wrapper summary'
+  Assert-True -Condition ([string]$urlWarningSummary.generationMode -eq 'replay') -Message 'URL warning wrapper should use replay generation mode.'
+  Assert-True -Condition ([string]$urlWarningSummary.buildRequirementsInputMode -eq 'inline') -Message 'URL warning wrapper should expose buildRequirementsInputMode=inline.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$urlWarningSummary.pipelineTracePath)) -Message 'URL warning wrapper should create a pipeline trace JSON.'
+  $urlWarningTrace = (Get-Content -LiteralPath ([string]$urlWarningSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  $urlWarningTraceCodes = @($urlWarningTrace.build.validationWarningCodes | ForEach-Object { [string]$_ })
+  Assert-True -Condition ([bool]$urlWarningTrace.build.validationPassed) -Message 'URL warning pipeline trace should expose validationPassed=true.'
+  Assert-True -Condition ([int]$urlWarningTrace.build.validationPaginationRiskCount -ge 3) -Message 'URL warning pipeline trace should expose pagination risks.'
+  Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-long-section') -Message 'URL warning pipeline trace should expose pagination-risk-long-section.'
+  Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-dense-section-block') -Message 'URL warning pipeline trace should expose pagination-risk-dense-section-block.'
+  Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-figure-cluster') -Message 'URL warning pipeline trace should expose pagination-risk-figure-cluster.'
+  $urlWarningTraceMarkdown = Get-Content -LiteralPath ([string]$urlWarningSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($urlWarningTraceMarkdown -match 'Validation passed: True') -Message 'URL warning pipeline markdown should include validation status.'
+  Assert-True -Condition ($urlWarningTraceMarkdown -match ("Pagination risks: {0}" -f [int]$urlWarningSummary.validationPaginationRiskCount)) -Message 'URL warning pipeline markdown should include pagination risk count.'
+  $results.Add('build-report-from-url validation warning propagation OK') | Out-Null
+
   $guidedReplayOutputDir = Join-Path $tempRoot 'guided-replay-e2e-output'
   & (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1') `
     -OutputDir $guidedReplayOutputDir `
@@ -2702,6 +2832,35 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Validation passed: True') -Message 'Feishu pipeline markdown should include validation status.'
   Assert-True -Condition ($feishuPipelineTraceMarkdown -match 'Pagination risks: 0') -Message 'Feishu pipeline markdown should include pagination risk count.'
   $results.Add('Feishu wrapper pipeline OK') | Out-Null
+
+  $feishuWarningOutputDir = Join-Path $tempRoot 'feishu-warning-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
+    -TemplatePath $sampleDocx `
+    -ReportPath $paginationRiskReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -ImageSpecsPath $rowImageSpecsPath `
+    -RequirementsJson $paginationRiskRequirementsJson `
+    -OutputDir $feishuWarningOutputDir `
+    -StyleProfile auto `
+    -StyleProfilePath $buildStyleProfilePath | Out-Null
+  $feishuWarningSummaryPath = Join-Path $feishuWarningOutputDir 'feishu-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $feishuWarningSummaryPath) -Message 'Feishu warning wrapper did not create the wrapper summary.'
+  $feishuWarningSummary = (Get-Content -LiteralPath $feishuWarningSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-ValidationPaginationRiskSummary -Summary $feishuWarningSummary -MessagePrefix 'Feishu warning wrapper summary'
+  Assert-True -Condition ([string]$feishuWarningSummary.mode -eq 'local-report') -Message 'Feishu warning wrapper should use local-report mode.'
+  Assert-True -Condition ([string]$feishuWarningSummary.buildRequirementsInputMode -eq 'inline') -Message 'Feishu warning wrapper should expose buildRequirementsInputMode=inline.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuWarningSummary.pipelineTracePath)) -Message 'Feishu warning wrapper should create a pipeline trace JSON.'
+  $feishuWarningTrace = (Get-Content -LiteralPath ([string]$feishuWarningSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  $feishuWarningTraceCodes = @($feishuWarningTrace.build.validationWarningCodes | ForEach-Object { [string]$_ })
+  Assert-True -Condition ([bool]$feishuWarningTrace.build.validationPassed) -Message 'Feishu warning pipeline trace should expose validationPassed=true.'
+  Assert-True -Condition ([int]$feishuWarningTrace.build.validationPaginationRiskCount -ge 3) -Message 'Feishu warning pipeline trace should expose pagination risks.'
+  Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-long-section') -Message 'Feishu warning pipeline trace should expose pagination-risk-long-section.'
+  Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-dense-section-block') -Message 'Feishu warning pipeline trace should expose pagination-risk-dense-section-block.'
+  Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-figure-cluster') -Message 'Feishu warning pipeline trace should expose pagination-risk-figure-cluster.'
+  $feishuWarningTraceMarkdown = Get-Content -LiteralPath ([string]$feishuWarningSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($feishuWarningTraceMarkdown -match 'Validation passed: True') -Message 'Feishu warning pipeline markdown should include validation status.'
+  Assert-True -Condition ($feishuWarningTraceMarkdown -match ("Pagination risks: {0}" -f [int]$feishuWarningSummary.validationPaginationRiskCount)) -Message 'Feishu warning pipeline markdown should include pagination risk count.'
+  $results.Add('Feishu wrapper validation warning propagation OK') | Out-Null
 
   $originalWrapperAgentsHome = $env:AGENTS_HOME
   try {
