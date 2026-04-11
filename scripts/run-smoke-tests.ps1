@@ -1081,7 +1081,7 @@ arp -a
   $results.Add('report validation OK') | Out-Null
 
   $experimentDenseResults = ((@(
-        '实验结果表明网络参数检查、ping 连通验证和 arp 缓存比对保持一致，交换机链路状态与主机地址配置保持稳定，因此可以持续确认局域网搭建过程满足实验目标并具备重复验证条件。'
+        '实验结果表明网络参数检查、ping 连通验证和 arp 缓存比对保持一致，交换机链路状态与主机地址配置保持稳定，因此可以持续确认局域网搭建过程满足实验目标并具备重复验证条件，相关截图见图1、图2和图3。'
       ) * 18) -join '')
   $experimentStructureRiskReportPath = Join-Path $tempRoot 'experiment-structure-risk-report.md'
   @(
@@ -1119,8 +1119,10 @@ arp -a
   Assert-True -Condition ($experimentStructureRiskCodes -contains 'duplicate-section-heading') -Message 'Experiment structural-risk fixture should report duplicate-section-heading.'
   Assert-True -Condition ($experimentStructureRiskCodes -contains 'section-order-anomaly') -Message 'Experiment structural-risk fixture should report section-order-anomaly.'
   Assert-True -Condition ($experimentStructureRiskCodes -contains 'placeholder-only-section') -Message 'Experiment structural-risk fixture should report placeholder-only-section.'
-  Assert-True -Condition (([int]$experimentStructureRiskValidation.summary.paginationRiskCount) -ge 1) -Message 'Experiment structural-risk fixture should surface at least one pagination risk warning.'
+  Assert-True -Condition (([int]$experimentStructureRiskValidation.summary.paginationRiskCount) -ge 3) -Message 'Experiment structural-risk fixture should surface pagination risk warnings.'
+  Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-long-section') -Message 'Experiment structural-risk fixture should report pagination-risk-long-section.'
   Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Experiment structural-risk fixture should report pagination-risk-dense-section-block.'
+  Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Experiment structural-risk fixture should report pagination-risk-figure-cluster.'
   $results.Add('experiment structural validation OK') | Out-Null
 
   $referenceTextPath = Join-Path $tempRoot 'tutorial-reference.txt'
@@ -1677,6 +1679,52 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([bool]$internshipValidation.passed) -Message 'Internship report validation should pass for the internship profile.'
   Assert-True -Condition ([string]$internshipValidation.reportProfileName -eq 'internship-report') -Message 'Internship report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$internshipValidation.summary.sectionCount -ge 7) -Message 'Internship report validation did not load the expected section rules.'
+
+  $internshipDenseUnit = ((@(
+        '实习单位的项目协作流程覆盖需求评审、接口联调、测试验收和缺陷回归，导师要求每天同步进度并把关键页面截图整理为图1、图2和图3，因此这一节故意保持长段落以触发分页风险检测。'
+      ) * 18) -join '')
+  $internshipStructureRiskReportPath = Join-Path $tempRoot 'internship-structure-risk-report.md'
+  @(
+    '专业实习报告',
+    '',
+    '专业名称：软件工程',
+    '实习项目：企业门户管理后台开发',
+    '',
+    '一、实习目标',
+    '本次实习目标是熟悉企业项目中的需求拆解、接口联调和缺陷跟踪流程，并把课堂学习的前端开发知识迁移到真实后台系统。开展实习前还需要明确交付边界、沟通节奏和代码提交规范。',
+    '',
+    '二、实习单位',
+    $internshipDenseUnit,
+    '',
+    '五、工作成果',
+    '阶段成果包括完成公告管理页面、操作日志筛选和权限菜单配置的若干改造，并配合测试同学复现和关闭了多条缺陷。相关工作也沉淀为交接说明，便于后续迭代继续维护。',
+    '',
+    '三、岗位职责',
+    '岗位职责包括根据任务单完成页面开发、接口字段联调、异常提示处理和代码评审修改，同时需要在例会上同步进展并记录待解决风险。',
+    '',
+    '六、遇到的问题与改进',
+    '',
+    '七、实习体会',
+    '__________',
+    '',
+    '八、实习目标',
+    '重复标题段落仅用于触发结构校验。'
+  ) | Set-Content -LiteralPath $internshipStructureRiskReportPath -Encoding UTF8
+  $internshipStructureRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $internshipStructureRiskReportPath -ReportProfileName 'internship-report' -Format json | Out-String) | ConvertFrom-Json
+  $internshipStructureRiskCodes = @($internshipStructureRiskValidation.findings | ForEach-Object { [string]$_.code })
+  $internshipStructureRiskWarningCodes = @($internshipStructureRiskValidation.summary.warningCodes)
+  Assert-True -Condition (-not [bool]$internshipStructureRiskValidation.passed) -Message 'Internship structural-risk fixture should not pass validation.'
+  Assert-True -Condition ([string]$internshipStructureRiskValidation.reportProfileName -eq 'internship-report') -Message 'Internship structural-risk fixture should keep the internship profile.'
+  Assert-True -Condition ($internshipStructureRiskCodes -contains 'missing-profile-required-heading') -Message 'Internship structural-risk fixture should report missing-profile-required-heading.'
+  Assert-True -Condition ($internshipStructureRiskCodes -contains 'duplicate-section-heading') -Message 'Internship structural-risk fixture should report duplicate-section-heading.'
+  Assert-True -Condition ($internshipStructureRiskCodes -contains 'section-order-anomaly') -Message 'Internship structural-risk fixture should report section-order-anomaly.'
+  Assert-True -Condition ($internshipStructureRiskCodes -contains 'empty-section') -Message 'Internship structural-risk fixture should report empty-section.'
+  Assert-True -Condition ($internshipStructureRiskCodes -contains 'placeholder-only-section') -Message 'Internship structural-risk fixture should report placeholder-only-section.'
+  Assert-True -Condition (([int]$internshipStructureRiskValidation.summary.paginationRiskCount) -ge 3) -Message 'Internship structural-risk fixture should surface pagination risk warnings.'
+  Assert-True -Condition ($internshipStructureRiskWarningCodes -contains 'pagination-risk-long-section') -Message 'Internship structural-risk fixture should report pagination-risk-long-section.'
+  Assert-True -Condition ($internshipStructureRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Internship structural-risk fixture should report pagination-risk-dense-section-block.'
+  Assert-True -Condition ($internshipStructureRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Internship structural-risk fixture should report pagination-risk-figure-cluster.'
+  $results.Add('internship structural validation OK') | Out-Null
 
   $internshipTemplateDocx = Join-Path $tempRoot 'internship-template.docx'
   New-InternshipTemplateDocx -Path $internshipTemplateDocx

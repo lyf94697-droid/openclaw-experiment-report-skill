@@ -25,6 +25,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Improved the final docx style formatter so body table rows can flow more naturally in common report templates instead of preserving awkward row-splitting constraints.
 - Improved direct-chat image handling so OpenClaw-staged relative attachment paths such as `media/inbound/example.png` can resolve into the final docx image pipeline.
 - Propagated structural validation and pagination-risk summaries through URL and Feishu wrapper outputs.
+- Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 
 ### Fixed
 
