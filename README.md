@@ -77,6 +77,52 @@
 - validation 从“检查有没有章节”扩展到 profile-specific structural validation，包括缺必需章节、章节顺序异常、重复标题、空节、占位符节、过短章节和分页风险 warning
 - 现阶段仍然优先服务学校报告类文档，不急着扩到完全自由格式的周报、月报或项目文档
 
+## Validation 与风险输出
+
+`validate-report-draft.ps1`、`build-report.ps1`、`build-report-from-url.ps1` 和 `build-report-from-feishu.ps1` 现在都会把结构校验和分页风险写进 machine-readable JSON，方便自动化判断报告是否能继续进入模板填充和交付检查。
+
+主要输出文件：
+
+| 文件 | 作用 |
+| --- | --- |
+| `validation.json` | `validate-report-draft.ps1` 的完整校验结果，包含章节命中、finding 列表和汇总计数 |
+| `summary.json` | `build-report.ps1` 的构建摘要，会透出 validation、layout check、image plan 和最终 docx 路径 |
+| `url-build-summary.json` | URL wrapper 摘要，会透出下游 build validation/risk 汇总 |
+| `feishu-build-summary.json` | Feishu/local wrapper 摘要，会透出下游 build validation/risk 汇总 |
+| `pipeline-trace.json` / `pipeline-trace.md` | wrapper 级调试视图，聚合 generation mode、input mode、validation 状态和关键产物路径 |
+
+常用字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `validationPassed` | 没有 error 时为 `true`；pagination risk 目前是 warning，不会单独导致失败 |
+| `validationErrorCount` / `validationWarningCount` | validation finding 的 error / warning 数量 |
+| `validationPaginationRiskCount` | `category = pagination` 的风险 warning 数量 |
+| `validationStructuralIssueCount` | `category = structure` 的结构问题数量 |
+| `validationErrorCodes` / `validationWarningCodes` | 去重后的机器可读 code 列表 |
+| `validationWarningSummary` | warning 的轻量摘要，包含 `severity`、`code`、`category`、`message` |
+| `validationFindingCountsByCode` / `validationFindingCountsByCategory` | 按 code 和 category 聚合的计数表 |
+
+当前结构校验 code：
+
+| Code | Severity | 含义 |
+| --- | --- | --- |
+| `missing-profile-required-heading` | error | 使用内置或 profile-backed 规则时，缺少 profile 要求的章节标题 |
+| `missing-required-section` | error | 使用外部 requirements 且没有 profile 标记时，缺少要求章节 |
+| `duplicate-section-heading` | error | 同一章节标题重复出现 |
+| `section-order-anomaly` | error | 章节出现顺序和 profile / requirements 期望顺序不一致 |
+| `empty-section` | error | 章节存在但没有正文内容 |
+| `placeholder-only-section` | error | 章节正文只有占位符，例如 `__________`、`TODO`、`placeholder` |
+| `short-section` | error | 章节正文低于该章节的 `minChars` 要求 |
+
+当前分页风险 code：
+
+| Code | Severity | 含义 |
+| --- | --- | --- |
+| `pagination-risk-long-section` | warning | 单个章节正文较长，进入 Word/WPS 模板后更容易跨页 |
+| `pagination-risk-dense-section-block` | warning | 单个章节文本密集、段落数少，分页时容易形成大块断裂 |
+| `pagination-risk-figure-cluster` | warning | 单个章节引用较多图片，图片和图注可能造成分页压力 |
+
 ## 快速开始
 
 ### 1. 安装 skill

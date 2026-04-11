@@ -35,9 +35,16 @@ Priority work:
 
 - integrate image-placement planning into the main wrappers instead of exposing it only as a lower-level script option
 - improve template compatibility diagnostics and explain why a template did or did not fit automatic filling rules
-- strengthen pagination and layout risk checks for grouped images, especially WPS-sensitive cases
+- keep strengthening pagination and layout risk checks for grouped images, especially WPS-sensitive cases
 - keep expanding regression fixtures for mixed cover/body templates, grouped screenshots, and section-end image insertion
 - move more hardcoded experiment-report rules into explicit profile metadata
+
+Implemented stabilization baseline:
+
+- profile-specific structural validation now reports machine-readable finding codes for missing required headings, duplicate headings, section-order anomalies, empty sections, placeholder-only sections, and short sections
+- pagination-risk warnings now report machine-readable codes for long sections, dense section blocks, and figure-heavy sections
+- `build-report.ps1`, `build-report-from-url.ps1`, and `build-report-from-feishu.ps1` now propagate validation and pagination-risk summaries into their summary JSON files and pipeline traces
+- smoke coverage now includes passing fixtures, structural-risk fixtures, and end-to-end pagination-warning propagation through the local build, URL wrapper, and Feishu wrapper paths
 
 Definition of done for this phase:
 
@@ -189,9 +196,9 @@ Alongside new profiles, the repository should keep investing in a few shared cap
 ### Validation And Risk Detection
 
 - richer output checks per profile
-- pagination-risk warnings
-- profile-specific structural validation
-- clearer summaries in machine-readable output files
+- configurable pagination-risk thresholds in profile metadata
+- more Word/WPS-sensitive layout heuristics for image-heavy reports
+- clearer remediation guidance in machine-readable output files
 
 ### Prompt Assets And Examples
 
