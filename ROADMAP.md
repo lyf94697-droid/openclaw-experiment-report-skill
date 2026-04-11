@@ -47,7 +47,7 @@ Definition of done for this phase:
 
 ## Phase 1: Introduce Real Document Profiles
 
-The next architectural step is to stop treating `experiment-report` as the only first-class document type.
+This phase is now partially implemented. The repository no longer treats `experiment-report` as the only first-class document type.
 
 Introduce reusable document profiles with profile-owned metadata such as:
 
@@ -59,18 +59,27 @@ Introduce reusable document profiles with profile-owned metadata such as:
 - prompt preset
 - image placement defaults
 
-Initial goal:
+Implemented baseline:
+
+- `experiment-report`
+- `course-design-report`
+- `internship-report`
+- profile-backed validation, field-map generation, image-map generation, insertion, styling, and smoke coverage
+
+Continuing goal:
 
 - keep one shared implementation pipeline
 - switch behavior by profile metadata rather than by more script-specific branching
 
-This phase is the prerequisite for healthy expansion.
+This phase remains the prerequisite for healthy expansion.
 
 ## Phase 2: Expand To The Closest Document Families
 
 The first new document types should be the ones that reuse the most of the current logic.
 
 ### 1. Course Design Reports
+
+Status: built-in profile is in place.
 
 Why first:
 
@@ -119,6 +128,8 @@ Likely profile differences:
 After the evidence-heavy document profiles are stable, the repository can move into less screenshot-centric but still structured document types.
 
 ### 4. Internship Reports
+
+Status: built-in profile is in place.
 
 Good fit because they still benefit from:
 

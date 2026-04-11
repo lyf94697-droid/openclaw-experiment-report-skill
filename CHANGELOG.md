@@ -20,6 +20,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 
 - Expanded `README.md` with a quick-start build flow, demo links, and contributor-oriented repository structure notes.
 - Expanded `README.md` with repository health notes and a future profile-driven document roadmap.
+- Clarified the GitHub-facing documentation for the expansion from experiment reports into course-design and internship report profiles.
 - Expanded smoke tests to cover the new local build entry point and required repository files.
 - Improved the final docx style formatter so body table rows can flow more naturally in common report templates instead of preserving awkward row-splitting constraints.
 - Improved direct-chat image handling so OpenClaw-staged relative attachment paths such as `media/inbound/example.png` can resolve into the final docx image pipeline.
