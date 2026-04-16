@@ -38,7 +38,11 @@ param(
 
   [string]$StyledDocxOutPath,
 
+  [string]$TemplateFrameDocxOutPath,
+
   [switch]$StyleFinalDocx,
+
+  [switch]$CreateTemplateFrameDocx,
 
   [ValidateSet("auto", "default", "compact", "school")]
   [string]$StyleProfile = "auto",
@@ -148,6 +152,7 @@ $validationPath = $null
 $filledOutlinePath = $null
 $filledWithImagesOutlinePath = $null
 $styledOutlinePath = $null
+$resolvedTemplateFrameDocxOutPath = $null
 $styleResult = $null
 $summaryPath = Join-Path $resolvedOutputDir "summary.json"
 $layoutCheckPath = Join-Path $resolvedOutputDir "layout-check.json"
@@ -315,6 +320,19 @@ $finalDocxPath = if ($null -ne $resolvedStyledDocxOutPath) {
   $resolvedFilledDocxOutPath
 }
 
+if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($TemplateFrameDocxOutPath))) {
+  $resolvedTemplateFrameDocxOutPath = if ([string]::IsNullOrWhiteSpace($TemplateFrameDocxOutPath)) {
+    Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalDocxPath)) + ".template-frame.docx")
+  } else {
+    [System.IO.Path]::GetFullPath($TemplateFrameDocxOutPath)
+  }
+  Ensure-ParentDirectory -Path $resolvedTemplateFrameDocxOutPath
+  & (Join-Path $repoRoot "scripts\convert-docx-template-frame.ps1") `
+    -DocxPath $finalDocxPath `
+    -OutPath $resolvedTemplateFrameDocxOutPath `
+    -Overwrite | Out-Null
+}
+
 $layoutCheckParams = @{
   DocxPath = $finalDocxPath
   Format = "json"
@@ -381,6 +399,7 @@ $summary = [pscustomobject]@{
   filledWithImagesOutlinePath = $filledWithImagesOutlinePath
   styledDocxPath = $resolvedStyledDocxOutPath
   styledOutlinePath = $styledOutlinePath
+  templateFrameDocxPath = $resolvedTemplateFrameDocxOutPath
   layoutCheckPath = $layoutCheckPath
   layoutCheckPassed = $(if ($null -ne $layoutCheckResult) { [bool]$layoutCheckResult.passed } else { $null })
   layoutCheckMessage = $(if ($null -ne $layoutCheckResult -and $layoutCheckResult.PSObject.Properties.Name -contains "message") { [string]$layoutCheckResult.message } else { $null })
@@ -418,6 +437,9 @@ if ($null -ne $resolvedFilledDocxWithImagesOutPath) {
 }
 if ($null -ne $resolvedStyledDocxOutPath) {
   Write-Output ("Styled docx path: {0}" -f $resolvedStyledDocxOutPath)
+}
+if ($null -ne $resolvedTemplateFrameDocxOutPath) {
+  Write-Output ("Template-frame docx path: {0}" -f $resolvedTemplateFrameDocxOutPath)
 }
 Write-Output ("Final docx path: {0}" -f $finalDocxPath)
 Write-Output ("Layout check path: {0}" -f $layoutCheckPath)

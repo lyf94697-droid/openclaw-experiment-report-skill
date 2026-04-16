@@ -102,6 +102,7 @@
 | `validationErrorCodes` / `validationWarningCodes` | 去重后的机器可读 code 列表 |
 | `validationWarningSummary` | warning 的轻量摘要，包含 `severity`、`code`、`category`、`message` |
 | `validationFindingCountsByCode` / `validationFindingCountsByCategory` | 按 code 和 category 聚合的计数表 |
+| `templateFrameDocxPath` | 可选模板边框版 `docx` 路径；普通最终稿仍保留在 `finalDocxPath` |
 
 当前结构校验 code：
 
@@ -215,6 +216,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 在教程标题或参考文本已经包含实验名称时，can omit `-ExperimentName`
 - `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
+- 如果你想额外生成保留模板表格边框的一体版，可以对 `build-report.ps1` 传 `-CreateTemplateFrameDocx`，或对 `build-report-from-url.ps1` / `build-report-from-feishu.ps1` 传 `-CreateTemplateFrameDocx`；wrapper 会把普通最终稿写到 `finalDocxPath`，把边框版写到 `templateFrameDocxPath`
 - 自动生成正文、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
 - 仓库现在内置三个 profile：`experiment-report`、`course-design-report` 和 `internship-report`；如果你要生成课程设计报告或专业实习报告，可以直接传对应的 `-ReportProfileName`
 - `build-report-from-url.ps1` 的自动 prompt 也会跟随 active report profile 调整文案，像 `课程名称` / `课题名称` 这类字段标签会直接从 profile 里取，而不再固定写成实验报告措辞

@@ -657,6 +657,7 @@ try {
       (Join-Path $repoRoot 'scripts\build-report-from-url.ps1'),
       (Join-Path $repoRoot 'scripts\check-report-profile-template-fit.ps1'),
       (Join-Path $repoRoot 'scripts\check-docx-layout.ps1'),
+      (Join-Path $repoRoot 'scripts\convert-docx-template-frame.ps1'),
       (Join-Path $repoRoot 'scripts\extract-docx-template.ps1'),
       (Join-Path $repoRoot 'scripts\fetch-csdn-article.ps1'),
       (Join-Path $repoRoot 'scripts\fetch-web-article.ps1'),
@@ -2507,12 +2508,14 @@ URL: https://example.com/network-lab
     -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') `
     -OutputDir $buildReportOutputDir `
     -StyleFinalDocx `
+    -CreateTemplateFrameDocx `
     -StyleProfilePath $buildStyleProfilePath
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'generated-field-map.json')) -Message 'build-report did not create the generated field map.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.docx')) -Message 'build-report did not create the filled docx.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'image-placement-plan.md')) -Message 'build-report did not create the image placement plan.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.docx')) -Message 'build-report did not create the image-filled docx.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.styled.docx')) -Message 'build-report did not create the styled docx.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.images.styled.template-frame.docx')) -Message 'build-report did not create the template-frame docx.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'layout-check.json')) -Message 'build-report did not create the layout check JSON.'
   $buildReportSummary = (Get-Content -LiteralPath (Join-Path $buildReportOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([bool]$buildReportSummary.validationPassed) -Message 'build-report summary reported a failed validation result.'
@@ -2532,6 +2535,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$buildReportSummary.layoutCheckMessage -match 'Layout check passed') -Message 'build-report summary is missing the readable layout-check message.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportSummary.templateFrameDocxPath)) -Message 'build-report summary is missing a readable template-frame docx path.'
+  $buildReportTemplateFrameOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path ([string]$buildReportSummary.templateFrameDocxPath) -Format markdown | Out-String
+  Assert-True -Condition ($buildReportTemplateFrameOutline -match 'Source:') -Message 'build-report template-frame docx could not be extracted.'
   Assert-True -Condition ([string]$buildReportSummary.reportProfileName -eq 'experiment-report') -Message 'build-report summary is missing the expected report profile name.'
   Assert-True -Condition ([string]$buildReportSummary.reportInputMode -eq 'path') -Message 'build-report summary should record reportInputMode=path for file-backed reports.'
   Assert-True -Condition ([string]$buildReportSummary.metadataInputMode -eq 'path') -Message 'build-report summary should record metadataInputMode=path for metadata files.'
@@ -2687,6 +2693,7 @@ URL: https://example.com/network-lab
     -ImageSpecsPath $courseDesignImageSpecsPath `
     -OutputDir $preparedSummaryBuildOutputDir `
     -StyleProfile auto `
+    -CreateTemplateFrameDocx `
     -PreGeneratedReportPath $preparedSummaryMockReportPath `
     -SkipSessionReset | Out-Null
   $preparedSummaryBuildSummaryPath = Join-Path $preparedSummaryBuildOutputDir 'url-build-summary.json'
@@ -2714,10 +2721,12 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.rawReportPath)) -Message 'Prepared-summary URL wrapper did not write the raw report file.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.cleanedReportPath)) -Message 'Prepared-summary URL wrapper did not write the cleaned report file.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.finalDocxPath)) -Message 'Prepared-summary URL wrapper final docx path does not exist.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryBuildSummary.templateFrameDocxPath)) -Message 'Prepared-summary URL wrapper template-frame docx path does not exist.'
   $preparedSummaryTrace = (Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$preparedSummaryTrace.wrapper.generationMode -eq 'replay') -Message 'Prepared-summary URL pipeline trace should keep generationMode=replay.'
   Assert-True -Condition ([string]$preparedSummaryTrace.build.reportInputMode -eq 'path') -Message 'Prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
   Assert-True -Condition ([string]$preparedSummaryTrace.build.imageInputMode -eq 'specs-path') -Message 'Prepared-summary URL pipeline trace should keep build.imageInputMode=specs-path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$preparedSummaryTrace.artifacts.templateFrameDocxPath)) -Message 'Prepared-summary URL pipeline trace should expose the copied template-frame docx.'
   Assert-True -Condition ([bool]$preparedSummaryTrace.build.validationPassed) -Message 'Prepared-summary URL pipeline trace should expose validationPassed.'
   Assert-True -Condition ([int]$preparedSummaryTrace.build.validationPaginationRiskCount -eq 0) -Message 'Prepared-summary URL pipeline trace should expose zero pagination risks.'
   $preparedSummaryTraceMarkdown = Get-Content -LiteralPath ([string]$preparedSummaryBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
@@ -2788,6 +2797,7 @@ URL: https://example.com/network-lab
     -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') `
     -OutputDir $feishuBuildOutputDir `
     -StyleProfile auto `
+    -CreateTemplateFrameDocx `
     -StyleProfilePath $buildStyleProfilePath | Out-Null
   $feishuBuildSummaryPath = Join-Path $feishuBuildOutputDir 'feishu-build-summary.json'
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummaryPath) -Message 'Feishu wrapper did not create the wrapper summary.'
@@ -2800,6 +2810,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuBuildSummary.detailLevel -eq 'full') -Message 'Feishu wrapper summary did not preserve the default full detail level.'
   Assert-True -Condition ((Split-Path -Parent $feishuBuildSummary.finalDocxPath) -eq $feishuBuildOutputDir) -Message 'Feishu wrapper should copy the final docx to the output root.'
   Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.finalDocxPath) -Message 'Feishu wrapper summary final docx path does not exist.'
+  Assert-True -Condition ((Split-Path -Parent $feishuBuildSummary.templateFrameDocxPath) -eq $feishuBuildOutputDir) -Message 'Feishu wrapper should copy the template-frame docx to the output root.'
+  Assert-True -Condition (Test-Path -LiteralPath $feishuBuildSummary.templateFrameDocxPath) -Message 'Feishu wrapper summary template-frame docx path does not exist.'
   Assert-True -Condition ([string]$feishuBuildSummary.artifactsDir -eq (Join-Path $feishuBuildOutputDir 'artifacts')) -Message 'Feishu wrapper summary is missing the expected artifacts directory.'
   Assert-True -Condition ([string]$feishuBuildSummary.reportProfileName -eq 'experiment-report') -Message 'Feishu wrapper summary is missing the expected report profile name.'
   Assert-True -Condition ([string]$feishuBuildSummary.reportProfileDisplayName -eq '实验报告') -Message 'Feishu wrapper summary is missing the expected report profile display name.'
@@ -2824,6 +2836,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$feishuPipelineTrace.wrapper.mode -eq 'local-report') -Message 'Feishu pipeline trace should keep wrapper.mode=local-report.'
   Assert-True -Condition ([string]$feishuPipelineTrace.wrapper.generationMode -eq 'none') -Message 'Feishu pipeline trace should keep wrapper.generationMode=none.'
   Assert-True -Condition ([string]$feishuPipelineTrace.build.requirementsInputMode -eq 'path') -Message 'Feishu pipeline trace should keep build.requirementsInputMode=path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuPipelineTrace.artifacts.templateFrameDocxPath)) -Message 'Feishu pipeline trace should expose the copied template-frame docx.'
   Assert-True -Condition ([bool]$feishuPipelineTrace.build.validationPassed) -Message 'Feishu pipeline trace should expose validationPassed.'
   Assert-True -Condition ([int]$feishuPipelineTrace.build.validationPaginationRiskCount -eq 0) -Message 'Feishu pipeline trace should expose zero pagination risks.'
   $feishuPipelineTraceMarkdown = Get-Content -LiteralPath ([string]$feishuBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
@@ -2941,6 +2954,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\build-report-from-url.ps1')) -Message 'Install script did not copy build-report-from-url script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\check-report-profile-template-fit.ps1')) -Message 'Install script did not copy the template-fit checker script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\check-docx-layout.ps1')) -Message 'Install script did not copy layout check script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\convert-docx-template-frame.ps1')) -Message 'Install script did not copy template-frame converter script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\fetch-web-article.ps1')) -Message 'Install script did not copy web fetch script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\format-docx-report-style.ps1')) -Message 'Install script did not copy style formatter script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-field-map.ps1')) -Message 'Install script did not copy field-map generator script.'

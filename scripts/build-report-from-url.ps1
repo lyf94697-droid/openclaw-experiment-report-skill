@@ -54,6 +54,10 @@ param(
 
   [string]$FinalDocxPath,
 
+  [string]$TemplateFrameDocxPath,
+
+  [switch]$CreateTemplateFrameDocx,
+
   [string]$OpenClawCmd = $env:OPENCLAW_CMD,
 
   [string]$BrowserProfile = $env:OPENCLAW_BROWSER_PROFILE,
@@ -246,6 +250,7 @@ $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePa
 $resolvedPreGeneratedReportPath = Resolve-AbsolutePathIfProvided -Path $PreGeneratedReportPath
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
+$resolvedTemplateFrameDocxPath = if ([string]::IsNullOrWhiteSpace($TemplateFrameDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($TemplateFrameDocxPath) }
 $inputSummaryPath = if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
   Join-Path $resolvedOutputDir "report-inputs-summary.json"
 } else {
@@ -392,6 +397,9 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
+  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+    $buildParams.CreateTemplateFrameDocx = $true
+  }
 
   & (Join-Path $repoRoot "scripts\build-report.ps1") @buildParams | Out-Null
   $buildSummaryPath = Join-Path $resolvedOutputDir "summary.json"
@@ -425,6 +433,33 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
     Copy-Item -LiteralPath $generatedFinalDocxPath -Destination $finalDocxPath -Force
   } else {
     $finalDocxPath = $generatedFinalDocxPath
+  }
+}
+
+$buildTemplateFrameDocxPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "templateFrameDocxPath") { [string]$buildSummary.templateFrameDocxPath } else { $null })
+$templateFrameDocxPath = $null
+if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+  if ([string]::IsNullOrWhiteSpace($buildTemplateFrameDocxPath) -or -not (Test-Path -LiteralPath $buildTemplateFrameDocxPath -PathType Leaf)) {
+    throw "Template-frame docx was requested, but build-report.ps1 did not produce templateFrameDocxPath."
+  }
+
+  $templateFrameDocxPath = if (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath)) {
+    $resolvedTemplateFrameDocxPath
+  } elseif (-not [string]::IsNullOrWhiteSpace($finalDocxPath)) {
+    Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalDocxPath)) + ".template-frame.docx")
+  } else {
+    throw "Template-frame docx was requested, but no final docx path is available."
+  }
+
+  $templateFrameParent = Split-Path -Parent $templateFrameDocxPath
+  if (-not [string]::IsNullOrWhiteSpace($templateFrameParent)) {
+    New-Item -ItemType Directory -Path $templateFrameParent -Force | Out-Null
+  }
+
+  if (-not [string]::Equals($buildTemplateFrameDocxPath, $templateFrameDocxPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Copy-Item -LiteralPath $buildTemplateFrameDocxPath -Destination $templateFrameDocxPath -Force
+  } else {
+    $templateFrameDocxPath = $buildTemplateFrameDocxPath
   }
 }
 
@@ -463,6 +498,7 @@ $pipelineTrace = [pscustomobject]@{
     requirementsInputMode = $buildRequirementsInputMode
     imageInputMode = $buildImageInputMode
     imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
+    templateFrameDocxPath = $buildTemplateFrameDocxPath
     layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
     layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
     validationPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPath") { [string]$buildSummary.validationPath } else { $null })
@@ -479,6 +515,7 @@ $pipelineTrace = [pscustomobject]@{
     rawReportPath = $rawReportPath
     cleanedReportPath = $cleanedReportPath
     finalDocxPath = $finalDocxPath
+    templateFrameDocxPath = $templateFrameDocxPath
     preGeneratedReportPath = $resolvedPreGeneratedReportPath
   }
 }
@@ -503,6 +540,7 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("- Requirements input mode: $buildRequirementsInputMode")
 [void]$pipelineTraceMarkdownLines.Add("- Image input mode: $buildImageInputMode")
 [void]$pipelineTraceMarkdownLines.Add("- Image plan path: $($pipelineTrace.build.imagePlanPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $buildTemplateFrameDocxPath")
 [void]$pipelineTraceMarkdownLines.Add("- Layout check path: $($pipelineTrace.build.layoutCheckPath)")
 [void]$pipelineTraceMarkdownLines.Add("- Layout check passed: $($pipelineTrace.build.layoutCheckPassed)")
 [void]$pipelineTraceMarkdownLines.Add("- Validation path: $($pipelineTrace.build.validationPath)")
@@ -517,6 +555,7 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("- Raw report path: $rawReportPath")
 [void]$pipelineTraceMarkdownLines.Add("- Cleaned report path: $cleanedReportPath")
 [void]$pipelineTraceMarkdownLines.Add("- Final docx path: $finalDocxPath")
+[void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $templateFrameDocxPath")
 [void]$pipelineTraceMarkdownLines.Add("- Pre-generated report path: $resolvedPreGeneratedReportPath")
 [System.IO.File]::WriteAllText($pipelineTraceMarkdownPath, ($pipelineTraceMarkdownLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($true)))
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
@@ -556,6 +595,7 @@ $wrapperSummary = [pscustomobject]@{
   buildMetadataInputMode = $buildMetadataInputMode
   buildRequirementsInputMode = $buildRequirementsInputMode
   buildImageInputMode = $buildImageInputMode
+  buildTemplateFrameDocxPath = $buildTemplateFrameDocxPath
   imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
   imagePlanLowConfidenceCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanLowConfidenceCount") { $buildSummary.imagePlanLowConfidenceCount } else { $null })
   imagePlanNeedsReview = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanNeedsReview") { $buildSummary.imagePlanNeedsReview } else { $null })
@@ -576,6 +616,7 @@ $wrapperSummary = [pscustomobject]@{
   validationWarningCodes = $buildValidationWarningCodes
   validationWarningSummary = $buildValidationWarningSummary
   finalDocxPath = $finalDocxPath
+  templateFrameDocxPath = $templateFrameDocxPath
 }
 [System.IO.File]::WriteAllText($wrapperSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
 
@@ -590,5 +631,8 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveRequirementsPath)) {
 }
 if (-not [string]::IsNullOrWhiteSpace($finalDocxPath)) {
   Write-Output ("Final docx path: {0}" -f $finalDocxPath)
+}
+if (-not [string]::IsNullOrWhiteSpace($templateFrameDocxPath)) {
+  Write-Output ("Template-frame docx path: {0}" -f $templateFrameDocxPath)
 }
 Write-Output ("Wrapper summary path: {0}" -f $wrapperSummaryPath)

@@ -9,6 +9,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 ### Added
 
 - Added `scripts/build-report.ps1` as a single local entry point for validation, field-map generation, template filling, image insertion, and final style formatting.
+- Added `scripts/convert-docx-template-frame.ps1` and template-frame output support for the local, URL, and Feishu build paths.
 - Added `scripts/report-defaults.ps1` so generated runs can remember the last course name and experiment name.
 - Added `CONTRIBUTING.md` with repository workflow, testing expectations, and contribution scope.
 - Added `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, and `ROADMAP.md` for GitHub-facing repository completeness.
@@ -28,6 +29,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Propagated structural validation and pagination-risk summaries through URL and Feishu wrapper outputs.
 - Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
+- Added smoke coverage for template-frame docx generation and wrapper summary propagation.
 
 ### Fixed
 

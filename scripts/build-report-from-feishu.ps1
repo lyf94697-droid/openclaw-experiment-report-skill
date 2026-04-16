@@ -61,6 +61,10 @@ param(
 
   [string]$FinalDocxPath,
 
+  [string]$TemplateFrameDocxPath,
+
+  [switch]$CreateTemplateFrameDocx,
+
   [string]$ReportOutPath,
 
   [string]$SummaryPath,
@@ -250,6 +254,7 @@ $resolvedArtifactsDir = if ([string]::IsNullOrWhiteSpace($ArtifactsDir)) {
   [System.IO.Path]::GetFullPath($ArtifactsDir)
 }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
+$resolvedTemplateFrameDocxPath = if ([string]::IsNullOrWhiteSpace($TemplateFrameDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($TemplateFrameDocxPath) }
 $resolvedReportOutPath = if ([string]::IsNullOrWhiteSpace($ReportOutPath)) { Join-Path $resolvedOutputDir "report.txt" } else { [System.IO.Path]::GetFullPath($ReportOutPath) }
 $resolvedSummaryPath = if ([string]::IsNullOrWhiteSpace($SummaryPath)) { Join-Path $resolvedOutputDir "feishu-build-summary.json" } else { [System.IO.Path]::GetFullPath($SummaryPath) }
 
@@ -259,6 +264,9 @@ Ensure-ParentDirectory -Path $resolvedReportOutPath
 Ensure-ParentDirectory -Path $resolvedSummaryPath
 if (-not [string]::IsNullOrWhiteSpace($resolvedFinalDocxPath)) {
   Ensure-ParentDirectory -Path $resolvedFinalDocxPath
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath)) {
+  Ensure-ParentDirectory -Path $resolvedTemplateFrameDocxPath
 }
 
 $resolvedImageArchiveDir = if ([string]::IsNullOrWhiteSpace($ImageArchiveDir)) {
@@ -319,6 +327,9 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   }
   if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
     $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
+  }
+  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+    $buildParams.CreateTemplateFrameDocx = $true
   }
 
   & (Join-Path $repoRoot "scripts\build-report.ps1") @buildParams | Out-Null
@@ -408,6 +419,9 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
     $buildParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
   }
+  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+    $buildParams.CreateTemplateFrameDocx = $true
+  }
 
   if ($SkipSessionReset) {
     $buildParams.SkipSessionReset = $true
@@ -442,6 +456,25 @@ Ensure-ParentDirectory -Path $resolvedFinalDocxDestination
 
 if (-not [string]::Equals($generatedFinalDocxPath, $resolvedFinalDocxDestination, [System.StringComparison]::OrdinalIgnoreCase)) {
   Copy-Item -LiteralPath $generatedFinalDocxPath -Destination $resolvedFinalDocxDestination -Force
+}
+
+$generatedTemplateFrameDocxPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "templateFrameDocxPath") { [string]$innerSummary.templateFrameDocxPath } else { $null })
+$resolvedTemplateFrameDocxDestination = $null
+if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+  if ([string]::IsNullOrWhiteSpace($generatedTemplateFrameDocxPath) -or -not (Test-Path -LiteralPath $generatedTemplateFrameDocxPath -PathType Leaf)) {
+    throw "Template-frame docx was requested, but the inner build did not produce templateFrameDocxPath."
+  }
+
+  $resolvedTemplateFrameDocxDestination = if (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath)) {
+    $resolvedTemplateFrameDocxPath
+  } else {
+    Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($resolvedFinalDocxDestination)) + ".template-frame.docx")
+  }
+  Ensure-ParentDirectory -Path $resolvedTemplateFrameDocxDestination
+
+  if (-not [string]::Equals($generatedTemplateFrameDocxPath, $resolvedTemplateFrameDocxDestination, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Copy-Item -LiteralPath $generatedTemplateFrameDocxPath -Destination $resolvedTemplateFrameDocxDestination -Force
+  }
 }
 
 $resolvedCopiedReportPath = $null
@@ -531,6 +564,7 @@ $pipelineTrace = [pscustomobject]@{
     requirementsInputMode = $buildRequirementsInputMode
     imageInputMode = $buildImageInputMode
     imagePlanPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$innerSummary.imagePlanPath } else { $null })
+    templateFrameDocxPath = $generatedTemplateFrameDocxPath
     layoutCheckPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$innerSummary.layoutCheckPath } else { $null })
     layoutCheckPassed = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $innerSummary.layoutCheckPassed } else { $null })
     validationPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPath") { [string]$innerSummary.validationPath } else { $null })
@@ -544,6 +578,7 @@ $pipelineTrace = [pscustomobject]@{
   artifacts = [pscustomobject]@{
     reportPath = $resolvedCopiedReportPath
     finalDocxPath = $resolvedFinalDocxDestination
+    templateFrameDocxPath = $resolvedTemplateFrameDocxDestination
     summaryPath = $resolvedSummaryPath
     innerSummaryPath = $innerSummaryPath
     preGeneratedReportPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "preGeneratedReportPath" -and -not [string]::IsNullOrWhiteSpace([string]$innerSummary.preGeneratedReportPath)) { [string]$innerSummary.preGeneratedReportPath } else { $resolvedPreGeneratedReportPath })
@@ -570,6 +605,7 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("- Requirements input mode: $buildRequirementsInputMode")
 [void]$pipelineTraceMarkdownLines.Add("- Image input mode: $buildImageInputMode")
 [void]$pipelineTraceMarkdownLines.Add("- Image plan path: $($pipelineTrace.build.imagePlanPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $generatedTemplateFrameDocxPath")
 [void]$pipelineTraceMarkdownLines.Add("- Layout check path: $($pipelineTrace.build.layoutCheckPath)")
 [void]$pipelineTraceMarkdownLines.Add("- Layout check passed: $($pipelineTrace.build.layoutCheckPassed)")
 [void]$pipelineTraceMarkdownLines.Add("- Validation path: $($pipelineTrace.build.validationPath)")
@@ -581,6 +617,7 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("")
 [void]$pipelineTraceMarkdownLines.Add("- Report path: $resolvedCopiedReportPath")
 [void]$pipelineTraceMarkdownLines.Add("- Final docx path: $resolvedFinalDocxDestination")
+[void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $resolvedTemplateFrameDocxDestination")
 [void]$pipelineTraceMarkdownLines.Add("- Wrapper summary path: $resolvedSummaryPath")
 [void]$pipelineTraceMarkdownLines.Add("- Inner summary path: $innerSummaryPath")
 [void]$pipelineTraceMarkdownLines.Add("- Pre-generated report path: $($pipelineTrace.artifacts.preGeneratedReportPath)")
@@ -617,6 +654,8 @@ $wrapperSummary = [pscustomobject]@{
   referenceMaxChars = $ReferenceMaxChars
   reportPath = $resolvedCopiedReportPath
   finalDocxPath = $resolvedFinalDocxDestination
+  templateFrameDocxPath = $resolvedTemplateFrameDocxDestination
+  buildTemplateFrameDocxPath = $generatedTemplateFrameDocxPath
   imageArchiveDir = $(if ($archivedImagePaths.Count -gt 0) { $resolvedImageArchiveDir } else { $null })
   archivedImagePaths = $archivedImagePaths
   summaryPath = $resolvedSummaryPath
@@ -659,4 +698,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedCopiedReportPath)) {
 }
 Write-Output ("Artifacts dir: {0}" -f $resolvedArtifactsDir)
 Write-Output ("Final docx path: {0}" -f $resolvedFinalDocxDestination)
+if (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxDestination)) {
+  Write-Output ("Template-frame docx path: {0}" -f $resolvedTemplateFrameDocxDestination)
+}
 Write-Output ("Summary path: {0}" -f $resolvedSummaryPath)

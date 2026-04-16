@@ -44,6 +44,7 @@ Implemented stabilization baseline:
 - profile-specific structural validation now reports machine-readable finding codes for missing required headings, duplicate headings, section-order anomalies, empty sections, placeholder-only sections, and short sections
 - pagination-risk warnings now report machine-readable codes for long sections, dense section blocks, and figure-heavy sections
 - `build-report.ps1`, `build-report-from-url.ps1`, and `build-report-from-feishu.ps1` now propagate validation and pagination-risk summaries into their summary JSON files and pipeline traces
+- `build-report.ps1`, `build-report-from-url.ps1`, and `build-report-from-feishu.ps1` now support optional template-frame docx delivery while keeping the normal final docx path stable
 - smoke coverage now includes passing fixtures, structural-risk fixtures, and end-to-end pagination-warning propagation through the local build, URL wrapper, and Feishu wrapper paths
 
 Definition of done for this phase:
