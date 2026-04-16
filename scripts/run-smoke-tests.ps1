@@ -687,6 +687,7 @@ try {
       (Join-Path $repoRoot 'scripts\generate-report-chat.ps1'),
       (Join-Path $repoRoot 'scripts\install-skill.ps1'),
       (Join-Path $repoRoot 'scripts\insert-docx-images.ps1'),
+      (Join-Path $repoRoot 'scripts\new-report-profile.ps1'),
       (Join-Path $repoRoot 'scripts\prepare-report-prompt.ps1'),
       (Join-Path $repoRoot 'scripts\report-defaults.ps1'),
       (Join-Path $repoRoot 'scripts\report-profiles.ps1'),
@@ -955,6 +956,28 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 5) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
+
+  $newReportProfilePath = Join-Path $tempRoot 'weekly-report.json'
+  $newReportProfileResult = (& (Join-Path $repoRoot 'scripts\new-report-profile.ps1') `
+      -Name 'weekly-report' `
+      -DisplayName '周报' `
+      -DefaultExperimentProperty '周报' `
+      -CourseNameLabel '项目名称' `
+      -TitleNameLabel '周报主题' `
+      -DateLabel '周次' `
+      -LocationLabel '工作环境' `
+      -SectionHeadings @('工作目标', '工作环境', '工作范围与依据', '完成事项', '工作结果', '问题与改进', '下周计划') `
+      -OutPath $newReportProfilePath `
+      -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$newReportProfileResult.validationPassed) -Message 'Profile scaffold generator did not validate the generated profile.'
+  Assert-True -Condition (Test-Path -LiteralPath $newReportProfilePath) -Message 'Profile scaffold generator did not create the profile JSON.'
+  $generatedWeeklyProfile = (Get-Content -LiteralPath $newReportProfilePath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$generatedWeeklyProfile.name -eq 'weekly-report') -Message 'Profile scaffold generator wrote an unexpected profile name.'
+  Assert-True -Condition ([string]$generatedWeeklyProfile.displayName -eq '周报') -Message 'Profile scaffold generator wrote an unexpected display name.'
+  Assert-True -Condition ([string]$generatedWeeklyProfile.sectionFields[3].heading -eq '完成事项') -Message 'Profile scaffold generator did not preserve the steps heading.'
+  $generatedWeeklyProfileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -ProfilePath $newReportProfilePath -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$generatedWeeklyProfileValidation.passed) -Message 'Generated weekly profile failed standalone validation.'
+  $results.Add('report profile scaffold generator OK') | Out-Null
 
   $originalInputsAgentsHome = $env:AGENTS_HOME
   try {
@@ -3131,6 +3154,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-image-map.ps1')) -Message 'Install script did not copy image-map generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-report-inputs.ps1')) -Message 'Install script did not copy report-input generation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\new-report-profile.ps1')) -Message 'Install script did not copy profile scaffold generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-defaults.ps1')) -Message 'Install script did not copy the report-defaults helper script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-profiles.ps1')) -Message 'Install script did not copy the report-profiles helper script.'

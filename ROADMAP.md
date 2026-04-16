@@ -74,6 +74,7 @@ Implemented baseline:
 - `internship-report`
 - `software-test-report`
 - `deployment-report`
+- `scripts/new-report-profile.ps1` now scaffolds schema-valid report profile drafts
 - profile JSON now has schema-backed validation and smoke coverage
 - profile-backed validation, field-map generation, image-map generation, insertion, styling, and smoke coverage
 
