@@ -609,6 +609,22 @@ function Test-HasUtf8Bom {
   return $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
 }
 
+function Test-HasNonAsciiText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $text = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+  foreach ($character in $text.ToCharArray()) {
+    if ([int][char]$character -gt 127) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openclaw-exp-report-smoke-" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
@@ -682,6 +698,14 @@ try {
 
   Assert-True -Condition (-not (Test-HasUtf8Bom -Path (Join-Path $repoRoot 'SKILL.md'))) -Message 'SKILL.md must not start with a UTF-8 BOM because OpenClaw frontmatter parsing will fail.'
   $results.Add('skill frontmatter encoding OK') | Out-Null
+
+  $nonAsciiPowerShellScriptsWithoutBom = @(
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Filter *.ps1 |
+      Where-Object { (Test-HasNonAsciiText -Path $_.FullName) -and -not (Test-HasUtf8Bom -Path $_.FullName) } |
+      ForEach-Object { $_.FullName }
+  )
+  Assert-True -Condition ($nonAsciiPowerShellScriptsWithoutBom.Count -eq 0) -Message ("PowerShell scripts with non-ASCII text must include a UTF-8 BOM for Windows PowerShell 5.1: {0}" -f ($nonAsciiPowerShellScriptsWithoutBom -join ", "))
+  $results.Add('PowerShell script encoding OK') | Out-Null
 
   $exampleFieldMap = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-field-map.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ($null -ne $exampleFieldMap) -Message 'Example field-map JSON did not parse.'
