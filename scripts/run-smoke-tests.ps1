@@ -666,6 +666,7 @@ try {
       (Join-Path $repoRoot 'profiles\experiment-report.json'),
       (Join-Path $repoRoot 'profiles\course-design-report.json'),
       (Join-Path $repoRoot 'profiles\internship-report.json'),
+      (Join-Path $repoRoot 'profiles\software-test-report.json'),
       (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
@@ -875,6 +876,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $internshipProfile) -contains '校内指导教师') -Message 'Internship profile metadata prefixes are missing 校内指导教师.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $internshipProfile) -contains '实习过程与内容') -Message 'Internship profile required headings are missing 实习过程与内容.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $internshipProfile -SectionId 'result' -BaseName 'intern-home') -eq '实习成果截图') -Message 'Internship profile image caption defaults are missing the result caption.'
+  $softwareTestProfile = Get-ReportProfile -ProfileName 'software-test-report' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$softwareTestProfile.name -eq 'software-test-report') -Message 'Software-test profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$softwareTestProfile.displayName -eq '软件测试报告') -Message 'Software-test profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $softwareTestProfile) -eq 'school') -Message 'Software-test profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $softwareTestProfile) -contains '测试项目') -Message 'Software-test profile metadata prefixes are missing 测试项目.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $softwareTestProfile) -contains '测试用例设计与执行') -Message 'Software-test profile required headings are missing 测试用例设计与执行.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $softwareTestProfile -SectionId 'result' -BaseName 'result-pass') -eq '测试结果截图') -Message 'Software-test profile image caption defaults are missing the result caption.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -908,13 +916,24 @@ URL: https://example.com/network-lab
   $internshipMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件工程' -ResolvedExperimentName '企业门户管理后台开发' -Profile $internshipProfile -ResolvedStudentName '王敏' -ResolvedStudentId '20262345' -ResolvedClassName '软工 2303' -ResolvedTeacherName '周老师' -ResolvedExperimentProperty '专业实习' -ResolvedExperimentDate '2026-03-01 至 2026-03-28' -ResolvedExperimentLocation '杭州云帆科技有限公司（滨江区）') | ConvertFrom-Json
   Assert-True -Condition ([string]$internshipMetadata.学生姓名 -eq '王敏') -Message 'Auto metadata helper did not emit the internship student label.'
   Assert-True -Condition ([string]$internshipMetadata.实习项目 -eq '企业门户管理后台开发') -Message 'Auto metadata helper did not emit the internship title label.'
+  $softwareTestPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '软件测试技术' -ResolvedExperimentName '图书管理系统功能测试' -Profile $softwareTestProfile -DetailLevel 'full'
+  Assert-True -Condition ($softwareTestPromptText -match '软件测试报告 body') -Message 'Auto prompt helper did not use the software-test display name.'
+  Assert-True -Condition ($softwareTestPromptText -match '课程名称: 软件测试技术') -Message 'Auto prompt helper did not emit the software-test course-name label.'
+  Assert-True -Condition ($softwareTestPromptText -match '测试项目: 图书管理系统功能测试') -Message 'Auto prompt helper did not emit the software-test project label.'
+  Assert-True -Condition ($softwareTestPromptText -match '测试用例设计与执行') -Message 'Auto prompt helper did not include software-test required headings.'
+  $softwareTestRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '软件测试技术' -ResolvedExperimentName '图书管理系统功能测试' -Profile $softwareTestProfile -ExtraKeywords @('登录测试', '图书管理系统功能测试') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$softwareTestRequirements.minChars -eq 1600) -Message 'Auto requirements helper did not use the software-test full minChars.'
+  Assert-True -Condition (@($softwareTestRequirements.sections | Where-Object { $_.name -eq '测试用例设计与执行' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the software-test case section heading.'
+  $softwareTestMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件测试技术' -ResolvedExperimentName '图书管理系统功能测试' -Profile $softwareTestProfile -ResolvedStudentName '赵强' -ResolvedStudentId '20263456' -ResolvedClassName '软工 2304' -ResolvedTeacherName '陈老师' -ResolvedExperimentProperty '功能测试' -ResolvedExperimentDate '2026-04-10' -ResolvedExperimentLocation 'Chrome 122 / Windows 11 / MySQL 8.0') | ConvertFrom-Json
+  Assert-True -Condition ([string]$softwareTestMetadata.学生姓名 -eq '赵强') -Message 'Auto metadata helper did not emit the software-test student label.'
+  Assert-True -Condition ([string]$softwareTestMetadata.测试项目 -eq '图书管理系统功能测试') -Message 'Auto metadata helper did not emit the software-test project label.'
   $results.Add('report profile loader OK') | Out-Null
 
   $reportProfileSchema = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\report-profile.schema.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$reportProfileSchema.title -eq 'OpenClaw report profile') -Message 'Report profile schema did not parse.'
   $profileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$profileValidation.passed) -Message 'Report profile validation failed.'
-  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 3) -Message 'Report profile validation did not cover built-in profiles.'
+  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 4) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
 
@@ -1483,6 +1502,55 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $sampleImageTwo) -Message 'Failed to create the second sample image fixture.'
   Assert-True -Condition (Test-Path -LiteralPath $sampleImageThree) -Message 'Failed to create the third sample image fixture.'
   Assert-True -Condition (Test-Path -LiteralPath $sampleImageFour) -Message 'Failed to create the fourth sample image fixture.'
+
+  $softwareTestReportPath = Join-Path $tempRoot 'software-test-report.md'
+  @'
+软件测试报告
+
+课程名称：软件测试技术
+测试项目：图书管理系统功能测试
+学生姓名：赵强
+学号：20263456
+指导教师：陈老师
+测试类型：功能测试
+测试时间：2026-04-10
+测试环境：Chrome 122 / Windows 11 / MySQL 8.0
+
+一、测试目标
+本次软件测试的目标是围绕图书管理系统的登录、图书查询、借阅登记和归还处理等核心功能进行验证，确认系统在常见用户路径下能够稳定返回正确结果。
+测试过程中重点关注输入校验、状态流转和异常提示，确保学生用户、管理员用户和无效输入场景都能得到明确反馈。
+
+二、测试环境
+测试环境使用 Windows 11、Chrome 122、Node.js 本地服务和 MySQL 8.0 测试库，浏览器缓存会在每轮关键用例执行前清理。
+测试账号分为学生账号、管理员账号和锁定账号三类，数据库预置了可借图书、已借出图书和不存在编号等多组数据，便于覆盖正常流程和异常流程。
+
+三、测试范围与依据
+测试范围包括账号登录、图书检索、借阅登记、归还确认、库存数量更新和错误提示展示，不覆盖后台统计报表和权限配置等后续迭代功能。
+测试依据来自课程给定的需求说明、页面原型和接口字段约定，判断标准是页面展示、接口返回、数据库状态三者保持一致。
+
+四、测试用例设计与执行
+用例设计采用等价类和边界值思路，先验证正确账号登录、错误密码提示和空用户名拦截，再验证图书名称关键字搜索、编号精确查询和无结果提示。
+借阅流程中，使用学生账号选择一本库存大于零的图书，点击借阅后检查页面提示、借阅记录和库存扣减是否同步更新；归还流程则检查记录状态是否从借阅中变为已归还，并确认库存数量恢复。
+针对异常场景，额外执行重复借阅、无库存借阅、已归还记录再次归还和接口断开等用例，观察系统是否给出清晰错误信息，而不是出现白屏或状态混乱。
+
+五、测试结果
+本轮测试共执行十八条功能用例，其中十六条通过，两条记录为问题项。登录、查询、正常借阅和正常归还流程均能按照预期完成，页面提示和数据库状态一致。
+发现的问题主要集中在无库存借阅时按钮未及时禁用，以及接口超时后页面仍保留上一次成功提示。两个问题不会阻断主流程，但会影响用户对当前操作结果的判断。
+
+六、缺陷分析与改进
+无库存借阅问题的原因是前端只在页面首次加载时读取库存状态，借阅按钮没有在库存字段变化后重新计算禁用条件，导致边界数据下仍然可以触发提交动作。
+接口超时提示问题则来自请求异常分支没有清理旧状态，建议在进入新请求前统一重置提示区域，并在失败分支加入明确的重试说明。后续还应补充并发借阅和弱网环境测试，降低状态不同步风险。
+
+七、测试总结
+通过本次测试，可以确认图书管理系统的核心业务路径已经基本可用，登录、查询、借阅和归还流程具备课程演示所需的完整性。
+测试也暴露出前端状态刷新和异常提示处理仍有细节不足，后续改进应优先围绕边界库存、接口失败和重复提交三个方向补充自动化回归用例。
+'@ | Set-Content -LiteralPath $softwareTestReportPath -Encoding UTF8
+
+  $softwareTestValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $softwareTestReportPath -ReportProfileName 'software-test-report' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$softwareTestValidation.passed) -Message 'Software-test report validation should pass for the software-test profile.'
+  Assert-True -Condition ([string]$softwareTestValidation.reportProfileName -eq 'software-test-report') -Message 'Software-test report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$softwareTestValidation.summary.sectionCount -ge 7) -Message 'Software-test report validation did not load the expected section rules.'
+  $results.Add('software-test profile validation OK') | Out-Null
 
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
@@ -3005,6 +3073,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\experiment-report.json')) -Message 'Install script did not copy the experiment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\course-design-report.json')) -Message 'Install script did not copy the course-design-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\internship-report.json')) -Message 'Install script did not copy the internship-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\software-test-report.json')) -Message 'Install script did not copy the software-test-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
