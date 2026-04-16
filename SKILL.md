@@ -1,12 +1,12 @@
 ---
 name: experiment-report
-description: Write Chinese university lab reports and nearby school report documents from scratch or fit report content into a user-provided WPS, Word, or docx blank template. Use when the user asks for an experiment report, lab report, course design report, internship report, software test report, experiment summary, or a WPS, Word, or docx template to be filled from topic, requirements, code, data, screenshots, tutorial pages, or results.
+description: Write Chinese university lab reports and nearby school report documents from scratch or fit report content into a user-provided WPS, Word, or docx blank template. Use when the user asks for an experiment report, lab report, course design report, internship report, software test report, deployment report, operations report, experiment summary, or a WPS, Word, or docx template to be filled from topic, requirements, code, data, screenshots, tutorial pages, or results.
 ---
 
 ## When this skill applies
 
 - The user asks to write or complete an experiment report from zero.
-- The user asks for a course design report, internship report, or software test report that follows a fixed school-style structure.
+- The user asks for a course design report, internship report, software test report, deployment report, or operations report that follows a fixed school-style structure.
 - The user has a blank WPS, Word, or docx template and wants it filled.
 - The user provides an experiment title, requirements, screenshots, code, data, outputs, or conclusions and wants a polished report.
 - The user provides a tutorial article or CSDN page as the main procedural reference.

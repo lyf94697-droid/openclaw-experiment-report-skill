@@ -667,6 +667,7 @@ try {
       (Join-Path $repoRoot 'profiles\course-design-report.json'),
       (Join-Path $repoRoot 'profiles\internship-report.json'),
       (Join-Path $repoRoot 'profiles\software-test-report.json'),
+      (Join-Path $repoRoot 'profiles\deployment-report.json'),
       (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
@@ -883,6 +884,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $softwareTestProfile) -contains '测试项目') -Message 'Software-test profile metadata prefixes are missing 测试项目.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $softwareTestProfile) -contains '测试用例设计与执行') -Message 'Software-test profile required headings are missing 测试用例设计与执行.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $softwareTestProfile -SectionId 'result' -BaseName 'result-pass') -eq '测试结果截图') -Message 'Software-test profile image caption defaults are missing the result caption.'
+  $deploymentProfile = Get-ReportProfile -ProfileName 'deployment-report' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$deploymentProfile.name -eq 'deployment-report') -Message 'Deployment profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$deploymentProfile.displayName -eq '部署运维报告') -Message 'Deployment profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $deploymentProfile) -eq 'school') -Message 'Deployment profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $deploymentProfile) -contains '部署项目') -Message 'Deployment profile metadata prefixes are missing 部署项目.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $deploymentProfile) -contains '部署步骤与配置') -Message 'Deployment profile required headings are missing 部署步骤与配置.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $deploymentProfile -SectionId 'result' -BaseName 'health-result') -eq '验证结果截图') -Message 'Deployment profile image caption defaults are missing the result caption.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -927,13 +935,24 @@ URL: https://example.com/network-lab
   $softwareTestMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件测试技术' -ResolvedExperimentName '图书管理系统功能测试' -Profile $softwareTestProfile -ResolvedStudentName '赵强' -ResolvedStudentId '20263456' -ResolvedClassName '软工 2304' -ResolvedTeacherName '陈老师' -ResolvedExperimentProperty '功能测试' -ResolvedExperimentDate '2026-04-10' -ResolvedExperimentLocation 'Chrome 122 / Windows 11 / MySQL 8.0') | ConvertFrom-Json
   Assert-True -Condition ([string]$softwareTestMetadata.学生姓名 -eq '赵强') -Message 'Auto metadata helper did not emit the software-test student label.'
   Assert-True -Condition ([string]$softwareTestMetadata.测试项目 -eq '图书管理系统功能测试') -Message 'Auto metadata helper did not emit the software-test project label.'
+  $deploymentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '云平台运维实践' -ResolvedExperimentName '校园门户系统容器化部署' -Profile $deploymentProfile -DetailLevel 'full'
+  Assert-True -Condition ($deploymentPromptText -match '部署运维报告 body') -Message 'Auto prompt helper did not use the deployment display name.'
+  Assert-True -Condition ($deploymentPromptText -match '课程名称: 云平台运维实践') -Message 'Auto prompt helper did not emit the deployment course-name label.'
+  Assert-True -Condition ($deploymentPromptText -match '部署项目: 校园门户系统容器化部署') -Message 'Auto prompt helper did not emit the deployment project label.'
+  Assert-True -Condition ($deploymentPromptText -match '部署步骤与配置') -Message 'Auto prompt helper did not include deployment required headings.'
+  $deploymentRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '云平台运维实践' -ResolvedExperimentName '校园门户系统容器化部署' -Profile $deploymentProfile -ExtraKeywords @('Docker', 'Nginx', '校园门户系统容器化部署') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$deploymentRequirements.minChars -eq 1600) -Message 'Auto requirements helper did not use the deployment full minChars.'
+  Assert-True -Condition (@($deploymentRequirements.sections | Where-Object { $_.name -eq '部署步骤与配置' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the deployment steps section heading.'
+  $deploymentMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '云平台运维实践' -ResolvedExperimentName '校园门户系统容器化部署' -Profile $deploymentProfile -ResolvedStudentName '刘洋' -ResolvedStudentId '20264567' -ResolvedClassName '网工 2301' -ResolvedTeacherName '孙老师' -ResolvedExperimentProperty '系统部署' -ResolvedExperimentDate '2026-04-12' -ResolvedExperimentLocation 'Ubuntu 22.04 / Docker 26 / Nginx 1.24') | ConvertFrom-Json
+  Assert-True -Condition ([string]$deploymentMetadata.学生姓名 -eq '刘洋') -Message 'Auto metadata helper did not emit the deployment student label.'
+  Assert-True -Condition ([string]$deploymentMetadata.部署项目 -eq '校园门户系统容器化部署') -Message 'Auto metadata helper did not emit the deployment project label.'
   $results.Add('report profile loader OK') | Out-Null
 
   $reportProfileSchema = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\report-profile.schema.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$reportProfileSchema.title -eq 'OpenClaw report profile') -Message 'Report profile schema did not parse.'
   $profileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$profileValidation.passed) -Message 'Report profile validation failed.'
-  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 4) -Message 'Report profile validation did not cover built-in profiles.'
+  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 5) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
 
@@ -1551,6 +1570,55 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$softwareTestValidation.reportProfileName -eq 'software-test-report') -Message 'Software-test report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$softwareTestValidation.summary.sectionCount -ge 7) -Message 'Software-test report validation did not load the expected section rules.'
   $results.Add('software-test profile validation OK') | Out-Null
+
+  $deploymentReportPath = Join-Path $tempRoot 'deployment-report.md'
+  @'
+部署运维报告
+
+课程名称：云平台运维实践
+部署项目：校园门户系统容器化部署
+学生姓名：刘洋
+学号：20264567
+指导教师：孙老师
+部署类型：系统部署
+部署时间：2026-04-12
+部署环境：Ubuntu 22.04 / Docker 26 / Nginx 1.24
+
+一、部署目标
+本次部署任务的目标是将校园门户系统从本地开发环境迁移到 Linux 服务器容器环境中运行，使前端静态页面、后端接口服务和数据库连接能够形成完整访问链路。
+部署完成后需要能够通过浏览器访问门户首页、登录接口和健康检查地址，并保证服务重启后仍然可以按预期恢复运行。
+
+二、部署环境
+部署环境使用 Ubuntu 22.04 服务器，基础组件包括 Docker 26、Docker Compose、Nginx 1.24、MySQL 8.0 和 Node.js 运行镜像。
+服务器开放 80、443 和后端内部服务端口，部署前已经完成防火墙规则检查、镜像仓库登录、项目配置文件整理和数据库初始化脚本准备。
+
+三、部署方案与架构
+整体方案采用 Nginx 反向代理加多容器编排结构，前端构建产物由 Nginx 容器提供静态访问，后端服务以应用容器形式运行，数据库使用独立 MySQL 容器保存业务数据。
+配置层面将端口、数据库连接、日志目录和上传目录拆分到环境变量与挂载卷中，减少后续重新发布时对镜像内容的直接修改。
+
+四、部署步骤与配置
+部署前先拉取项目代码并确认分支版本，然后执行前端构建命令生成静态资源，再构建后端应用镜像并检查镜像标签是否与发布版本一致。
+随后编写 docker-compose 配置文件，分别声明前端、后端和数据库服务的镜像、端口、环境变量、依赖关系和数据卷挂载路径，确保应用启动顺序能够满足数据库先就绪、接口再连接的要求。
+启动服务后，通过 docker ps 查看容器状态，通过 docker logs 检查后端启动日志，并在 Nginx 配置中补充静态资源缓存、接口代理和超时参数，最后重新加载 Nginx 使配置生效。
+
+五、验证结果
+部署完成后，浏览器能够正常访问校园门户首页，登录接口返回成功状态，健康检查地址显示服务正常，数据库中也可以看到初始化后的用户和菜单数据。
+通过 curl 请求后端健康检查接口返回 200 状态码，查看容器日志没有持续报错，重启后端容器后服务可以在短时间内恢复访问，说明本次部署满足基本运行和恢复要求。
+
+六、问题处理与回滚预案
+部署过程中出现过后端容器首次启动无法连接数据库的问题，排查后发现数据库容器虽然已启动但初始化尚未完成，因此在 compose 配置中补充健康检查和重试等待逻辑。
+如果后续发布版本出现严重异常，可以先切回上一版镜像标签并重新执行 docker compose up，同时保留当前数据库卷不变；若数据库结构变更导致问题，则优先使用发布前导出的备份文件恢复。
+
+七、部署总结
+通过本次部署任务，完整梳理了从构建镜像、编写 compose 配置、配置 Nginx 代理到验证服务状态的流程，理解了环境变量、数据卷和日志检查在运维工作中的作用。
+本次系统已经能够稳定完成基础访问和健康检查，但后续仍需补充自动化发布脚本、HTTPS 证书续期提醒和更细粒度的监控告警，以提高实际运维场景下的可靠性。
+'@ | Set-Content -LiteralPath $deploymentReportPath -Encoding UTF8
+
+  $deploymentValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $deploymentReportPath -ReportProfileName 'deployment-report' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$deploymentValidation.passed) -Message 'Deployment report validation should pass for the deployment profile.'
+  Assert-True -Condition ([string]$deploymentValidation.reportProfileName -eq 'deployment-report') -Message 'Deployment report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$deploymentValidation.summary.sectionCount -ge 7) -Message 'Deployment report validation did not load the expected section rules.'
+  $results.Add('deployment profile validation OK') | Out-Null
 
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
@@ -3074,6 +3142,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\course-design-report.json')) -Message 'Install script did not copy the course-design-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\internship-report.json')) -Message 'Install script did not copy the internship-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\software-test-report.json')) -Message 'Install script did not copy the software-test-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\deployment-report.json')) -Message 'Install script did not copy the deployment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'

@@ -1,0 +1,132 @@
+{
+  "name": "deployment-report",
+  "displayName": "部署运维报告",
+  "defaultStyleProfile": "school",
+  "defaultExperimentProperty": "系统部署",
+  "metadataFields": [
+    { "key": "Name", "label": "学生姓名", "aliases": ["姓名"] },
+    { "key": "StudentId", "label": "学号", "aliases": ["学生学号"] },
+    { "key": "ClassName", "label": "班级" },
+    { "key": "TeacherName", "label": "指导教师", "aliases": ["指导老师"] },
+    { "key": "CourseName", "label": "课程名称", "aliases": ["实训课程", "所属课程"] },
+    { "key": "ExperimentName", "label": "部署项目", "aliases": ["项目名称", "系统名称", "部署对象"] },
+    { "key": "ExperimentProperty", "label": "部署类型", "aliases": ["任务类型", "部署类别"] },
+    { "key": "ExperimentDate", "label": "部署时间", "aliases": ["完成时间", "日期"] },
+    { "key": "ExperimentLocation", "label": "部署环境", "aliases": ["部署地点", "运行环境"] }
+  ],
+  "extraLabels": [
+    { "key": "Version", "label": "部署版本" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "部署目标",
+      "aliases": ["部署目标", "部署目的", "任务目标"],
+      "minChars": { "standard": 30, "full": 70 }
+    },
+    {
+      "key": "Environment",
+      "heading": "部署环境",
+      "aliases": ["部署环境", "运行环境", "服务器环境", "部署工具与环境"],
+      "minChars": { "standard": 50, "full": 100 }
+    },
+    {
+      "key": "Theory",
+      "heading": "部署方案与架构",
+      "aliases": ["部署方案与架构", "部署方案", "系统架构", "架构说明"],
+      "minChars": { "standard": 50, "full": 110 }
+    },
+    {
+      "key": "Steps",
+      "heading": "部署步骤与配置",
+      "aliases": ["部署步骤与配置", "部署步骤", "部署过程", "配置过程", "实施过程"],
+      "minChars": { "standard": 90, "full": 190 }
+    },
+    {
+      "key": "Results",
+      "heading": "验证结果",
+      "aliases": ["验证结果", "部署结果", "运行结果", "验收结果"],
+      "minChars": { "standard": 70, "full": 150 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题处理与回滚预案",
+      "aliases": ["问题处理与回滚预案", "问题处理", "故障分析", "回滚预案", "问题与改进"],
+      "minChars": { "standard": 50, "full": 120 }
+    },
+    {
+      "key": "Summary",
+      "heading": "部署总结",
+      "aliases": ["部署总结", "总结", "运维总结", "任务总结"],
+      "minChars": { "standard": 40, "full": 100 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "部署计划",
+    "发布清单",
+    "风险说明"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "部署环境截图",
+      "steps": "部署步骤截图",
+      "result": "验证结果截图",
+      "analysis": "问题处理截图",
+      "summary": "部署总结截图",
+      "default": "部署过程截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "deploy|release|setup|install|配置|部署|安装", "caption": "部署步骤截图" },
+      { "pattern": "nginx|docker|server|env|config|服务器|环境|容器", "caption": "部署环境截图" },
+      { "pattern": "verify|result|status|health|curl|测试|验证|结果", "caption": "验证结果截图" },
+      { "pattern": "error|rollback|log|issue|故障|异常|回滚|日志", "caption": "问题处理截图" }
+    ]
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["部署目标", "部署方案"],
+      "blocks": [
+        { "heading": "一、部署目标", "sectionIds": ["purpose"] },
+        { "heading": "二、部署方案与架构", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["部署步骤", "部署总结"],
+      "blocks": [
+        { "heading": "三、部署环境", "sectionIds": ["environment"] },
+        { "heading": "四、部署步骤与配置", "sectionIds": ["steps"] },
+        { "heading": "五、验证结果", "sectionIds": ["result"] },
+        { "heading": "六、问题处理与回滚预案", "sectionIds": ["analysis"] },
+        { "heading": "七、部署总结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 1000,
+      "promptGuidance": [
+        "Prefer a submit-ready deployment or operations report instead of a short checklist.",
+        "The deployment steps and verification sections should describe commands, configuration intent, observed status, and pass/fail evidence."
+      ]
+    },
+    "full": {
+      "minChars": 1600,
+      "promptGuidance": [
+        "Prefer a submit-ready deployment or operations report with substantial operational detail instead of a terse outline.",
+        "Unless source material is very sparse, aim for roughly 1600 to 2400 Chinese characters.",
+        "The environment, architecture, deployment steps, verification results, and rollback-risk sections should be the most detailed parts.",
+        "When describing the deployment process, explain prerequisites, service configuration, startup order, health checks, observed outcomes, and fallback handling."
+      ]
+    }
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评"
+  ]
+}
