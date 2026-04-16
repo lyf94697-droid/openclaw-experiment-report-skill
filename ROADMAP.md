@@ -72,6 +72,7 @@ Implemented baseline:
 - `experiment-report`
 - `course-design-report`
 - `internship-report`
+- profile JSON now has schema-backed validation and smoke coverage
 - profile-backed validation, field-map generation, image-map generation, insertion, styling, and smoke coverage
 
 Continuing goal:

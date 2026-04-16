@@ -85,6 +85,7 @@ description: Write Chinese university lab reports from scratch or fit report con
 - For chat-driven local execution, prefer `scripts/build-report-from-feishu.ps1` so the wrapper can keep the final deliverable in the output root and move intermediate files into an `artifacts/` subdirectory.
 - The image pipeline can resolve OpenClaw-staged relative attachment paths such as `media/inbound/example.png`, so when those paths appear in prompt-injected media notes you can reuse them directly in `-ImagePaths`.
 - When the template has fixed section headings plus blank paragraphs, prefer block mappings over flattening long body content into a single field.
+- When adding or editing a report profile under `profiles/`, run `scripts/validate-report-profiles.ps1` before relying on it in generation, field-map, image-map, or validation workflows.
 - For public tutorial pages, prefer `scripts/fetch-web-article.ps1`; keep `scripts/fetch-csdn-article.ps1` as the compatibility wrapper for CSDN-specific workflows.
 - When a tutorial page should flow directly into report generation, prefer `scripts/prepare-report-prompt.ps1` so the extracted reference text is appended to the final request deterministically.
 - The helpers are optional. If they are unavailable, still finish the report from the information already provided.
