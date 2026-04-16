@@ -659,6 +659,9 @@ try {
       (Join-Path $repoRoot 'examples\docx-image-specs.json'),
       (Join-Path $repoRoot 'examples\docx-image-specs-row.json'),
       (Join-Path $repoRoot 'examples\docx-report-metadata.json'),
+      (Join-Path $repoRoot 'examples\profile-presets\README.md'),
+      (Join-Path $repoRoot 'examples\profile-presets\weekly-report.json'),
+      (Join-Path $repoRoot 'examples\profile-presets\meeting-minutes.json'),
       (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\sample-report.txt'),
@@ -956,6 +959,18 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 5) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
+
+  $exampleProfilePresetValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -ProfileDir (Join-Path $repoRoot 'examples\profile-presets') -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$exampleProfilePresetValidation.passed) -Message 'Example profile presets failed validation.'
+  Assert-True -Condition ([int]$exampleProfilePresetValidation.summary.profileCount -eq 2) -Message 'Example profile preset validation should cover the curated preset pair.'
+  Assert-True -Condition ([int]$exampleProfilePresetValidation.summary.errorCount -eq 0) -Message 'Example profile preset validation reported unexpected errors.'
+  $exampleWeeklyPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\weekly-report.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$exampleWeeklyPreset.defaultStyleProfile -eq 'compact') -Message 'Weekly preset should demonstrate compact as the default style profile.'
+  Assert-True -Condition ([string]$exampleWeeklyPreset.sectionFields[3].heading -eq '本周完成事项') -Message 'Weekly preset is missing the expected steps heading.'
+  $exampleMeetingPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\meeting-minutes.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$exampleMeetingPreset.defaultStyleProfile -eq 'default') -Message 'Meeting-minutes preset should demonstrate default as the default style profile.'
+  Assert-True -Condition ([string]$exampleMeetingPreset.sectionFields[3].heading -eq '讨论过程与决议') -Message 'Meeting-minutes preset is missing the expected steps heading.'
+  $results.Add('example profile presets OK') | Out-Null
 
   $newReportProfilePath = Join-Path $tempRoot 'weekly-report.json'
   $newReportProfileResult = (& (Join-Path $repoRoot 'scripts\new-report-profile.ps1') `
@@ -3170,6 +3185,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\README.md')) -Message 'Install script did not copy the profile preset README.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'

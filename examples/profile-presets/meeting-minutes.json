@@ -1,0 +1,121 @@
+{
+  "name": "meeting-minutes",
+  "displayName": "会议纪要",
+  "defaultStyleProfile": "default",
+  "defaultExperimentProperty": "会议纪要",
+  "metadataFields": [
+    { "key": "Name", "label": "记录人", "aliases": ["纪要整理人", "会议记录"] },
+    { "key": "StudentId", "label": "工号/学号", "aliases": ["工号", "学号"] },
+    { "key": "ClassName", "label": "参会小组", "aliases": ["参会团队", "所属班级"] },
+    { "key": "TeacherName", "label": "主持人", "aliases": ["会议主持", "负责人"] },
+    { "key": "CourseName", "label": "项目名称", "aliases": ["项目", "会议所属项目"] },
+    { "key": "ExperimentName", "label": "会议主题", "aliases": ["会议标题", "议题主题"] },
+    { "key": "ExperimentProperty", "label": "纪要类型", "aliases": ["文档类型"] },
+    { "key": "ExperimentDate", "label": "会议日期", "aliases": ["会议时间", "日期"] },
+    { "key": "ExperimentLocation", "label": "会议地点", "aliases": ["地点", "会议形式"] }
+  ],
+  "extraLabels": [
+    { "key": "Attendees", "label": "参会人员" },
+    { "key": "MeetingId", "label": "会议编号" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "会议目标",
+      "aliases": ["会议目标", "会议目的", "召开目标"],
+      "minChars": { "standard": 30, "full": 60 }
+    },
+    {
+      "key": "Environment",
+      "heading": "参会信息与背景",
+      "aliases": ["参会信息与背景", "参会信息", "会议背景"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Theory",
+      "heading": "议题与输入",
+      "aliases": ["议题与输入", "会议议题", "讨论输入"],
+      "minChars": { "standard": 40, "full": 100 }
+    },
+    {
+      "key": "Steps",
+      "heading": "讨论过程与决议",
+      "aliases": ["讨论过程与决议", "讨论过程", "会议讨论记录"],
+      "minChars": { "standard": 80, "full": 180 }
+    },
+    {
+      "key": "Results",
+      "heading": "当前结论",
+      "aliases": ["当前结论", "已确认事项", "会议结论"],
+      "minChars": { "standard": 60, "full": 130 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "风险与争议",
+      "aliases": ["风险与争议", "待确认问题", "分歧与风险"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Summary",
+      "heading": "后续安排",
+      "aliases": ["后续安排", "行动计划", "待办事项"],
+      "minChars": { "standard": 40, "full": 90 }
+    }
+  ],
+  "extraSectionHeadings": ["行动项", "责任分工"],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "参会信息截图",
+      "steps": "讨论过程截图",
+      "result": "结论确认截图",
+      "analysis": "风险争议截图",
+      "summary": "后续安排截图",
+      "default": "会议材料截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "agenda|topic|brief|议题|议程", "caption": "参会信息截图" },
+      { "pattern": "meeting|whiteboard|discussion|chat|讨论", "caption": "讨论过程截图" },
+      { "pattern": "decision|approve|confirm|结论|确认", "caption": "结论确认截图" },
+      { "pattern": "risk|issue|debate|problem|争议|风险", "caption": "风险争议截图" }
+    ]
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["会议目标", "议题与输入"],
+      "blocks": [
+        { "heading": "一、会议目标", "sectionIds": ["purpose"] },
+        { "heading": "二、议题与输入", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["讨论过程与决议", "后续安排"],
+      "blocks": [
+        { "heading": "参会信息与背景", "sectionIds": ["environment"] },
+        { "heading": "三、讨论过程与决议", "sectionIds": ["steps"] },
+        { "heading": "四、当前结论", "sectionIds": ["result"] },
+        { "heading": "五、风险与争议", "sectionIds": ["analysis"] },
+        { "heading": "六、后续安排", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 800,
+      "promptGuidance": [
+        "Prefer a factual meeting record instead of generic narrative filler.",
+        "Separate background, discussion, confirmed conclusions, unresolved risks, and follow-up actions."
+      ]
+    },
+    "full": {
+      "minChars": 1300,
+      "promptGuidance": [
+        "Prefer a submit-ready meeting minutes document with explicit decisions and action items.",
+        "Keep confirmed conclusions separate from assumptions, disagreements, and pending questions.",
+        "When owners or deadlines are available, keep them attached to the relevant follow-up item instead of moving them into vague summary text."
+      ]
+    }
+  },
+  "forbiddenPatterns": ["TODO", "TBD", "待补充", "会后补充", "另行通知"]
+}

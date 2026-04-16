@@ -14,6 +14,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added `scripts/new-report-profile.ps1` to scaffold schema-valid report profiles before manual profile tuning.
 - Added the built-in `software-test-report` profile for software testing reports with test-case, result, and defect-analysis sections.
 - Added the built-in `deployment-report` profile for deployment and operations reports with deployment, verification, and rollback sections.
+- Added `examples/profile-presets/` with reusable `weekly-report` and `meeting-minutes` custom profile presets for adjacent document experiments.
 - Added `scripts/report-defaults.ps1` so generated runs can remember the last course name and experiment name.
 - Added `CONTRIBUTING.md` with repository workflow, testing expectations, and contribution scope.
 - Added `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, and `ROADMAP.md` for GitHub-facing repository completeness.

@@ -216,6 +216,13 @@ Alongside new profiles, the repository should keep investing in a few shared cap
 - profile-specific prompt presets
 - more realistic end-to-end fixtures
 
+Implemented baseline:
+
+- `examples/profile-presets/weekly-report.json`
+- `examples/profile-presets/meeting-minutes.json`
+
+These stay outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles.
+
 ## Non-Goals For Now
 
 - turning the repository into a general-purpose office suite

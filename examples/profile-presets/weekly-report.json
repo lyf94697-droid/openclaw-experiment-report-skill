@@ -1,0 +1,121 @@
+{
+  "name": "weekly-report",
+  "displayName": "周报",
+  "defaultStyleProfile": "compact",
+  "defaultExperimentProperty": "项目周报",
+  "metadataFields": [
+    { "key": "Name", "label": "提交人", "aliases": ["汇报人", "负责人"] },
+    { "key": "StudentId", "label": "工号/学号", "aliases": ["工号", "学号"] },
+    { "key": "ClassName", "label": "小组/班级", "aliases": ["项目组", "所属班级"] },
+    { "key": "TeacherName", "label": "审核人", "aliases": ["导师", "指导人"] },
+    { "key": "CourseName", "label": "项目名称", "aliases": ["项目", "课题名称"] },
+    { "key": "ExperimentName", "label": "周报主题", "aliases": ["周报标题", "主题"] },
+    { "key": "ExperimentProperty", "label": "报告类型", "aliases": ["文档类型"] },
+    { "key": "ExperimentDate", "label": "周次", "aliases": ["统计周期", "汇报周期"] },
+    { "key": "ExperimentLocation", "label": "工作环境", "aliases": ["协作平台", "工作地点"] }
+  ],
+  "extraLabels": [
+    { "key": "Department", "label": "部门" },
+    { "key": "Sprint", "label": "迭代" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "工作目标",
+      "aliases": ["工作目标", "本周目标", "目标与里程碑"],
+      "minChars": { "standard": 30, "full": 70 }
+    },
+    {
+      "key": "Environment",
+      "heading": "协作环境",
+      "aliases": ["协作环境", "项目背景与协作环境", "开发与协作环境"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Theory",
+      "heading": "本周任务与输入",
+      "aliases": ["本周任务与输入", "需求来源与优先级", "输入事项"],
+      "minChars": { "standard": 40, "full": 100 }
+    },
+    {
+      "key": "Steps",
+      "heading": "本周完成事项",
+      "aliases": ["本周完成事项", "已完成工作", "推进过程与执行"],
+      "minChars": { "standard": 80, "full": 180 }
+    },
+    {
+      "key": "Results",
+      "heading": "阶段成果",
+      "aliases": ["阶段成果", "当前产出", "交付物与数据"],
+      "minChars": { "standard": 60, "full": 140 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "风险与改进",
+      "aliases": ["风险与改进", "问题与阻塞", "问题与优化"],
+      "minChars": { "standard": 40, "full": 100 }
+    },
+    {
+      "key": "Summary",
+      "heading": "下周计划",
+      "aliases": ["下周计划", "下阶段安排", "后续计划"],
+      "minChars": { "standard": 40, "full": 100 }
+    }
+  ],
+  "extraSectionHeadings": ["关键里程碑", "待协调事项"],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "协作环境截图",
+      "steps": "本周完成事项截图",
+      "result": "阶段成果截图",
+      "analysis": "风险与改进截图",
+      "summary": "下周计划截图",
+      "default": "周报过程截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "kanban|jira|tapd|trello|board|task|任务", "caption": "本周完成事项截图" },
+      { "pattern": "demo|ui|page|screen|result|output|交付|成果", "caption": "阶段成果截图" },
+      { "pattern": "bug|issue|risk|error|block|问题", "caption": "风险与改进截图" },
+      { "pattern": "feishu|slack|meeting|env|repo|环境|平台", "caption": "协作环境截图" }
+    ]
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["工作目标", "本周任务与输入"],
+      "blocks": [
+        { "heading": "一、工作目标", "sectionIds": ["purpose"] },
+        { "heading": "二、本周任务与输入", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["本周完成事项", "下周计划"],
+      "blocks": [
+        { "heading": "协作环境", "sectionIds": ["environment"] },
+        { "heading": "三、本周完成事项", "sectionIds": ["steps"] },
+        { "heading": "四、阶段成果", "sectionIds": ["result"] },
+        { "heading": "五、风险与改进", "sectionIds": ["analysis"] },
+        { "heading": "六、下周计划", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 900,
+      "promptGuidance": [
+        "Prefer an execution-focused weekly report instead of a diary-like summary.",
+        "Describe concrete inputs, completed work, outputs, blockers, and the next actions."
+      ]
+    },
+    "full": {
+      "minChars": 1400,
+      "promptGuidance": [
+        "Prefer a submit-ready weekly report with substantial detail instead of a short checklist.",
+        "When possible, describe progress in terms of objective, action, evidence, and impact.",
+        "Call out unresolved risks and dependency changes explicitly instead of hiding them in generic language."
+      ]
+    }
+  },
+  "forbiddenPatterns": ["TODO", "TBD", "待补充", "自行填写", "会后补充"]
+}

@@ -234,6 +234,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 新增 report profile 时，可以先用 `scripts/new-report-profile.ps1` 生成 schema-valid 草稿，再按具体文档类型调整标题、alias、图注和 prompt 文案
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
+- 如果你还不想把新文档类型直接升级成内置 profile，可以先看 `examples/profile-presets/`：目前仓库提供 `weekly-report.json` 和 `meeting-minutes.json` 两份可直接试跑的自定义 preset，适合先验证“这条 pipeline 能不能复用”
+- 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
 - 正文排版会单独识别步骤编号和 DOS/终端命令，步骤段不做首行缩进，命令段使用等宽字体、浅灰底和更紧凑的单倍行距
 - 最终排版会统一标题、正文、图注的字号；表格型模板会尽量保留模板默认字体观感，避免额外强制字体导致成品不像原模板
@@ -242,6 +244,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 多张图片连续归入同一实验章节时，插图流程会默认使用每行 2 张的自动分组布局；显式 `ImageSpecs` 里的 `layout` 配置仍然优先生效
 - 生成最终 `docx` 后会写出 `layout-check.json`，检查图片数、图注数、残留占位符和常见实验报告章节，summary 里也会记录 `layoutCheckPassed`、错误数和警告数
 - `layout-check.json` 会检查图注编号是否连续，summary 里会给出 `layoutCheckMessage`，便于不打开 JSON 也能快速判断排版是否过关
+
+例如，先用外部 preset 验证周报是否适合这条流水线：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
+  -ReportProfilePath ".\examples\profile-presets\weekly-report.json" `
+  -CourseName "校园导览小程序" `
+  -ExperimentName "第 6 周迭代周报" `
+  -StudentName "李四" `
+  -StudentId "20261234" `
+  -ClassName "软工 2302" `
+  -TeacherName "王老师" `
+  -ExperimentDate "第 6 周" `
+  -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
+  -DetailLevel full `
+  -OutputDir ".\tests-output\weekly-preset-sample"
+```
 
 ### 4. 飞书或直聊场景补充
 
@@ -304,4 +323,3 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 ## License
 
 MIT
-
