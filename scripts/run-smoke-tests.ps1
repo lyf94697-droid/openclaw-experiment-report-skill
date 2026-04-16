@@ -666,6 +666,7 @@ try {
       (Join-Path $repoRoot 'profiles\experiment-report.json'),
       (Join-Path $repoRoot 'profiles\course-design-report.json'),
       (Join-Path $repoRoot 'profiles\internship-report.json'),
+      (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
@@ -690,7 +691,8 @@ try {
       (Join-Path $repoRoot 'scripts\reset-openclaw-session.ps1'),
       (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1'),
       (Join-Path $repoRoot 'scripts\self-check.ps1'),
-      (Join-Path $repoRoot 'scripts\validate-report-draft.ps1')
+      (Join-Path $repoRoot 'scripts\validate-report-draft.ps1'),
+      (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1')
     )) {
     Assert-True -Condition (Test-Path -LiteralPath $requiredPath) -Message "Missing required path: $requiredPath"
   }
@@ -907,6 +909,14 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$internshipMetadata.学生姓名 -eq '王敏') -Message 'Auto metadata helper did not emit the internship student label.'
   Assert-True -Condition ([string]$internshipMetadata.实习项目 -eq '企业门户管理后台开发') -Message 'Auto metadata helper did not emit the internship title label.'
   $results.Add('report profile loader OK') | Out-Null
+
+  $reportProfileSchema = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\report-profile.schema.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$reportProfileSchema.title -eq 'OpenClaw report profile') -Message 'Report profile schema did not parse.'
+  $profileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$profileValidation.passed) -Message 'Report profile validation failed.'
+  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 3) -Message 'Report profile validation did not cover built-in profiles.'
+  Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
+  $results.Add('report profile schema validation OK') | Out-Null
 
   $originalInputsAgentsHome = $env:AGENTS_HOME
   try {
@@ -2990,10 +3000,12 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-profiles.ps1')) -Message 'Install script did not copy the report-profiles helper script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\apply-docx-field-map.ps1')) -Message 'Install script did not copy fill script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-profiles.ps1')) -Message 'Install script did not copy profile validation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\experiment-report.json')) -Message 'Install script did not copy the experiment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\course-design-report.json')) -Message 'Install script did not copy the course-design-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\internship-report.json')) -Message 'Install script did not copy the internship-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
