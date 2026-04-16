@@ -72,6 +72,7 @@ Implemented baseline:
 - `experiment-report`
 - `course-design-report`
 - `internship-report`
+- `software-test-report`
 - profile JSON now has schema-backed validation and smoke coverage
 - profile-backed validation, field-map generation, image-map generation, insertion, styling, and smoke coverage
 
@@ -103,6 +104,8 @@ Likely profile differences:
 - more emphasis on architecture and results analysis
 
 ### 2. Software Test Reports
+
+Status: built-in profile is in place.
 
 Why second:
 

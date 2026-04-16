@@ -66,10 +66,11 @@
 
 仓库现在的核心变化，是从“实验报告专用脚本”扩展成“同一条报告构建流水线 + 可切换 report profile”。
 
-- 已内置三类报告 profile：`experiment-report`、`course-design-report`、`internship-report`
+- 已内置四类报告 profile：`experiment-report`、`course-design-report`、`internship-report`、`software-test-report`
 - `experiment-report` 覆盖常见实验目的、实验环境、实验原理或任务要求、实验步骤、实验结果、问题分析、实验总结
 - `course-design-report` 覆盖设计目标、开发环境、需求分析、方案设计与实现、运行结果、问题与改进、设计总结
 - `internship-report` 覆盖实习目的、实习单位与环境、实习任务与要求、实习过程与内容、实习成果、问题分析与改进、实习总结
+- `software-test-report` 覆盖测试目标、测试环境、测试范围与依据、测试用例设计与执行、测试结果、缺陷分析与改进、测试总结
 - profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、图注规则、图片落位优先级和复合模板填充规则
 - 模板适配能力也被抽象出来，可以用 `check-report-profile-template-fit.ps1` 诊断新模板缺字段、缺章节、缺 alias 或是否需要新增复合填充规则
 - 插图流程已经支持按 profile 识别章节、生成图片落位预案、写入图注、连续图片 2 列分组布局，以及最终 layout check
@@ -218,7 +219,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
 - 如果你想额外生成保留模板表格边框的一体版，可以对 `build-report.ps1` 传 `-CreateTemplateFrameDocx`，或对 `build-report-from-url.ps1` / `build-report-from-feishu.ps1` 传 `-CreateTemplateFrameDocx`；wrapper 会把普通最终稿写到 `finalDocxPath`，把边框版写到 `templateFrameDocxPath`
 - 自动生成正文、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
-- 仓库现在内置三个 profile：`experiment-report`、`course-design-report` 和 `internship-report`；如果你要生成课程设计报告或专业实习报告，可以直接传对应的 `-ReportProfileName`
+- 仓库现在内置四个 profile：`experiment-report`、`course-design-report`、`internship-report` 和 `software-test-report`；如果你要生成课程设计报告、专业实习报告或软件测试报告，可以直接传对应的 `-ReportProfileName`
 - `build-report-from-url.ps1` 的自动 prompt 也会跟随 active report profile 调整文案，像 `课程名称` / `课题名称` 这类字段标签会直接从 profile 里取，而不再固定写成实验报告措辞
 - 最近一次保存的 `CourseName` / `ExperimentName` 默认值现在会按 report profile 隔离保存，`course-design-report` 不会再复用 `experiment-report` 的最近一次题目
 - 如果你只想先拿到自动生成的输入物，不想立刻跑 OpenClaw 或 `docx` 流水线，可以先运行 `scripts/generate-report-inputs.ps1`，它会单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json` 和一份 summary
@@ -264,7 +265,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 ## 项目现状
 
 当前版本已经可以跑通一条完整的学校报告类文档工作流：生成正文、填模板、插图片、补图注、做最终排版。  
-实验报告、课程设计报告和专业实习报告已经进入内置 profile 范围，并且都有 smoke 覆盖。  
+实验报告、课程设计报告、专业实习报告和软件测试报告已经进入内置 profile 范围，并且都有 smoke 覆盖。
 仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把 profile-driven 这条链路做得更稳、更好用、更容易复现。
 
 ## Roadmap
