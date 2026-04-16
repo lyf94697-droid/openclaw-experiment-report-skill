@@ -2,7 +2,13 @@ Set-StrictMode -Version Latest
 
 function Resolve-ExperimentReportDefaultsPath {
   param(
-    [string]$AgentsHome = $env:AGENTS_HOME
+    [string]$AgentsHome = $env:AGENTS_HOME,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath
   )
 
   $agentsRoot = if (-not [string]::IsNullOrWhiteSpace($AgentsHome)) {
@@ -11,13 +17,32 @@ function Resolve-ExperimentReportDefaultsPath {
     Join-Path $HOME ".agents"
   }
 
-  return (Join-Path $agentsRoot "experiment-report.defaults.json")
+  $defaultsKey = if (-not [string]::IsNullOrWhiteSpace($ReportProfilePath)) {
+    [System.IO.Path]::GetFileNameWithoutExtension($ReportProfilePath)
+  } elseif (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+    $ReportProfileName
+  } else {
+    "experiment-report"
+  }
+
+  return (Join-Path $agentsRoot ("{0}.defaults.json" -f $defaultsKey))
 }
 
 function Read-ExperimentReportDefaults {
   param(
-    [string]$DefaultsPath = (Resolve-ExperimentReportDefaultsPath)
+    [AllowNull()]
+    [string]$DefaultsPath,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath
   )
+
+  if ([string]::IsNullOrWhiteSpace($DefaultsPath)) {
+    $DefaultsPath = Resolve-ExperimentReportDefaultsPath -ReportProfileName $ReportProfileName -ReportProfilePath $ReportProfilePath
+  }
 
   if ([string]::IsNullOrWhiteSpace($DefaultsPath) -or -not (Test-Path -LiteralPath $DefaultsPath)) {
     return $null
@@ -260,10 +285,21 @@ function Resolve-ExperimentReportNames {
 
     [string]$InferredExperimentName,
 
-    [string]$DefaultsPath = (Resolve-ExperimentReportDefaultsPath)
+    [AllowNull()]
+    [string]$DefaultsPath,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath
   )
 
-  $storedDefaults = Read-ExperimentReportDefaults -DefaultsPath $DefaultsPath
+  if ([string]::IsNullOrWhiteSpace($DefaultsPath)) {
+    $DefaultsPath = Resolve-ExperimentReportDefaultsPath -ReportProfileName $ReportProfileName -ReportProfilePath $ReportProfilePath
+  }
+
+  $storedDefaults = Read-ExperimentReportDefaults -DefaultsPath $DefaultsPath -ReportProfileName $ReportProfileName -ReportProfilePath $ReportProfilePath
   $storedCourseName = if ($null -ne $storedDefaults) { [string]$storedDefaults.courseName } else { $null }
   $storedExperimentName = if ($null -ne $storedDefaults) { [string]$storedDefaults.experimentName } else { $null }
 
@@ -296,11 +332,22 @@ function Save-ExperimentReportDefaults {
     [Parameter(Mandatory = $true)]
     [string]$ExperimentName,
 
-    [string]$DefaultsPath = (Resolve-ExperimentReportDefaultsPath)
+    [AllowNull()]
+    [string]$DefaultsPath,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath
   )
 
   if ([string]::IsNullOrWhiteSpace($CourseName) -or [string]::IsNullOrWhiteSpace($ExperimentName)) {
-    throw "CourseName and ExperimentName are required to save experiment-report defaults."
+    throw "CourseName and ExperimentName are required to save report defaults."
+  }
+
+  if ([string]::IsNullOrWhiteSpace($DefaultsPath)) {
+    $DefaultsPath = Resolve-ExperimentReportDefaultsPath -ReportProfileName $ReportProfileName -ReportProfilePath $ReportProfilePath
   }
 
   $resolvedDefaultsPath = [System.IO.Path]::GetFullPath($DefaultsPath)
@@ -312,6 +359,8 @@ function Save-ExperimentReportDefaults {
   $payload = [pscustomobject]@{
     courseName = $CourseName
     experimentName = $ExperimentName
+    reportProfileName = $ReportProfileName
+    reportProfilePath = $ReportProfilePath
     updatedAt = (Get-Date).ToString("s")
   }
 

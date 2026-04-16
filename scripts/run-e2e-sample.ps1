@@ -18,6 +18,8 @@ param(
 
   [int]$ReferenceMaxChars = 30000,
 
+  [string]$PreGeneratedReportPath,
+
   [string]$TemplatePath,
 
   [string]$MetadataPath,
@@ -153,6 +155,9 @@ if ($Mode -eq "native-agent") {
 $resolvedRequirementsPath = (Resolve-Path -LiteralPath $RequirementsPath).Path
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+if ($Mode -ne "guided-chat" -and -not [string]::IsNullOrWhiteSpace($PreGeneratedReportPath)) {
+  throw "PreGeneratedReportPath is only supported in guided-chat mode."
+}
 if ($useDefaultPromptText) {
   $PromptPath = Join-Path $resolvedOutputDir "e2e-sample-prompt.txt"
   Set-Content -LiteralPath $PromptPath -Value (Get-DefaultPromptText) -Encoding UTF8
@@ -160,11 +165,15 @@ if ($useDefaultPromptText) {
 $resolvedPromptPath = (Resolve-Path -LiteralPath $PromptPath).Path
 $resolvedTemplatePath = $null
 $resolvedMetadataPath = $null
+$resolvedPreGeneratedReportPath = $null
 if (-not [string]::IsNullOrWhiteSpace($TemplatePath)) {
   $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 }
 if (-not [string]::IsNullOrWhiteSpace($MetadataPath)) {
   $resolvedMetadataPath = (Resolve-Path -LiteralPath $MetadataPath).Path
+}
+if (-not [string]::IsNullOrWhiteSpace($PreGeneratedReportPath)) {
+  $resolvedPreGeneratedReportPath = (Resolve-Path -LiteralPath $PreGeneratedReportPath).Path
 }
 $styleOutputRequested = $StyleFinalDocx -or (-not [string]::IsNullOrWhiteSpace($StyledDocxOutPath))
 
@@ -222,7 +231,18 @@ $model = $null
 $skillActive = $false
 
 if ($Mode -eq "guided-chat") {
-  $guidedOutput = & (Join-Path $repoRoot "scripts\generate-report-chat.ps1") -PromptPath $promptOutPath -SessionKey $SessionKey -OutFile $reportPath $(if ($SkipSessionReset) { '-SkipSessionReset' })
+  $generateChatParams = @{
+    PromptPath = $promptOutPath
+    SessionKey = $SessionKey
+    OutFile = $reportPath
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+    $generateChatParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
+  }
+  if ($SkipSessionReset) {
+    $generateChatParams.SkipSessionReset = $true
+  }
+  $guidedOutput = & (Join-Path $repoRoot "scripts\generate-report-chat.ps1") @generateChatParams
   $reportText = (Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8).Trim()
   [System.IO.File]::WriteAllText($agentOutputPath, ($guidedOutput | Out-String), (New-Object System.Text.UTF8Encoding($true)))
   $responseFormat = 'gateway-chat'
@@ -263,6 +283,7 @@ if ($Mode -eq "guided-chat") {
   [System.IO.File]::WriteAllText($reportPath, $reportText, (New-Object System.Text.UTF8Encoding($true)))
 }
 
+$generationMode = if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) { "replay" } else { "live" }
 $validationJson = & (Join-Path $repoRoot "scripts\validate-report-draft.ps1") -Path $reportPath -RequirementsPath $resolvedRequirementsPath -Format json | Out-String
 [System.IO.File]::WriteAllText($validationPath, $validationJson, (New-Object System.Text.UTF8Encoding($true)))
 $validationResult = $validationJson | ConvertFrom-Json
@@ -356,6 +377,7 @@ if ($null -ne $resolvedTemplatePath) {
 $summary = [pscustomobject]@{
   passed = [bool]$validationResult.passed
   mode = $Mode
+  generationMode = $generationMode
   responseFormat = $responseFormat
   agent = $Agent
   skillCommand = $SkillCommand
@@ -369,6 +391,7 @@ $summary = [pscustomobject]@{
   promptPath = $promptOutPath
   rawOutputPath = $agentOutputPath
   agentJsonPath = $(if ($responseFormat -eq 'json') { $agentJsonPath } else { $null })
+  preGeneratedReportPath = $resolvedPreGeneratedReportPath
   reportPath = $reportPath
   validationPath = $validationPath
   templatePath = $resolvedTemplatePath

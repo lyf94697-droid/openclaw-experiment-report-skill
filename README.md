@@ -55,12 +55,74 @@
 
 ## 当前范围
 
-- 当前版本聚焦中文大学实验报告场景
+- 当前版本已经从单一中文大学实验报告，扩展为面向“学校报告类文档”的 profile-driven 本地流水线
 - 当前仓库主要面向 OpenClaw 用户，不是独立桌面应用
 - 仓库已经包含 `SKILL.md`、`references/`、`scripts/`、`examples/`、`demo/` 和 GitHub 协作治理文件
 - 当前稳定路径是“OpenClaw 生成 + 本地脚本处理模板、图片和排版”
 - 常见空白模板、章节正文、截图插入和最终样式处理已经可以跑通
 - 当前暂时不保证 Word/WPS GUI 自动化填写，也不承诺任意复杂模板都能无人工确认处理
+
+## 已经扩展到哪些方面
+
+仓库现在的核心变化，是从“实验报告专用脚本”扩展成“同一条报告构建流水线 + 可切换 report profile”。
+
+- 已内置三类报告 profile：`experiment-report`、`course-design-report`、`internship-report`
+- `experiment-report` 覆盖常见实验目的、实验环境、实验原理或任务要求、实验步骤、实验结果、问题分析、实验总结
+- `course-design-report` 覆盖设计目标、开发环境、需求分析、方案设计与实现、运行结果、问题与改进、设计总结
+- `internship-report` 覆盖实习目的、实习单位与环境、实习任务与要求、实习过程与内容、实习成果、问题分析与改进、实习总结
+- profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、图注规则、图片落位优先级和复合模板填充规则
+- 模板适配能力也被抽象出来，可以用 `check-report-profile-template-fit.ps1` 诊断新模板缺字段、缺章节、缺 alias 或是否需要新增复合填充规则
+- 插图流程已经支持按 profile 识别章节、生成图片落位预案、写入图注、连续图片 2 列分组布局，以及最终 layout check
+- 构建过程现在会写出 `summary.json`、`pipeline-trace.json`、`pipeline-trace.md`、`image-placement-plan.md` 和 `layout-check.json`，方便复盘每次运行到底用了什么输入、生成了什么产物
+- validation 从“检查有没有章节”扩展到 profile-specific structural validation，包括缺必需章节、章节顺序异常、重复标题、空节、占位符节、过短章节和分页风险 warning
+- 现阶段仍然优先服务学校报告类文档，不急着扩到完全自由格式的周报、月报或项目文档
+
+## Validation 与风险输出
+
+`validate-report-draft.ps1`、`build-report.ps1`、`build-report-from-url.ps1` 和 `build-report-from-feishu.ps1` 现在都会把结构校验和分页风险写进 machine-readable JSON，方便自动化判断报告是否能继续进入模板填充和交付检查。
+
+主要输出文件：
+
+| 文件 | 作用 |
+| --- | --- |
+| `validation.json` | `validate-report-draft.ps1` 的完整校验结果，包含章节命中、finding 列表和汇总计数 |
+| `summary.json` | `build-report.ps1` 的构建摘要，会透出 validation、layout check、image plan 和最终 docx 路径 |
+| `url-build-summary.json` | URL wrapper 摘要，会透出下游 build validation/risk 汇总 |
+| `feishu-build-summary.json` | Feishu/local wrapper 摘要，会透出下游 build validation/risk 汇总 |
+| `pipeline-trace.json` / `pipeline-trace.md` | wrapper 级调试视图，聚合 generation mode、input mode、validation 状态和关键产物路径 |
+
+常用字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `validationPassed` | 没有 error 时为 `true`；pagination risk 目前是 warning，不会单独导致失败 |
+| `validationErrorCount` / `validationWarningCount` | validation finding 的 error / warning 数量 |
+| `validationPaginationRiskCount` | `category = pagination` 的风险 warning 数量 |
+| `validationStructuralIssueCount` | `category = structure` 的结构问题数量 |
+| `validationErrorCodes` / `validationWarningCodes` | 去重后的机器可读 code 列表 |
+| `validationWarningSummary` | warning 的轻量摘要，包含 `severity`、`code`、`category`、`message` |
+| `validationFindingCountsByCode` / `validationFindingCountsByCategory` | 按 code 和 category 聚合的计数表 |
+| `templateFrameDocxPath` | 可选模板边框版 `docx` 路径；普通最终稿仍保留在 `finalDocxPath` |
+
+当前结构校验 code：
+
+| Code | Severity | 含义 |
+| --- | --- | --- |
+| `missing-profile-required-heading` | error | 使用内置或 profile-backed 规则时，缺少 profile 要求的章节标题 |
+| `missing-required-section` | error | 使用外部 requirements 且没有 profile 标记时，缺少要求章节 |
+| `duplicate-section-heading` | error | 同一章节标题重复出现 |
+| `section-order-anomaly` | error | 章节出现顺序和 profile / requirements 期望顺序不一致 |
+| `empty-section` | error | 章节存在但没有正文内容 |
+| `placeholder-only-section` | error | 章节正文只有占位符，例如 `__________`、`TODO`、`placeholder` |
+| `short-section` | error | 章节正文低于该章节的 `minChars` 要求 |
+
+当前分页风险 code：
+
+| Code | Severity | 含义 |
+| --- | --- | --- |
+| `pagination-risk-long-section` | warning | 单个章节正文较长，进入 Word/WPS 模板后更容易跨页 |
+| `pagination-risk-dense-section-block` | warning | 单个章节文本密集、段落数少，分页时容易形成大块断裂 |
+| `pagination-risk-figure-cluster` | warning | 单个章节引用较多图片，图片和图注可能造成分页压力 |
 
 ## 快速开始
 
@@ -92,7 +154,7 @@ openclaw skills list
 
 ### 2. 常用入口脚本
 
-最常用的本地入口有 3 个：
+最常用的本地入口有 4 个：
 
 - `scripts/build-report-from-feishu.ps1`
   适合飞书或直接聊天场景，负责把生成、模板填充、插图和最终输出串起来
@@ -100,6 +162,8 @@ openclaw skills list
   适合“教程链接 -> 报告正文 -> 模板填充 -> 最终 docx”这类流程
 - `scripts/build-report.ps1`
   适合你已经有正文和模板，只想走确定性的本地 `docx` 打包流程
+- `scripts/generate-report-inputs.ps1`
+  适合先单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`，再手动调试生成或对接外部流水线
 
 如果你需要拆开流水线逐步处理，仓库里也已经提供模板抽取、字段映射生成、图片映射生成、插图、样式优化、网页抓取、提示词准备和端到端验证脚本，入口都在 [scripts](scripts) 目录。
 
@@ -148,13 +212,29 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 
 补充说明：
 
-- `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 会优先从提示词、参考文本或 URL 片段推断 `ExperimentName`；推断不到时才复用最近一次保存的实验名
+- `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 会优先从提示词、参考文本或 URL 片段推断 `ExperimentName`；推断不到时才复用最近一次保存的题目名
 - 在教程标题或参考文本已经包含实验名称时，can omit `-ExperimentName`
 - `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
+- 如果你想额外生成保留模板表格边框的一体版，可以对 `build-report.ps1` 传 `-CreateTemplateFrameDocx`，或对 `build-report-from-url.ps1` / `build-report-from-feishu.ps1` 传 `-CreateTemplateFrameDocx`；wrapper 会把普通最终稿写到 `finalDocxPath`，把边框版写到 `templateFrameDocxPath`
+- 自动生成正文、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
+- 仓库现在内置三个 profile：`experiment-report`、`course-design-report` 和 `internship-report`；如果你要生成课程设计报告或专业实习报告，可以直接传对应的 `-ReportProfileName`
+- `build-report-from-url.ps1` 的自动 prompt 也会跟随 active report profile 调整文案，像 `课程名称` / `课题名称` 这类字段标签会直接从 profile 里取，而不再固定写成实验报告措辞
+- 最近一次保存的 `CourseName` / `ExperimentName` 默认值现在会按 report profile 隔离保存，`course-design-report` 不会再复用 `experiment-report` 的最近一次题目
+- 如果你只想先拿到自动生成的输入物，不想立刻跑 OpenClaw 或 `docx` 流水线，可以先运行 `scripts/generate-report-inputs.ps1`，它会单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json` 和一份 summary
+- 如果你已经有一份可复用的正文，想离线回放后续 validation / 模板填充 / 插图流程，`build-report-from-feishu.ps1`、`build-report-from-url.ps1`、`run-e2e-sample.ps1` 和 `generate-report-chat.ps1` 现在都支持显式 `-PreGeneratedReportPath`
+- 相关 summary JSON 现在会额外写出 `generationMode`，用于区分 `live`、`replay` 和 `none`（直接传本地正文）的运行路径
+- `build-report.ps1`、`generate-docx-field-map.ps1`、`check-report-profile-template-fit.ps1`、`generate-docx-image-map.ps1`、`insert-docx-images.ps1` 的输出现在也会补充 `inputMode` 字段，用于区分报告、metadata、requirements、图片规格和 image-map 分别来自文件、内联 JSON 还是直接图片列表
+- `build-report-from-url.ps1` 和 `build-report-from-feishu.ps1` 的 wrapper summary 现在也会透出下游 `buildReportInputMode` / `buildMetadataInputMode` / `buildRequirementsInputMode` / `buildImageInputMode`，用于把 wrapper 的 `generationMode` 和实际 docx 构建输入来源串成一条完整链路
+- 这两个 wrapper 现在还会额外写出一份 `pipeline-trace.json`，把 `wrapper.mode`、`wrapper.generationMode`、下游 `build.*InputMode` 和关键产物路径聚合到一份更短的调试视图里
+- 同时也会生成一份更适合人工快速查看的 `pipeline-trace.md`
+- `generate-docx-field-map.ps1` 的 JSON 输出现在会额外带 `diagnostics` 和 `summary.diagnosticCountsByCode`，用于解释模板里哪些章节标题、metadata 标签或复合正文单元格没有命中自动映射规则
+- 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
+- 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
 - 正文排版会单独识别步骤编号和 DOS/终端命令，步骤段不做首行缩进，命令段使用等宽字体、浅灰底和更紧凑的单倍行距
 - 最终排版会统一标题、正文、图注的字号；表格型模板会尽量保留模板默认字体观感，避免额外强制字体导致成品不像原模板
 - 表格型实验报告模板会使用更接近模板默认观感的字号，把正文单元格改为顶部对齐，并减少普通正文的强制分页保持，避免留下过多空白
+- 不确定多张截图会被放到哪里时，可以先运行 `scripts/generate-docx-image-map.ps1 -PlanOnly -Format markdown` 输出图片分配预案，确认章节、图注和布局后再生成正式 image map
 - 多张图片连续归入同一实验章节时，插图流程会默认使用每行 2 张的自动分组布局；显式 `ImageSpecs` 里的 `layout` 配置仍然优先生效
 - 生成最终 `docx` 后会写出 `layout-check.json`，检查图片数、图注数、残留占位符和常见实验报告章节，summary 里也会记录 `layoutCheckPassed`、错误数和警告数
 - `layout-check.json` 会检查图注编号是否连续，summary 里会给出 `layoutCheckMessage`，便于不打开 JSON 也能快速判断排版是否过关
@@ -166,6 +246,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 最稳的方式不是让模型临场拼很多中间 JSON，而是直接调用 `scripts/build-report-from-feishu.ps1`
 - 飞书里手机直接上传截图时，可以参考 `examples/feishu-uploaded-images-docx-prompt.md`
 - 电脑本地直接上传截图时，可以参考 `examples/local-uploaded-images-docx-prompt.md`
+- 想一次生成、不等待图片分配确认时，可以参考 `examples/one-shot-uploaded-images-docx-prompt.md`
 - 如果你 uploaded images and you also provide local image paths，建议把上传图片当作语义参考，把本地路径当作最终 `docx` 插图文件来源
 - 如果运行时把附件提示注入成类似 `media/inbound/example.png` 这样的相对路径，这些路径也可以继续作为 `-ImagePaths` 传给插图流程
 - 对于未标注章节的多张截图，脚本会按上传顺序优先把前半归入实验步骤、后半归入实验结果，再对同章节连续图片应用 2 列布局
@@ -181,18 +262,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 
 ## 项目现状
 
-当前版本已经可以跑通一条完整的实验报告工作流：生成正文、填模板、插图片、补图注、做最终排版。  
-仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把“实验报告”这条链路做得更稳、更好用、更容易复现。  
-后续扩展会基于现有文档流水线逐步推进，而不是把新类型文档硬塞进现有逻辑里。
+当前版本已经可以跑通一条完整的学校报告类文档工作流：生成正文、填模板、插图片、补图注、做最终排版。  
+实验报告、课程设计报告和专业实习报告已经进入内置 profile 范围，并且都有 smoke 覆盖。  
+仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把 profile-driven 这条链路做得更稳、更好用、更容易复现。
 
 ## Roadmap
 
-当前方向很明确：先把实验报告场景做实用，再逐步抽象成更通用的文档生成工具。
+当前方向很明确：先把学校报告类文档场景做实用，再逐步抽象成更通用的文档生成工具。
 
-- 继续补常见实验报告模板和模板适配策略
+- 继续补常见实验报告、课程设计报告、实习报告模板和模板适配策略
 - 强化教程链接、截图、正文、模板之间的自动串联能力
 - 增强图片插入、图注和多图布局的配置能力
-- 支持更多课程作业类文档
+- 支持更多课程作业类和证据驱动类文档
 - 逐步扩展到周报、月报、项目文档等可配置文档类型
 - 继续完善样式 profile，让不同学校/模板的排版策略更容易切换
 

@@ -8,6 +8,7 @@ Thumbs.db
 local-inputs/
 outputs/
 tests-output/
+tmp-debug-*.ps1
 *.filled.docx
 *.images.docx
 *.styled.docx
