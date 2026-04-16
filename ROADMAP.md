@@ -73,6 +73,7 @@ Implemented baseline:
 - `course-design-report`
 - `internship-report`
 - `software-test-report`
+- `deployment-report`
 - profile JSON now has schema-backed validation and smoke coverage
 - profile-backed validation, field-map generation, image-map generation, insertion, styling, and smoke coverage
 
@@ -121,6 +122,8 @@ Likely profile differences:
 - richer validation rules
 
 ### 3. Deployment Or Operations Reports
+
+Status: built-in profile is in place.
 
 Why third:
 

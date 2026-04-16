@@ -12,6 +12,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added `scripts/convert-docx-template-frame.ps1` and template-frame output support for the local, URL, and Feishu build paths.
 - Added `profiles/report-profile.schema.json` and `scripts/validate-report-profiles.ps1` to make built-in report profiles schema-backed and smoke-tested.
 - Added the built-in `software-test-report` profile for software testing reports with test-case, result, and defect-analysis sections.
+- Added the built-in `deployment-report` profile for deployment and operations reports with deployment, verification, and rollback sections.
 - Added `scripts/report-defaults.ps1` so generated runs can remember the last course name and experiment name.
 - Added `CONTRIBUTING.md` with repository workflow, testing expectations, and contribution scope.
 - Added `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, and `ROADMAP.md` for GitHub-facing repository completeness.
