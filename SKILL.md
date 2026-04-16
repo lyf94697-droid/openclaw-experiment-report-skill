@@ -83,6 +83,7 @@ description: Write Chinese university lab reports and nearby school report docum
 - For local screenshots or experiment photos that should be embedded into the filled docx, prefer `scripts/generate-docx-image-map.ps1` first and then run `scripts/insert-docx-images.ps1` on the already-filled copy.
 - For a polished final docx copy, optionally run `scripts/format-docx-report-style.ps1` after filling fields and inserting images.
 - For a template-frame bordered copy, run `scripts/convert-docx-template-frame.ps1 -DocxPath <normal.docx> -OutPath <bordered.docx> -Overwrite`, pass `-CreateTemplateFrameDocx` to `scripts/build-report.ps1`, or pass `-CreateTemplateFrameDocx` / `-TemplateFrameDocxPath` to the URL or Feishu wrappers to produce the extra copy automatically.
+- For a new report profile, start with `scripts/new-report-profile.ps1`, then edit the generated JSON for profile-specific aliases, captions, and prompt guidance before running profile validation.
 - For chat-driven local execution, prefer `scripts/build-report-from-feishu.ps1` so the wrapper can keep the final deliverable in the output root and move intermediate files into an `artifacts/` subdirectory.
 - The image pipeline can resolve OpenClaw-staged relative attachment paths such as `media/inbound/example.png`, so when those paths appear in prompt-injected media notes you can reuse them directly in `-ImagePaths`.
 - When the template has fixed section headings plus blank paragraphs, prefer block mappings over flattening long body content into a single field.
