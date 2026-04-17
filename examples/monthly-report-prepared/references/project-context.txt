@@ -1,0 +1,9 @@
+2026 年 4 月，仓库围绕“保持一条可复用的文档流水线，同时让不同文档类型通过 profile 元数据切换行为”这个方向持续升级。
+
+本月已经稳定的能力包括：experiment-report、course-design-report、internship-report、software-test-report、deployment-report、weekly-report、meeting-minutes、monthly-report 八个 built-in profile；profile 级 metadata 标签、章节要求、默认样式、分页风险阈值与 remediation；build-report / build-report-from-url / build-report-from-feishu 三条主流水线上的 validation 汇总、pipeline trace 与 template-frame docx 输出。
+
+本月还补强了 examples/profile-presets 下的 weekly-report、meeting-minutes、monthly-report 示例快照，以及 scripts/run-profile-preset-samples.ps1 和 scripts/analyze-roadmap-next-step.ps1，前者用于批量生成 preset prompt/metadata/requirements 示例，后者用于每天从 ROADMAP 里挑出一个最小、可被 smoke 覆盖的升级点。
+
+近期一条重要工作是 prepared-summary 回放能力。仓库已经支持把 prompt、metadata、requirements 和参考文本先固化成 report-inputs-summary.json，再通过 build-report-from-url.ps1 或 build-report-from-feishu.ps1 复用这些输入，配合 PreGeneratedReportPath 离线回放 validation、模板填充、插图和样式化流程。
+
+为了让这类夹具更适合直接放进仓库复用，prepared-summary 里的 promptPath、metadataPath、requirementsPath、referenceTextPaths、fetchedReferenceTextPaths、defaultsPath、reportProfilePath 等链接路径需要能够相对于 summary 文件自身解析，而不是假定它们永远来自一次临时生成目录。

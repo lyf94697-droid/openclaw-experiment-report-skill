@@ -287,7 +287,11 @@ if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
   & (Join-Path $repoRoot "scripts\generate-report-inputs.ps1") @inputParams | Out-Null
 }
 
-$inputSummary = (Get-Content -LiteralPath $inputSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+$inputSummary = if ($null -ne $preparedInputsContext.summary) {
+  $preparedInputsContext.summary
+} else {
+  (Get-Content -LiteralPath $inputSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+}
 $resolvedCourseName = [string]$inputSummary.courseName
 $resolvedExperimentName = [string]$inputSummary.experimentName
 $effectiveDetailLevel = [string]$preparedInputsContext.detailLevel

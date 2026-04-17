@@ -29,6 +29,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added issue templates, a PR template, and a matrix quality workflow under `.github/`.
 - Added `demo/` assets and a demo guide suitable for GitHub repository previews.
 - Added `.gitattributes` to keep Office files and demo images treated as binary content.
+- Added `examples/monthly-report-prepared/` as a reusable prepared-summary replay bundle for the built-in `monthly-report` profile.
 
 ### Changed
 
@@ -49,8 +50,10 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
 - Propagated profile-specific pagination-risk remediations through generated requirements, validation summaries, build summaries, and wrapper traces.
 - Added smoke coverage for template-frame docx generation and wrapper summary propagation.
+- Expanded smoke coverage so a checked-in `monthly-report` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 
 ### Fixed
 
 - Fixed the report-style formatter so it no longer leaks XML attribute return values into the PowerShell pipeline.
 - Fixed title detection for common report titles such as `计算机网络实验报告`.
+- Fixed prepared-summary replay so linked paths inside `report-inputs-summary.json` resolve relative to the summary file, making checked-in bundles portable across workspaces.

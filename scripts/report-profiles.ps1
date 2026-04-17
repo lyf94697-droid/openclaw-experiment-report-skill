@@ -71,6 +71,88 @@ function Get-ReportProfile {
   return $profile
 }
 
+function Resolve-PreparedInputsLinkedPath {
+  param(
+    [AllowNull()]
+    [string]$Path,
+
+    [AllowNull()]
+    [string]$BaseDirectory
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return $null
+  }
+
+  if ([System.IO.Path]::IsPathRooted($Path) -or [string]::IsNullOrWhiteSpace($BaseDirectory)) {
+    return [System.IO.Path]::GetFullPath($Path)
+  }
+
+  return [System.IO.Path]::GetFullPath((Join-Path $BaseDirectory $Path))
+}
+
+function Resolve-PreparedInputsLinkedPathList {
+  param(
+    [AllowNull()]
+    [object]$Paths,
+
+    [AllowNull()]
+    [string]$BaseDirectory
+  )
+
+  $resolvedPaths = New-Object System.Collections.Generic.List[string]
+  foreach ($pathItem in @($Paths)) {
+    $pathText = [string]$pathItem
+    if (-not [string]::IsNullOrWhiteSpace($pathText)) {
+      [void]$resolvedPaths.Add((Resolve-PreparedInputsLinkedPath -Path $pathText -BaseDirectory $BaseDirectory))
+    }
+  }
+
+  return @($resolvedPaths)
+}
+
+function Resolve-PreparedInputsSummaryLinkedPaths {
+  param(
+    [AllowNull()]
+    [psobject]$Summary,
+
+    [AllowNull()]
+    [string]$PreparedInputsSummaryPath
+  )
+
+  if ($null -eq $Summary -or [string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath)) {
+    return $Summary
+  }
+
+  $summaryDirectory = Split-Path -Parent $PreparedInputsSummaryPath
+  if ([string]::IsNullOrWhiteSpace($summaryDirectory)) {
+    return $Summary
+  }
+
+  foreach ($propertyName in @(
+      "outputDir",
+      "reportProfilePath",
+      "promptPath",
+      "metadataPath",
+      "requirementsPath",
+      "defaultsPath"
+    )) {
+    if ($Summary.PSObject.Properties.Name -contains $propertyName) {
+      $resolvedPath = Resolve-PreparedInputsLinkedPath -Path ([string]$Summary.$propertyName) -BaseDirectory $summaryDirectory
+      Add-Member -InputObject $Summary -MemberType NoteProperty -Name $propertyName -Value $resolvedPath -Force
+    }
+  }
+
+  foreach ($propertyName in @("referenceTextPaths", "fetchedReferenceTextPaths")) {
+    if ($Summary.PSObject.Properties.Name -contains $propertyName) {
+      $resolvedPathList = Resolve-PreparedInputsLinkedPathList -Paths $Summary.$propertyName -BaseDirectory $summaryDirectory
+      Add-Member -InputObject $Summary -MemberType NoteProperty -Name $propertyName -Value $resolvedPathList -Force
+    }
+  }
+
+  return $Summary
+}
+
 function Resolve-PreparedInputsSummaryContext {
   param(
     [AllowNull()]
@@ -99,7 +181,8 @@ function Resolve-PreparedInputsSummaryContext {
   }
 
   $preparedInputsSummary = if (-not [string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
-    (Get-Content -LiteralPath $resolvedPreparedInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    $loadedPreparedInputsSummary = (Get-Content -LiteralPath $resolvedPreparedInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Resolve-PreparedInputsSummaryLinkedPaths -Summary $loadedPreparedInputsSummary -PreparedInputsSummaryPath $resolvedPreparedInputsSummaryPath
   } else {
     $null
   }

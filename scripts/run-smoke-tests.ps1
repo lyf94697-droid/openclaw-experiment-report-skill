@@ -269,6 +269,103 @@ function New-CourseDesignTemplateDocx {
   }
 }
 
+function New-MonthlyReportTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>项目月报</w:t></w:r></w:p>
+    <w:p><w:r><w:t>项目名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>月报主题：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>提交人</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>工号/学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>小组/班级</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>审核人</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>月份周期：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>工作环境：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>报告类型：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>一、本月目标</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>协作环境</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>二、本月任务与输入</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>三、本月完成事项</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>四、阶段成果与数据</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>五、问题与改进</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>六、下月计划</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-InternshipTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -2182,6 +2279,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$monthlyRiskLongFinding.remediation -match 'week-by-week') -Message 'Monthly validation finding should use the custom long-section remediation.'
   $results.Add('monthly-report profile validation OK') | Out-Null
 
+  $monthlyReportTemplateDocx = Join-Path $tempRoot 'monthly-report-template.docx'
+  New-MonthlyReportTemplateDocx -Path $monthlyReportTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $monthlyReportTemplateDocx) -Message 'Failed to create the monthly-report template fixture.'
+
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
 软件工程课程设计报告
@@ -3478,6 +3579,77 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($preparedSummaryCleanedReport -match '方案设计与实现') -Message 'Prepared-summary URL wrapper cleaned report is missing the expected implementation heading.'
   $results.Add('build-report-from-url prepared summary OK') | Out-Null
 
+  $monthlyPreparedSummaryDir = Join-Path $repoRoot 'examples\monthly-report-prepared'
+  $monthlyPreparedSummaryPath = Join-Path $monthlyPreparedSummaryDir 'report-inputs-summary.json'
+  $monthlyPreparedPromptPath = Join-Path $monthlyPreparedSummaryDir 'prompt.txt'
+  $monthlyPreparedMetadataPath = Join-Path $monthlyPreparedSummaryDir 'metadata.auto.json'
+  $monthlyPreparedRequirementsPath = Join-Path $monthlyPreparedSummaryDir 'requirements.auto.json'
+  $monthlyPreparedDefaultsPath = Join-Path $monthlyPreparedSummaryDir 'defaults.snapshot.json'
+  $monthlyPreparedReferencePath = Join-Path $monthlyPreparedSummaryDir 'references\project-context.txt'
+  $monthlyPreparedReplayReportPath = Join-Path $monthlyPreparedSummaryDir 'report.replay.txt'
+  foreach ($fixturePath in @(
+      $monthlyPreparedSummaryPath,
+      $monthlyPreparedPromptPath,
+      $monthlyPreparedMetadataPath,
+      $monthlyPreparedRequirementsPath,
+      $monthlyPreparedDefaultsPath,
+      $monthlyPreparedReferencePath,
+      $monthlyPreparedReplayReportPath
+    )) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Monthly prepared-summary fixture is missing: {0}" -f $fixturePath)
+  }
+
+  $monthlyPreparedBuildOutputDir = Join-Path $tempRoot 'monthly-prepared-summary-url-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $monthlyReportTemplateDocx `
+    -PreparedInputsSummaryPath $monthlyPreparedSummaryPath `
+    -OutputDir $monthlyPreparedBuildOutputDir `
+    -StyleProfile auto `
+    -PreGeneratedReportPath $monthlyPreparedReplayReportPath `
+    -SkipSessionReset | Out-Null
+  $monthlyPreparedBuildSummaryPath = Join-Path $monthlyPreparedBuildOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $monthlyPreparedBuildSummaryPath) -Message 'Monthly prepared-summary URL wrapper did not create the wrapper summary.'
+  $monthlyPreparedBuildSummary = (Get-Content -LiteralPath $monthlyPreparedBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.reportProfileName -eq 'monthly-report') -Message 'Monthly prepared-summary URL wrapper should inherit the monthly-report profile.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.reportProfileDisplayName -eq '月报') -Message 'Monthly prepared-summary URL wrapper should inherit the monthly-report display name.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.reportProfilePath -eq (Join-Path $repoRoot 'profiles\monthly-report.json')) -Message 'Monthly prepared-summary URL wrapper should resolve the relative reportProfilePath.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.detailLevel -eq 'full') -Message 'Monthly prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.generationMode -eq 'replay') -Message 'Monthly prepared-summary URL wrapper should mark the report generation mode as replay.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.reportInputsSummaryPath -eq $monthlyPreparedSummaryPath) -Message 'Monthly prepared-summary URL wrapper should keep the original input summary path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.promptPath -eq $monthlyPreparedPromptPath) -Message 'Monthly prepared-summary URL wrapper should resolve the relative prompt path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.metadataPath -eq $monthlyPreparedMetadataPath) -Message 'Monthly prepared-summary URL wrapper should resolve the relative metadata path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.requirementsPath -eq $monthlyPreparedRequirementsPath) -Message 'Monthly prepared-summary URL wrapper should resolve the relative requirements path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.defaultsPath -eq $monthlyPreparedDefaultsPath) -Message 'Monthly prepared-summary URL wrapper should resolve the relative defaults path.'
+  Assert-True -Condition (@($monthlyPreparedBuildSummary.referenceTextPaths).Count -eq 1) -Message 'Monthly prepared-summary URL wrapper should keep one resolved reference text path.'
+  Assert-True -Condition ([string]@($monthlyPreparedBuildSummary.referenceTextPaths)[0] -eq $monthlyPreparedReferencePath) -Message 'Monthly prepared-summary URL wrapper should resolve the relative reference text path.'
+  Assert-True -Condition (@($monthlyPreparedBuildSummary.fetchedReferenceTextPaths).Count -eq 0) -Message 'Monthly prepared-summary URL wrapper should keep fetchedReferenceTextPaths empty for local fixtures.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.requestedCourseName -eq 'OpenClaw 实验报告技能仓库') -Message 'Monthly prepared-summary URL wrapper lost the requested project name.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.requestedExperimentName -eq '2026 年 4 月升级月报') -Message 'Monthly prepared-summary URL wrapper lost the requested monthly title.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.preGeneratedReportPath -eq $monthlyPreparedReplayReportPath) -Message 'Monthly prepared-summary URL wrapper summary is missing the replay report path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.buildReportInputMode -eq 'path') -Message 'Monthly prepared-summary URL wrapper should expose buildReportInputMode=path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Monthly prepared-summary URL wrapper should expose buildMetadataInputMode=path.'
+  Assert-True -Condition ([string]$monthlyPreparedBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Monthly prepared-summary URL wrapper should expose buildRequirementsInputMode=path.'
+  Assert-True -Condition ([bool]$monthlyPreparedBuildSummary.validationPassed) -Message 'Monthly prepared-summary URL wrapper should expose validationPassed=true.'
+  Assert-True -Condition ([int]$monthlyPreparedBuildSummary.validationWarningCount -eq 0) -Message 'Monthly prepared-summary URL wrapper should expose zero validation warnings.'
+  Assert-True -Condition ([int]$monthlyPreparedBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Monthly prepared-summary URL wrapper should expose zero pagination risks.'
+  Assert-True -Condition ([int]$monthlyPreparedBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Monthly prepared-summary URL wrapper should expose zero structural issues.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$monthlyPreparedBuildSummary.pipelineTracePath)) -Message 'Monthly prepared-summary URL wrapper should create a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$monthlyPreparedBuildSummary.pipelineTraceMarkdownPath)) -Message 'Monthly prepared-summary URL wrapper should create a pipeline-trace markdown file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$monthlyPreparedBuildSummary.rawReportPath)) -Message 'Monthly prepared-summary URL wrapper did not write the raw report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$monthlyPreparedBuildSummary.cleanedReportPath)) -Message 'Monthly prepared-summary URL wrapper did not write the cleaned report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$monthlyPreparedBuildSummary.finalDocxPath)) -Message 'Monthly prepared-summary URL wrapper final docx path does not exist.'
+  $monthlyPreparedTrace = (Get-Content -LiteralPath ([string]$monthlyPreparedBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$monthlyPreparedTrace.wrapper.generationMode -eq 'replay') -Message 'Monthly prepared-summary URL pipeline trace should keep generationMode=replay.'
+  Assert-True -Condition ([string]$monthlyPreparedTrace.artifacts.promptPath -eq $monthlyPreparedPromptPath) -Message 'Monthly prepared-summary URL pipeline trace should expose the resolved prompt path.'
+  Assert-True -Condition ([bool]$monthlyPreparedTrace.build.validationPassed) -Message 'Monthly prepared-summary URL pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$monthlyPreparedTrace.build.validationPaginationRiskCount -eq 0) -Message 'Monthly prepared-summary URL pipeline trace should expose zero pagination risks.'
+  $monthlyPreparedTraceMarkdown = Get-Content -LiteralPath ([string]$monthlyPreparedBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($monthlyPreparedTraceMarkdown -match 'Generation mode: replay') -Message 'Monthly prepared-summary URL pipeline markdown should include the replay generation mode.'
+  Assert-True -Condition ($monthlyPreparedTraceMarkdown -match 'Validation passed: True') -Message 'Monthly prepared-summary URL pipeline markdown should include validation status.'
+  $monthlyPreparedCleanedReport = Get-Content -LiteralPath ([string]$monthlyPreparedBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($monthlyPreparedCleanedReport -match '阶段成果与数据') -Message 'Monthly prepared-summary URL wrapper cleaned report is missing the expected results heading.'
+  $results.Add('build-report-from-url monthly prepared summary OK') | Out-Null
+
   $urlWarningOutputDir = Join-Path $tempRoot 'url-warning-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
     -TemplatePath $sampleDocx `
@@ -3731,6 +3903,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the monthly prepared-summary fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report.replay.txt')) -Message 'Install script did not copy the monthly replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'
