@@ -36,4 +36,18 @@ Recommended workflow:
 
 3. If the preset works for your document family, either keep using it through `-ReportProfilePath` or move a copy into `profiles/` and continue tuning aliases, captions, and prompt guidance.
 
+You can also generate sample input bundles for every preset in this directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-profile-preset-samples.ps1 `
+  -OutputDir ".\tests-output\profile-preset-samples"
+```
+
+That command writes one subdirectory per preset, each containing:
+
+- `prompt.txt`
+- `metadata.auto.json`
+- `requirements.auto.json`
+- `report-inputs-summary.json`
+
 These presets are intentionally examples, not built-in defaults. They are meant to shorten the path from "this repo is close to my document type" to "I can prototype my own profile today".

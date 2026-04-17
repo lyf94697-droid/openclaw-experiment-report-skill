@@ -220,6 +220,7 @@ Implemented baseline:
 
 - `examples/profile-presets/weekly-report.json`
 - `examples/profile-presets/meeting-minutes.json`
+- `scripts/run-profile-preset-samples.ps1`
 
 These stay outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles.
 

@@ -236,6 +236,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
 - 如果你还不想把新文档类型直接升级成内置 profile，可以先看 `examples/profile-presets/`：目前仓库提供 `weekly-report.json` 和 `meeting-minutes.json` 两份可直接试跑的自定义 preset，适合先验证“这条 pipeline 能不能复用”
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
+- 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
 - 正文排版会单独识别步骤编号和 DOS/终端命令，步骤段不做首行缩进，命令段使用等宽字体、浅灰底和更紧凑的单倍行距
 - 最终排版会统一标题、正文、图注的字号；表格型模板会尽量保留模板默认字体观感，避免额外强制字体导致成品不像原模板
@@ -260,6 +261,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
   -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
   -DetailLevel full `
   -OutputDir ".\tests-output\weekly-preset-sample"
+```
+
+如果你想同时生成全部示例 preset 的样例输入包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-profile-preset-samples.ps1 `
+  -OutputDir ".\tests-output\profile-preset-samples"
 ```
 
 ### 4. 飞书或直聊场景补充

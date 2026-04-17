@@ -696,6 +696,7 @@ try {
       (Join-Path $repoRoot 'scripts\report-profiles.ps1'),
       (Join-Path $repoRoot 'scripts\reset-openclaw-session.ps1'),
       (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1'),
+      (Join-Path $repoRoot 'scripts\run-profile-preset-samples.ps1'),
       (Join-Path $repoRoot 'scripts\self-check.ps1'),
       (Join-Path $repoRoot 'scripts\validate-report-draft.ps1'),
       (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1')
@@ -971,6 +972,22 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$exampleMeetingPreset.defaultStyleProfile -eq 'default') -Message 'Meeting-minutes preset should demonstrate default as the default style profile.'
   Assert-True -Condition ([string]$exampleMeetingPreset.sectionFields[3].heading -eq '讨论过程与决议') -Message 'Meeting-minutes preset is missing the expected steps heading.'
   $results.Add('example profile presets OK') | Out-Null
+
+  $profilePresetSamplesDir = Join-Path $tempRoot 'profile-preset-samples'
+  $profilePresetSamples = (& (Join-Path $repoRoot 'scripts\run-profile-preset-samples.ps1') -OutputDir $profilePresetSamplesDir -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([int]$profilePresetSamples.generatedCount -eq 2) -Message 'Profile preset sample runner should generate both curated preset samples.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$profilePresetSamples.summaryPath)) -Message 'Profile preset sample runner did not write its summary JSON.'
+  $weeklyPresetSample = @($profilePresetSamples.generated | Where-Object { [string]$_.reportProfileName -eq 'weekly-report' })[0]
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.promptPath)) -Message 'Weekly preset sample runner did not create prompt.txt.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.metadataPath)) -Message 'Weekly preset sample runner did not create metadata.auto.json.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.requirementsPath)) -Message 'Weekly preset sample runner did not create requirements.auto.json.'
+  $weeklyPresetRequirements = (Get-Content -LiteralPath ([string]$weeklyPresetSample.requirementsPath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (@($weeklyPresetRequirements.sections | Where-Object { [string]$_.name -eq '本周完成事项' }).Count -eq 1) -Message 'Weekly preset sample requirements are missing the expected completion section.'
+  $meetingPresetSample = @($profilePresetSamples.generated | Where-Object { [string]$_.reportProfileName -eq 'meeting-minutes' })[0]
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPresetSample.promptPath)) -Message 'Meeting-minutes preset sample runner did not create prompt.txt.'
+  $meetingPresetPrompt = Get-Content -LiteralPath ([string]$meetingPresetSample.promptPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($meetingPresetPrompt -match '会议纪要 body') -Message 'Meeting-minutes preset sample prompt is missing the profile display name.'
+  $results.Add('profile preset sample runner OK') | Out-Null
 
   $newReportProfilePath = Join-Path $tempRoot 'weekly-report.json'
   $newReportProfileResult = (& (Join-Path $repoRoot 'scripts\new-report-profile.ps1') `
@@ -3173,6 +3190,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-defaults.ps1')) -Message 'Install script did not copy the report-defaults helper script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\report-profiles.ps1')) -Message 'Install script did not copy the report-profiles helper script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-profile-preset-samples.ps1')) -Message 'Install script did not copy the profile preset sample runner script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\apply-docx-field-map.ps1')) -Message 'Install script did not copy fill script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-profiles.ps1')) -Message 'Install script did not copy profile validation script.'
