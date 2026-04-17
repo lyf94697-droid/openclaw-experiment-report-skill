@@ -6,7 +6,7 @@ Current examples:
 
 - `weekly-report.json` (a built-in profile also exists under `profiles/`)
 - `meeting-minutes.json` (a built-in profile also exists under `profiles/`)
-- `monthly-report.json` (currently remains a preset example; built-in promotion is still future work)
+- `monthly-report.json` (a built-in profile also exists under `profiles/`)
 
 Recommended workflow:
 
@@ -56,4 +56,4 @@ That command writes one subdirectory per preset, each containing:
 
 It also writes a top-level `profile-preset-samples.md` index so you can quickly preview all generated sample bundles without opening each JSON file.
 
-These presets are intentionally examples. `weekly-report` and `meeting-minutes` already exist as built-in profiles, while `monthly-report` remains an external adjacent preset that can be promoted later if the shape proves out.
+These presets are intentionally examples. `weekly-report`, `meeting-minutes`, and `monthly-report` already exist as built-in profiles; the preset copies remain useful as path-based sample snapshots that you can fork without touching `profiles/`.

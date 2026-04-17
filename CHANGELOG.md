@@ -16,8 +16,8 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added the built-in `deployment-report` profile for deployment and operations reports with deployment, verification, and rollback sections.
 - Added the built-in `weekly-report` profile for structured project weekly reports with progress, deliverables, risk, and next-step sections.
 - Added the built-in `meeting-minutes` profile for structured meeting records with decisions, risks, and follow-up sections.
-- Added the `monthly-report` custom profile preset for structured project monthly reports with goals, deliverables, metrics, and next-month planning sections.
-- Added `examples/profile-presets/` with reusable `weekly-report` and `meeting-minutes` custom profile presets for adjacent document experiments.
+- Added the built-in `monthly-report` profile for structured project monthly reports with goals, deliverables, metrics, and next-month planning sections.
+- Added `examples/profile-presets/` with reusable `weekly-report`, `meeting-minutes`, and `monthly-report` custom profile presets for adjacent document experiments.
 - Added `scripts/run-profile-preset-samples.ps1` to generate prompt, metadata, and requirements sample bundles from profile preset examples.
 - Added a Markdown index output to `scripts/run-profile-preset-samples.ps1` for faster preview of generated preset sample bundles.
 - Added a scheduled roadmap triage workflow and `scripts/analyze-roadmap-next-step.ps1` to surface small smoke-coverable next-step candidates from `ROADMAP.md`.
@@ -43,7 +43,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added remediation guidance to validation findings and warning summaries so machine-readable outputs include the next repair action.
 - Expanded smoke coverage so `weekly-report` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, and install packaging.
 - Expanded smoke coverage so `meeting-minutes` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, install packaging, and roadmap-triage expectations.
-- Expanded the preset sample runner and smoke coverage so `monthly-report` is validated, generated into sample bundles, copied through install packaging, and surfaced correctly in roadmap triage.
+- Expanded smoke coverage so `monthly-report` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, install packaging, and roadmap-triage expectations.
 - Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
 - Added smoke coverage for template-frame docx generation and wrapper summary propagation.

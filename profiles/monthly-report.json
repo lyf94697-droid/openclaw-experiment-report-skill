@@ -1,0 +1,127 @@
+{
+  "name": "monthly-report",
+  "displayName": "月报",
+  "defaultStyleProfile": "compact",
+  "defaultExperimentProperty": "项目月报",
+  "metadataFields": [
+    { "key": "Name", "label": "提交人", "aliases": ["汇报人", "负责人"] },
+    { "key": "StudentId", "label": "工号/学号", "aliases": ["工号", "学号"] },
+    { "key": "ClassName", "label": "小组/班级", "aliases": ["项目组", "所属班级"] },
+    { "key": "TeacherName", "label": "审核人", "aliases": ["导师", "指导人"] },
+    { "key": "CourseName", "label": "项目名称", "aliases": ["项目", "课题名称"] },
+    { "key": "ExperimentName", "label": "月报主题", "aliases": ["月报标题", "主题"] },
+    { "key": "ExperimentProperty", "label": "报告类型", "aliases": ["文档类型"] },
+    { "key": "ExperimentDate", "label": "月份周期", "aliases": ["统计周期", "汇报周期"] },
+    { "key": "ExperimentLocation", "label": "工作环境", "aliases": ["协作平台", "工作地点"] }
+  ],
+  "extraLabels": [
+    { "key": "Department", "label": "部门" },
+    { "key": "Milestone", "label": "阶段里程碑" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "本月目标",
+      "aliases": ["本月目标", "月度目标", "目标与里程碑"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Environment",
+      "heading": "协作环境",
+      "aliases": ["协作环境", "项目背景与协作环境", "开发与协作环境"],
+      "minChars": { "standard": 50, "full": 110 }
+    },
+    {
+      "key": "Theory",
+      "heading": "本月任务与输入",
+      "aliases": ["本月任务与输入", "需求来源与优先级", "输入事项"],
+      "minChars": { "standard": 60, "full": 130 }
+    },
+    {
+      "key": "Steps",
+      "heading": "本月完成事项",
+      "aliases": ["本月完成事项", "已完成工作", "推进过程与执行"],
+      "minChars": { "standard": 100, "full": 220 }
+    },
+    {
+      "key": "Results",
+      "heading": "阶段成果与数据",
+      "aliases": ["阶段成果与数据", "当前产出与数据", "交付物与指标"],
+      "minChars": { "standard": 80, "full": 180 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题与改进",
+      "aliases": ["问题与改进", "风险与改进", "问题与优化"],
+      "minChars": { "standard": 60, "full": 130 }
+    },
+    {
+      "key": "Summary",
+      "heading": "下月计划",
+      "aliases": ["下月计划", "下阶段安排", "后续计划"],
+      "minChars": { "standard": 60, "full": 130 }
+    }
+  ],
+  "extraSectionHeadings": ["关键里程碑", "待协调事项"],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "协作环境截图",
+      "steps": "本月完成事项截图",
+      "result": "阶段成果与数据截图",
+      "analysis": "问题与改进截图",
+      "summary": "下月计划截图",
+      "default": "月报过程截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "kanban|jira|tapd|trello|board|task|任务", "caption": "本月完成事项截图" },
+      { "pattern": "demo|ui|page|screen|result|output|chart|交付|成果|数据", "caption": "阶段成果与数据截图" },
+      { "pattern": "bug|issue|risk|error|block|problem|问题", "caption": "问题与改进截图" },
+      { "pattern": "feishu|slack|meeting|env|repo|环境|平台", "caption": "协作环境截图" }
+    ]
+  },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1600,
+    "denseSectionChars": 950,
+    "denseSectionParagraphs": 3,
+    "figureClusterRefs": 5
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["本月目标", "本月任务与输入"],
+      "blocks": [
+        { "heading": "一、本月目标", "sectionIds": ["purpose"] },
+        { "heading": "二、本月任务与输入", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["本月完成事项", "下月计划"],
+      "blocks": [
+        { "heading": "协作环境", "sectionIds": ["environment"] },
+        { "heading": "三、本月完成事项", "sectionIds": ["steps"] },
+        { "heading": "四、阶段成果与数据", "sectionIds": ["result"] },
+        { "heading": "五、问题与改进", "sectionIds": ["analysis"] },
+        { "heading": "六、下月计划", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 1200,
+      "promptGuidance": [
+        "Prefer an execution-focused monthly report instead of a diary-like summary.",
+        "Describe monthly goals, completed work, measurable outputs, problems, and next-month actions."
+      ]
+    },
+    "full": {
+      "minChars": 1800,
+      "promptGuidance": [
+        "Prefer a submit-ready monthly report with substantial detail instead of a short checklist.",
+        "When possible, describe progress in terms of objective, action, evidence, metrics, and impact.",
+        "Call out unresolved risks, dependency changes, and resource bottlenecks explicitly instead of hiding them in generic language."
+      ]
+    }
+  },
+  "forbiddenPatterns": ["TODO", "TBD", "待补充", "自行填写", "会后补充"]
+}

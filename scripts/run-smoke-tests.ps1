@@ -682,6 +682,7 @@ try {
       (Join-Path $repoRoot 'profiles\deployment-report.json'),
       (Join-Path $repoRoot 'profiles\weekly-report.json'),
       (Join-Path $repoRoot 'profiles\meeting-minutes.json'),
+      (Join-Path $repoRoot 'profiles\monthly-report.json'),
       (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\analyze-roadmap-next-step.ps1'),
@@ -931,6 +932,15 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $meetingMinutesProfile -SectionId 'result' -BaseName 'decision-confirmed') -eq '结论确认截图') -Message 'Meeting-minutes profile image caption defaults are missing the result caption.'
   $meetingMinutesPaginationThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $meetingMinutesProfile
   Assert-True -Condition ([int]$meetingMinutesPaginationThresholds.longSectionChars -eq 1000) -Message 'Meeting-minutes profile pagination-risk thresholds are missing.'
+  $monthlyReportProfile = Get-ReportProfile -ProfileName 'monthly-report' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$monthlyReportProfile.name -eq 'monthly-report') -Message 'Monthly-report profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$monthlyReportProfile.displayName -eq '月报') -Message 'Monthly-report profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $monthlyReportProfile) -eq 'compact') -Message 'Monthly-report profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $monthlyReportProfile) -contains '月报主题') -Message 'Monthly-report profile metadata prefixes are missing 月报主题.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $monthlyReportProfile) -contains '本月完成事项') -Message 'Monthly-report profile required headings are missing 本月完成事项.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $monthlyReportProfile -SectionId 'result' -BaseName 'monthly-metrics') -eq '阶段成果与数据截图') -Message 'Monthly-report profile image caption defaults are missing the result caption.'
+  $monthlyPaginationThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $monthlyReportProfile
+  Assert-True -Condition ([int]$monthlyPaginationThresholds.longSectionChars -eq 1600) -Message 'Monthly-report profile pagination-risk thresholds are missing.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -1009,13 +1019,24 @@ URL: https://example.com/network-lab
   $meetingMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代评审会' -Profile $meetingMinutesProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '评审会议纪要' -ResolvedExperimentDate '2026-04-13' -ResolvedExperimentLocation 'GitHub + 飞书会议') | ConvertFrom-Json
   Assert-True -Condition ([string]$meetingMetadata.记录人 -eq '李四') -Message 'Auto metadata helper did not emit the meeting-minutes recorder label.'
   Assert-True -Condition ([string]$meetingMetadata.会议主题 -eq '第 6 周迭代评审会') -Message 'Auto metadata helper did not emit the meeting-minutes title label.'
+  $monthlyPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '2026 年 4 月项目月报' -Profile $monthlyReportProfile -DetailLevel 'full'
+  Assert-True -Condition ($monthlyPromptText -match '月报 body') -Message 'Auto prompt helper did not use the monthly-report display name.'
+  Assert-True -Condition ($monthlyPromptText -match '项目名称: 校园导览小程序') -Message 'Auto prompt helper did not emit the monthly-report project label.'
+  Assert-True -Condition ($monthlyPromptText -match '月报主题: 2026 年 4 月项目月报') -Message 'Auto prompt helper did not emit the monthly-report title label.'
+  Assert-True -Condition ($monthlyPromptText -match '本月完成事项') -Message 'Auto prompt helper did not include monthly-report required headings.'
+  $monthlyRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '2026 年 4 月项目月报' -Profile $monthlyReportProfile -ExtraKeywords @('月度进展', '校园导览小程序') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$monthlyRequirements.minChars -eq 1800) -Message 'Auto requirements helper did not use the monthly-report full minChars.'
+  Assert-True -Condition (@($monthlyRequirements.sections | Where-Object { $_.name -eq '本月完成事项' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the monthly-report completion section heading.'
+  $monthlyMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '2026 年 4 月项目月报' -Profile $monthlyReportProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '项目月报' -ResolvedExperimentDate '2026-04' -ResolvedExperimentLocation 'GitHub + 飞书 + 本地开发环境') | ConvertFrom-Json
+  Assert-True -Condition ([string]$monthlyMetadata.提交人 -eq '李四') -Message 'Auto metadata helper did not emit the monthly-report owner label.'
+  Assert-True -Condition ([string]$monthlyMetadata.月报主题 -eq '2026 年 4 月项目月报') -Message 'Auto metadata helper did not emit the monthly-report title label.'
   $results.Add('report profile loader OK') | Out-Null
 
   $reportProfileSchema = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\report-profile.schema.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$reportProfileSchema.title -eq 'OpenClaw report profile') -Message 'Report profile schema did not parse.'
   $profileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$profileValidation.passed) -Message 'Report profile validation failed.'
-  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 7) -Message 'Report profile validation did not cover built-in profiles.'
+  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 8) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
 
@@ -1076,8 +1097,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($roadmapTriageMarkdown -match 'Smoke-Coverable') -Message 'Roadmap triage markdown is missing the smoke-coverable section.'
   Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'weekly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending weekly-report after promotion.'
   Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'meeting-minutes is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending meeting-minutes after promotion.'
-  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'monthly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 1) -Message 'Roadmap triage should advance to the next unbuilt profile candidate.'
-  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'monthly-report is listed in the recommended expansion order but is not a built-in profile.' -and [string]$_.suggestedNextStep -match 'Run the preset through sample generation' }).Count -eq 1) -Message 'Roadmap triage should recognize the monthly-report preset and suggest sample-driven promotion.'
+  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'monthly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending monthly-report after promotion.'
   $roadmapTriageWorkflow = Get-Content -LiteralPath (Join-Path $repoRoot '.github\workflows\roadmap-triage.yml') -Raw -Encoding UTF8
   Assert-True -Condition ($roadmapTriageWorkflow -match 'schedule:') -Message 'Roadmap triage workflow is missing a schedule trigger.'
   Assert-True -Condition ($roadmapTriageWorkflow -match 'workflow_dispatch:') -Message 'Roadmap triage workflow is missing a manual trigger.'
@@ -1212,6 +1232,38 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([int]$meetingGeneratedRequirements.minChars -eq 1300) -Message 'Meeting-minutes report-input generation requirements are missing the expected minChars.'
     Assert-True -Condition (@($meetingGeneratedRequirements.sections | Where-Object { $_.name -eq '讨论过程与决议' }).Count -eq 1) -Message 'Meeting-minutes report-input generation requirements are missing the discussion section.'
     Assert-True -Condition ([int]$meetingGeneratedRequirements.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Meeting-minutes report-input generation requirements are missing pagination-risk thresholds.'
+
+    $monthlyInputsOutputDir = Join-Path $tempRoot 'monthly-report-inputs-output'
+    & (Join-Path $repoRoot 'scripts\generate-report-inputs.ps1') `
+      -CourseName '校园导览小程序' `
+      -ExperimentName '2026 年 4 月项目月报' `
+      -StudentName '李四' `
+      -StudentId '20261234' `
+      -ClassName '软工 2302' `
+      -TeacherName '王老师' `
+      -ExperimentProperty '项目月报' `
+      -ExperimentDate '2026-04' `
+      -ExperimentLocation 'GitHub + 飞书 + 本地开发环境' `
+      -ReportProfileName 'monthly-report' `
+      -RequiredKeywords @('月度进展', '阶段成果') `
+      -OutputDir $monthlyInputsOutputDir `
+      -DetailLevel full | Out-Null
+    $monthlyInputsSummaryPath = Join-Path $monthlyInputsOutputDir 'report-inputs-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $monthlyInputsSummaryPath) -Message 'Monthly report-input generation did not create the summary JSON.'
+    $monthlyInputsSummary = (Get-Content -LiteralPath $monthlyInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$monthlyInputsSummary.reportProfileName -eq 'monthly-report') -Message 'Monthly report-input generation summary is missing the expected profile name.'
+    Assert-True -Condition ([string]$monthlyInputsSummary.reportProfileDisplayName -eq '月报') -Message 'Monthly report-input generation summary is missing the expected display name.'
+    Assert-True -Condition ((Split-Path -Leaf ([string]$monthlyInputsSummary.defaultsPath)) -eq 'monthly-report.defaults.json') -Message 'Monthly report-input generation should persist defaults under the profile-specific defaults file.'
+    $monthlyGeneratedPrompt = Get-Content -LiteralPath (Join-Path $monthlyInputsOutputDir 'prompt.txt') -Raw -Encoding UTF8
+    Assert-True -Condition ($monthlyGeneratedPrompt -match '月报 body') -Message 'Monthly report-input generation did not emit the expected prompt body.'
+    Assert-True -Condition ($monthlyGeneratedPrompt -match '月报主题: 2026 年 4 月项目月报') -Message 'Monthly report-input generation did not emit the expected title label.'
+    $monthlyGeneratedMetadata = (Get-Content -LiteralPath (Join-Path $monthlyInputsOutputDir 'metadata.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$monthlyGeneratedMetadata.提交人 -eq '李四') -Message 'Monthly report-input generation metadata is missing the owner label.'
+    Assert-True -Condition ([string]$monthlyGeneratedMetadata.月报主题 -eq '2026 年 4 月项目月报') -Message 'Monthly report-input generation metadata is missing the title label.'
+    $monthlyGeneratedRequirements = (Get-Content -LiteralPath (Join-Path $monthlyInputsOutputDir 'requirements.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([int]$monthlyGeneratedRequirements.minChars -eq 1800) -Message 'Monthly report-input generation requirements are missing the expected minChars.'
+    Assert-True -Condition (@($monthlyGeneratedRequirements.sections | Where-Object { $_.name -eq '本月完成事项' }).Count -eq 1) -Message 'Monthly report-input generation requirements are missing the completion section.'
+    Assert-True -Condition ([int]$monthlyGeneratedRequirements.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly report-input generation requirements are missing pagination-risk thresholds.'
   } finally {
     $env:AGENTS_HOME = $originalInputsAgentsHome
   }
@@ -1995,6 +2047,57 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$meetingValidation.summary.sectionCount -ge 7) -Message 'Meeting minutes validation did not load the expected section rules.'
   Assert-True -Condition ([int]$meetingValidation.summary.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Meeting minutes validation did not use the meeting pagination thresholds.'
   $results.Add('meeting-minutes profile validation OK') | Out-Null
+
+  $monthlyReportPath = Join-Path $tempRoot 'monthly-report.md'
+  @'
+项目月报
+
+项目名称：校园导览小程序
+月报主题：2026 年 4 月项目月报
+提交人：李四
+工号/学号：20261234
+小组/班级：软工 2302
+审核人：王老师
+报告类型：项目月报
+月份周期：2026-04
+工作环境：GitHub + 飞书 + 本地开发环境
+
+一、本月目标
+本月目标是把校园导览小程序从可演示的页面集合推进成一个具备连续使用价值的小程序版本，重点围绕地点分类、关键词搜索、详情页信息完整性和地图接入准备四条主线展开。
+在目标拆解时，团队不仅关注功能是否完成，还要求每一项月度工作都能形成可复盘的输入、执行过程、结果证据和后续决策依据，从而让月报能够同时服务教学验收和团队内部管理。
+
+二、协作环境
+本月协作环境以 GitHub 仓库、飞书任务看板、接口文档和本地微信开发者工具为主，页面截图、任务状态、接口字段定义和演示脚本都统一放在同一套协作空间中维护。
+为了提高联调效率，本月前两周继续采用 mock 数据驱动前端开发，后两周逐步切换到本地接口服务，并通过固定的提测时间和问题清单同步机制减少重复沟通成本。
+
+三、本月任务与输入
+本月输入主要包括课程设计任务书、老师在阶段检查中提出的演示建议、地点基础数据表、页面原型图以及上个月遗留的搜索与导航问题清单。团队按照演示必要性和实现成本把任务分成必须完成、建议完成和可延后观察三类。
+在执行节奏上，项目先完成首页信息架构和地点详情字段整理，再推进搜索、分类筛选和页面状态处理，最后把地图接入的技术评估、路线提示方案和演示脚本整合到同一个月度里程碑中。
+
+四、本月完成事项
+本月已经完成首页分类卡片、地点列表、关键词搜索、详情页信息展示、加载与空状态处理，以及一套适合课堂答辩的演示流程。首页能够按教学楼、实验室、生活服务和公共设施分类展示地点，搜索页可以根据关键字快速返回结果，详情页也补齐了开放时间、位置说明和注意事项等字段。
+在工程推进方面，前端完成了页面结构重构和组件拆分，后端把地点列表、关键词搜索和详情查询接口从纯 mock 方案迁移到本地服务，保证了联调路径更加接近真实环境。团队还补充了页面截图归档、任务状态同步和问题回归机制，使每周输出都能自然汇总到本月报告中。
+除功能开发外，本月还集中清理了若干影响演示稳定性的细节问题，例如重复进入页面时的闪烁、无结果状态缺少提示、以及某些地点信息字段展示不完整等。通过这些整理，当前版本已经具备更稳定的展示基础，而不是仅能勉强跑通单一路径的原型。
+
+五、阶段成果与数据
+阶段成果是形成了一套可以端到端演示的校园导览小程序版本，并积累了相对完整的页面截图、任务记录、接口字段和问题清单。当前版本已经能够支持分类浏览、关键词搜索和地点详情查看三条核心路径，说明整体信息组织与交互方案是成立的。
+从月度数据角度看，本月完成了主要页面的结构定稿、三类核心接口的本地联调、若干关键截图的归档和一轮完整演示脚本的整理。虽然地图组件尚未正式接入，但已有的技术评估结果和路线提示草稿已经为下一阶段推进提供了相对清晰的投入边界和实施顺序。
+
+六、问题与改进
+当前主要问题在于地点数据规模仍然偏小，搜索排序规则还不够稳定，随着数据量上升，可能出现同名地点排序不合理或弱相关结果靠前的问题。另一个问题是地图组件虽然完成了预研，但尚未进入正式联调，导致详情页到路线展示之间仍存在体验断层。
+针对这些问题，团队计划下月优先推进地图接入验证，并同步补齐地点坐标、收藏状态和搜索排序策略。与此同时，还需要进一步收敛演示范围，避免为了追求功能数量而牺牲月度版本的稳定性和可讲解性。
+
+七、下月计划
+下月计划首先完成地图组件接入和一条完整路线展示链路，把详情页中的位置信息与可视化地图联动起来，形成更完整的导览体验。随后继续完善地点数据、收藏功能和搜索排序，提升用户在真实校园场景下的查找效率。
+在交付准备方面，下月还需要组织一次完整的演示彩排，记录操作顺序、页面截图、已知问题和讲解重点，并根据老师反馈决定是否继续扩功能或转入稳定性打磨，确保最终提交版本既可演示又便于答辩说明。
+'@ | Set-Content -LiteralPath $monthlyReportPath -Encoding UTF8
+
+  $monthlyValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $monthlyReportPath -ReportProfileName 'monthly-report' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$monthlyValidation.passed) -Message 'Monthly report validation should pass for the monthly-report profile.'
+  Assert-True -Condition ([string]$monthlyValidation.reportProfileName -eq 'monthly-report') -Message 'Monthly report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$monthlyValidation.summary.sectionCount -ge 7) -Message 'Monthly report validation did not load the expected section rules.'
+  Assert-True -Condition ([int]$monthlyValidation.summary.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly report validation did not use the monthly pagination thresholds.'
+  $results.Add('monthly-report profile validation OK') | Out-Null
 
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
@@ -3527,6 +3630,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\deployment-report.json')) -Message 'Install script did not copy the deployment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\weekly-report.json')) -Message 'Install script did not copy the weekly-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
