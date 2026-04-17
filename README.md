@@ -270,6 +270,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-profile-preset-samples.ps
   -OutputDir ".\tests-output\profile-preset-samples"
 ```
 
+这个命令会额外写出 `profile-preset-samples.md`，方便直接预览每个 preset 对应的 `prompt.txt`、`metadata.auto.json` 和 `requirements.auto.json` 路径。
+
 ### 4. 飞书或直聊场景补充
 
 如果你走 Feishu 或其他直接聊天场景，有几条经验是稳定有效的：

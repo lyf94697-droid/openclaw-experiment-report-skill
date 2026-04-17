@@ -11,6 +11,8 @@ param(
 
   [switch]$UseCurrentDefaults,
 
+  [string]$MarkdownPath,
+
   [ValidateSet("text", "json")]
   [string]$Format = "text"
 )
@@ -105,6 +107,61 @@ function Get-SampleValuesForProfile {
   }
 }
 
+function ConvertTo-MarkdownTableCell {
+  param(
+    [AllowNull()]
+    [string]$Value
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return ""
+  }
+
+  return ([string]$Value).Replace("|", "\|").Replace("`r", " ").Replace("`n", " ")
+}
+
+function Write-ProfilePresetSamplesMarkdown {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Summary,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $lines = New-Object System.Collections.Generic.List[string]
+  [void]$lines.Add("# Profile Preset Samples")
+  [void]$lines.Add("")
+  [void]$lines.Add(("Output directory: {0}" -f [string]$Summary.outputDir))
+  [void]$lines.Add(("Detail level: {0}" -f [string]$Summary.detailLevel))
+  [void]$lines.Add(("Defaults isolated: {0}" -f [string]$Summary.defaultsIsolated))
+  [void]$lines.Add(("Generated count: {0}" -f [int]$Summary.generatedCount))
+  [void]$lines.Add("")
+  [void]$lines.Add("| Profile | Display name | Output dir | Prompt | Metadata | Requirements |")
+  [void]$lines.Add("| --- | --- | --- | --- | --- | --- |")
+
+  foreach ($item in @($Summary.generated)) {
+    $cells = @(
+      (ConvertTo-MarkdownTableCell -Value ([string]$item.reportProfileName)),
+      (ConvertTo-MarkdownTableCell -Value ([string]$item.reportProfileDisplayName)),
+      (ConvertTo-MarkdownTableCell -Value ([string]$item.outputDir)),
+      (ConvertTo-MarkdownTableCell -Value ([string]$item.promptPath)),
+      (ConvertTo-MarkdownTableCell -Value ([string]$item.metadataPath)),
+      (ConvertTo-MarkdownTableCell -Value ([string]$item.requirementsPath))
+    )
+    [void]$lines.Add(("| {0} |" -f ($cells -join " | ")))
+  }
+
+  [void]$lines.Add("")
+  [void]$lines.Add("Each output directory contains `prompt.txt`, `metadata.auto.json`, `requirements.auto.json`, and `report-inputs-summary.json`.")
+
+  $parent = Split-Path -Parent $Path
+  if (-not [string]::IsNullOrWhiteSpace($parent)) {
+    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+  }
+  [System.IO.File]::WriteAllText($Path, (($lines -join [Environment]::NewLine) + [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($true)))
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $profilePresetPaths = Get-ProfilePresetPaths -PresetDirectory $PresetDir -RequestedProfilePaths $ProfilePath
 if ($profilePresetPaths.Count -eq 0) {
@@ -177,6 +234,12 @@ try {
 $defaultsIsolated = (-not [bool]$UseCurrentDefaults)
 $defaultsHome = if ([bool]$UseCurrentDefaults) { [string]$originalAgentsHome } else { $isolatedAgentsHome }
 $generatedItems = $generated.ToArray()
+$summaryPath = Join-Path $resolvedOutputDir "profile-preset-samples-summary.json"
+$resolvedMarkdownPath = if ([string]::IsNullOrWhiteSpace($MarkdownPath)) {
+  Join-Path $resolvedOutputDir "profile-preset-samples.md"
+} else {
+  [System.IO.Path]::GetFullPath($MarkdownPath)
+}
 
 $summary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
@@ -185,11 +248,12 @@ $summary = [pscustomobject]@{
   defaultsHome = $defaultsHome
   generatedCount = $generated.Count
   generated = $generatedItems
+  summaryPath = $summaryPath
+  markdownPath = $resolvedMarkdownPath
 }
 
-$summaryPath = Join-Path $resolvedOutputDir "profile-preset-samples-summary.json"
+Write-ProfilePresetSamplesMarkdown -Summary $summary -Path $resolvedMarkdownPath
 [System.IO.File]::WriteAllText($summaryPath, ($summary | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
-Add-Member -InputObject $summary -MemberType NoteProperty -Name summaryPath -Value $summaryPath -Force
 
 if ($Format -eq "json") {
   Write-Output ($summary | ConvertTo-Json -Depth 8)
@@ -197,6 +261,7 @@ if ($Format -eq "json") {
   Write-Output ("Generated profile preset samples: {0}" -f $generated.Count)
   Write-Output ("Output directory: {0}" -f $resolvedOutputDir)
   Write-Output ("Summary path: {0}" -f $summaryPath)
+  Write-Output ("Markdown path: {0}" -f $resolvedMarkdownPath)
   foreach ($item in $generated) {
     Write-Output ("- {0}: {1}" -f ([string]$item.reportProfileName), ([string]$item.outputDir))
   }

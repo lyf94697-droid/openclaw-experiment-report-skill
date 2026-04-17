@@ -50,4 +50,6 @@ That command writes one subdirectory per preset, each containing:
 - `requirements.auto.json`
 - `report-inputs-summary.json`
 
+It also writes a top-level `profile-preset-samples.md` index so you can quickly preview all generated sample bundles without opening each JSON file.
+
 These presets are intentionally examples, not built-in defaults. They are meant to shorten the path from "this repo is close to my document type" to "I can prototype my own profile today".

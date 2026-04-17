@@ -977,6 +977,11 @@ URL: https://example.com/network-lab
   $profilePresetSamples = (& (Join-Path $repoRoot 'scripts\run-profile-preset-samples.ps1') -OutputDir $profilePresetSamplesDir -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([int]$profilePresetSamples.generatedCount -eq 2) -Message 'Profile preset sample runner should generate both curated preset samples.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$profilePresetSamples.summaryPath)) -Message 'Profile preset sample runner did not write its summary JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$profilePresetSamples.markdownPath)) -Message 'Profile preset sample runner did not write its markdown index.'
+  $profilePresetSamplesMarkdown = Get-Content -LiteralPath ([string]$profilePresetSamples.markdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($profilePresetSamplesMarkdown -match 'Profile Preset Samples') -Message 'Profile preset sample markdown is missing the expected title.'
+  Assert-True -Condition ($profilePresetSamplesMarkdown -match 'weekly-report') -Message 'Profile preset sample markdown is missing weekly-report.'
+  Assert-True -Condition ($profilePresetSamplesMarkdown -match 'meeting-minutes') -Message 'Profile preset sample markdown is missing meeting-minutes.'
   $weeklyPresetSample = @($profilePresetSamples.generated | Where-Object { [string]$_.reportProfileName -eq 'weekly-report' })[0]
   Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.promptPath)) -Message 'Weekly preset sample runner did not create prompt.txt.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.metadataPath)) -Message 'Weekly preset sample runner did not create metadata.auto.json.'
