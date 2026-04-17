@@ -84,6 +84,12 @@
       { "pattern": "error|rollback|log|issue|故障|异常|回滚|日志", "caption": "问题处理截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 650,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["部署目标", "部署方案"],

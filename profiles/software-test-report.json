@@ -84,6 +84,12 @@
       { "pattern": "env|config|setup|browser|database|环境|配置", "caption": "测试环境截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 650,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["测试目标", "测试范围"],

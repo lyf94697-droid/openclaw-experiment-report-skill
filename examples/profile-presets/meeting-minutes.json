@@ -81,6 +81,12 @@
       { "pattern": "risk|issue|debate|problem|争议|风险", "caption": "风险争议截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 700,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 3
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["会议目标", "议题与输入"],

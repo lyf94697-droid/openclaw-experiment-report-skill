@@ -444,6 +444,29 @@ function Get-ReportProfileDefaultStyleProfile {
   return $normalized
 }
 
+function Get-ReportProfilePaginationRiskThresholds {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $thresholds = [ordered]@{
+    longSectionChars = 900
+    denseSectionChars = 550
+    denseSectionParagraphs = 2
+    figureClusterRefs = 3
+  }
+
+  $configuredThresholds = ConvertTo-ReportProfilePlainHashtable -InputObject (Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "paginationRiskThresholds")
+  foreach ($key in @($thresholds.Keys)) {
+    if ($configuredThresholds.ContainsKey($key) -and $null -ne $configuredThresholds[$key] -and -not [string]::IsNullOrWhiteSpace([string]$configuredThresholds[$key])) {
+      $thresholds[$key] = [int]$configuredThresholds[$key]
+    }
+  }
+
+  return [pscustomobject]$thresholds
+}
+
 function Get-ReportProfileImagePlacementDefaults {
   param(
     [Parameter(Mandatory = $true)]
@@ -723,6 +746,7 @@ function New-ReportProfileAutoRequirementsJson {
     sections = @($sectionRequirements)
     requiredKeywords = @($keywordList)
     forbiddenPatterns = @($Profile.forbiddenPatterns)
+    paginationRiskThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $Profile
   }
 
   return ($requirements | ConvertTo-Json -Depth 6)

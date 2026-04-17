@@ -81,6 +81,12 @@
       { "pattern": "feishu|slack|meeting|env|repo|环境|平台", "caption": "协作环境截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1200,
+    "denseSectionChars": 750,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["工作目标", "本周任务与输入"],

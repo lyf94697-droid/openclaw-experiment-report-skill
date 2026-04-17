@@ -264,6 +264,12 @@ $profile = [ordered]@{
       [ordered]@{ pattern = "env|environment|tool"; caption = ("{0} screenshot" -f [string]$headings[1]) }
     )
   }
+  paginationRiskThresholds = [ordered]@{
+    longSectionChars = 900
+    denseSectionChars = 550
+    denseSectionParagraphs = 2
+    figureClusterRefs = 3
+  }
   fieldMapCompositeRules = @(
     [ordered]@{
       matchAll = @([string]$headings[0], [string]$headings[2])

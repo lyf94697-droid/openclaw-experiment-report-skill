@@ -142,6 +142,7 @@ function Get-RequirementsRoot {
       minChars = [int]$detailProfile.minChars
       sections = @($sections)
       forbiddenPatterns = @($profile.forbiddenPatterns)
+      paginationRiskThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $profile
       reportProfileName = [string]$profile.name
       reportProfilePath = [string]$profile.resolvedProfilePath
     }
@@ -155,6 +156,33 @@ function Get-RequirementsRoot {
   }
 
   return ConvertTo-PlainHashtable -InputObject ($ConfigJson | ConvertFrom-Json)
+}
+
+function Resolve-PaginationRiskThresholds {
+  param(
+    [AllowNull()]
+    [object]$Value
+  )
+
+  $thresholds = [ordered]@{
+    longSectionChars = 900
+    denseSectionChars = 550
+    denseSectionParagraphs = 2
+    figureClusterRefs = 3
+  }
+
+  if ($null -eq $Value) {
+    return [pscustomobject]$thresholds
+  }
+
+  $configuredThresholds = ConvertTo-PlainHashtable -InputObject $Value
+  foreach ($key in @($thresholds.Keys)) {
+    if ($configuredThresholds.ContainsKey($key) -and $null -ne $configuredThresholds[$key] -and -not [string]::IsNullOrWhiteSpace([string]$configuredThresholds[$key])) {
+      $thresholds[$key] = [int]$configuredThresholds[$key]
+    }
+  }
+
+  return [pscustomobject]$thresholds
 }
 
 function Test-TextContains {
@@ -385,6 +413,11 @@ $usesExternalRequirements = (-not [string]::IsNullOrWhiteSpace($RequirementsPath
 $reportInfo = Get-ReportText -TextPath $Path -InlineText $Text
 $reportText = [string]$reportInfo.Text
 $requirementsRoot = Get-RequirementsRoot -ConfigPath $RequirementsPath -ConfigJson $RequirementsJson -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$paginationRiskThresholdSource = $null
+if ($requirementsRoot.ContainsKey("paginationRiskThresholds")) {
+  $paginationRiskThresholdSource = $requirementsRoot["paginationRiskThresholds"]
+}
+$paginationRiskThresholds = Resolve-PaginationRiskThresholds -Value $paginationRiskThresholdSource
 
 $resolvedValidationProfileName = if ($requirementsRoot.ContainsKey("reportProfileName") -and -not [string]::IsNullOrWhiteSpace([string]$requirementsRoot["reportProfileName"])) {
   [string]$requirementsRoot["reportProfileName"]
@@ -543,28 +576,32 @@ foreach ($sectionMatch in $sectionMatches) {
     }
   }
 
-  if ($sectionMatch.contentChars -ge 900) {
+  if ($paginationRiskThresholds.longSectionChars -gt 0 -and $sectionMatch.contentChars -ge $paginationRiskThresholds.longSectionChars) {
     Add-Finding -Target $findings -Severity "warning" -Code "pagination-risk-long-section" -Category "pagination" -Message ("Section '{0}' is long enough to be pagination-sensitive ({1} chars)." -f $sectionMatch.name, $sectionMatch.contentChars) -Context @{
       section = $sectionMatch.name
       lineNumber = $sectionMatch.lineNumber
       contentChars = [int]$sectionMatch.contentChars
+      threshold = [int]$paginationRiskThresholds.longSectionChars
     }
   }
 
-  if ($sectionMatch.contentChars -ge 550 -and $sectionMatch.paragraphCount -le 2) {
+  if ($paginationRiskThresholds.denseSectionChars -gt 0 -and $paginationRiskThresholds.denseSectionParagraphs -gt 0 -and $sectionMatch.contentChars -ge $paginationRiskThresholds.denseSectionChars -and $sectionMatch.paragraphCount -le $paginationRiskThresholds.denseSectionParagraphs) {
     Add-Finding -Target $findings -Severity "warning" -Code "pagination-risk-dense-section-block" -Category "pagination" -Message ("Section '{0}' is dense and may split awkwardly across pages ({1} chars in {2} paragraphs)." -f $sectionMatch.name, $sectionMatch.contentChars, $sectionMatch.paragraphCount) -Context @{
       section = $sectionMatch.name
       lineNumber = $sectionMatch.lineNumber
       contentChars = [int]$sectionMatch.contentChars
       paragraphCount = [int]$sectionMatch.paragraphCount
+      charThreshold = [int]$paginationRiskThresholds.denseSectionChars
+      paragraphThreshold = [int]$paginationRiskThresholds.denseSectionParagraphs
     }
   }
 
-  if ($sectionMatch.figureRefCount -ge 3) {
+  if ($paginationRiskThresholds.figureClusterRefs -gt 0 -and $sectionMatch.figureRefCount -ge $paginationRiskThresholds.figureClusterRefs) {
     Add-Finding -Target $findings -Severity "warning" -Code "pagination-risk-figure-cluster" -Category "pagination" -Message ("Section '{0}' references many figures ({1}), which may create layout and pagination pressure." -f $sectionMatch.name, $sectionMatch.figureRefCount) -Context @{
       section = $sectionMatch.name
       lineNumber = $sectionMatch.lineNumber
       figureRefCount = [int]$sectionMatch.figureRefCount
+      threshold = [int]$paginationRiskThresholds.figureClusterRefs
     }
   }
 }
@@ -658,6 +695,7 @@ $result = [pscustomobject]@{
     structuralIssueCount = $structuralIssueCount
     findingCountsByCode = $findingCountsByCode
     findingCountsByCategory = $findingCountsByCategory
+    paginationRiskThresholds = $paginationRiskThresholds
     errorCodes = @($findings | Where-Object { $_.severity -eq "error" } | ForEach-Object { [string]$_.code } | Select-Object -Unique)
     warningCodes = @($findings | Where-Object { $_.severity -eq "warning" } | ForEach-Object { [string]$_.code } | Select-Object -Unique)
   }
@@ -678,6 +716,7 @@ if ($Format -eq "json") {
   [void]$linesOut.Add("- Errors: $($result.summary.errorCount)")
   [void]$linesOut.Add("- Warnings: $($result.summary.warningCount)")
   [void]$linesOut.Add("- Pagination risks: $($result.summary.paginationRiskCount)")
+  [void]$linesOut.Add("- Pagination thresholds: long >= $($paginationRiskThresholds.longSectionChars) chars; dense >= $($paginationRiskThresholds.denseSectionChars) chars and <= $($paginationRiskThresholds.denseSectionParagraphs) paragraphs; figure cluster >= $($paginationRiskThresholds.figureClusterRefs) refs")
   [void]$linesOut.Add("- Structural issues: $($result.summary.structuralIssueCount)")
   [void]$linesOut.Add("")
   [void]$linesOut.Add("## Section Coverage")

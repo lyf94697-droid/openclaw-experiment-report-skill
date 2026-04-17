@@ -505,6 +505,46 @@ function Test-ImagePlacementDefaults {
   }
 }
 
+function Test-PaginationRiskThresholds {
+  param(
+    [AllowEmptyCollection()]
+    [System.Collections.Generic.List[object]]$Findings,
+
+    [AllowNull()]
+    [object]$Thresholds,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  if ($null -eq $Thresholds) {
+    return
+  }
+
+  if ($Thresholds -is [string] -or $Thresholds -is [System.ValueType] -or (($Thresholds -is [System.Collections.IEnumerable]) -and ($Thresholds -isnot [System.Collections.IDictionary]))) {
+    Add-ProfileFinding -Findings $Findings -Severity error -Code "pagination-risk-thresholds-invalid" -Path $Path -Message "paginationRiskThresholds must be an object when present."
+    return
+  }
+
+  $knownKeys = @("longSectionChars", "denseSectionChars", "denseSectionParagraphs", "figureClusterRefs")
+  foreach ($property in $Thresholds.PSObject.Properties) {
+    if ($knownKeys -notcontains [string]$property.Name) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "pagination-risk-threshold-unknown" -Path "$Path.$($property.Name)" -Message "paginationRiskThresholds contains an unknown property."
+    }
+  }
+
+  foreach ($key in $knownKeys) {
+    $value = Get-OptionalPropertyValue -InputObject $Thresholds -Name $key
+    if ($null -eq $value) {
+      continue
+    }
+
+    if (-not (Test-IntegerValue -Value $value) -or [int64]$value -lt 0) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "pagination-risk-threshold-invalid" -Path "$Path.$key" -Message "paginationRiskThresholds.$key must be a non-negative integer."
+    }
+  }
+}
+
 function Test-FieldMapCompositeRules {
   param(
     [AllowEmptyCollection()]
@@ -616,6 +656,7 @@ function Test-ReportProfile {
   }
 
   Test-ImagePlacementDefaults -Findings $Findings -ImagePlacementDefaults (Get-OptionalPropertyValue -InputObject $Profile -Name "imagePlacementDefaults") -KnownSectionIds $knownSectionIds -Path "$Path.imagePlacementDefaults"
+  Test-PaginationRiskThresholds -Findings $Findings -Thresholds (Get-OptionalPropertyValue -InputObject $Profile -Name "paginationRiskThresholds") -Path "$Path.paginationRiskThresholds"
   Test-FieldMapCompositeRules -Findings $Findings -Rules (Get-OptionalPropertyValue -InputObject $Profile -Name "fieldMapCompositeRules") -KnownSectionIds $knownSectionIds -Path "$Path.fieldMapCompositeRules"
   Test-DetailProfiles -Findings $Findings -DetailProfiles (Get-OptionalPropertyValue -InputObject $Profile -Name "detailProfiles") -Path "$Path.detailProfiles"
 

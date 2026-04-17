@@ -506,6 +506,7 @@ $pipelineTrace = [pscustomobject]@{
     validationErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationErrorCount") { $buildSummary.validationErrorCount } else { $null })
     validationWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationWarningCount") { $buildSummary.validationWarningCount } else { $null })
     validationPaginationRiskCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskCount") { $buildSummary.validationPaginationRiskCount } else { $null })
+    validationPaginationRiskThresholds = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskThresholds") { $buildSummary.validationPaginationRiskThresholds } else { $null })
     validationStructuralIssueCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $buildSummary.validationStructuralIssueCount } else { $null })
     validationWarningCodes = $buildValidationWarningCodes
   }
@@ -609,6 +610,7 @@ $wrapperSummary = [pscustomobject]@{
   validationErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationErrorCount") { $buildSummary.validationErrorCount } else { $null })
   validationWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationWarningCount") { $buildSummary.validationWarningCount } else { $null })
   validationPaginationRiskCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskCount") { $buildSummary.validationPaginationRiskCount } else { $null })
+  validationPaginationRiskThresholds = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskThresholds") { $buildSummary.validationPaginationRiskThresholds } else { $null })
   validationStructuralIssueCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $buildSummary.validationStructuralIssueCount } else { $null })
   validationFindingCountsByCode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationFindingCountsByCode") { $buildSummary.validationFindingCountsByCode } else { $null })
   validationFindingCountsByCategory = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationFindingCountsByCategory") { $buildSummary.validationFindingCountsByCategory } else { $null })

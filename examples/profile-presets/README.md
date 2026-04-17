@@ -36,6 +36,8 @@ Recommended workflow:
 
 3. If the preset works for your document family, either keep using it through `-ReportProfilePath` or move a copy into `profiles/` and continue tuning aliases, captions, and prompt guidance.
 
+Each preset can also tune `paginationRiskThresholds` so validation warnings match the document family's normal section length and screenshot density.
+
 You can also generate sample input bundles for every preset in this directory:
 
 ```powershell

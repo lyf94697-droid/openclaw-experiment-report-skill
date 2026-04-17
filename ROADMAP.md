@@ -43,6 +43,7 @@ Implemented stabilization baseline:
 
 - profile-specific structural validation now reports machine-readable finding codes for missing required headings, duplicate headings, section-order anomalies, empty sections, placeholder-only sections, and short sections
 - pagination-risk warnings now report machine-readable codes for long sections, dense section blocks, and figure-heavy sections
+- pagination-risk thresholds now live in profile metadata and flow into validation summaries, generated requirements, build summaries, and wrapper traces
 - `build-report.ps1`, `build-report-from-url.ps1`, and `build-report-from-feishu.ps1` now propagate validation and pagination-risk summaries into their summary JSON files and pipeline traces
 - `build-report.ps1`, `build-report-from-url.ps1`, and `build-report-from-feishu.ps1` now support optional template-frame docx delivery while keeping the normal final docx path stable
 - smoke coverage now includes passing fixtures, structural-risk fixtures, and end-to-end pagination-warning propagation through the local build, URL wrapper, and Feishu wrapper paths
@@ -205,7 +206,7 @@ Alongside new profiles, the repository should keep investing in a few shared cap
 ### Validation And Risk Detection
 
 - richer output checks per profile
-- configurable pagination-risk thresholds in profile metadata
+- more profile-specific pagination-risk presets for document families with very different length and screenshot density
 - more Word/WPS-sensitive layout heuristics for image-heavy reports
 - clearer remediation guidance in machine-readable output files
 
@@ -223,6 +224,7 @@ Implemented baseline:
 - `scripts/run-profile-preset-samples.ps1`
 - `scripts/analyze-roadmap-next-step.ps1`
 - `.github/workflows/roadmap-triage.yml`
+- schema-backed `paginationRiskThresholds` in report profiles and preset examples
 
 These stay outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles.
 

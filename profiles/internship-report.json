@@ -82,6 +82,12 @@
       { "pattern": "analysis|bug|error|problem|异常|问题", "caption": "问题分析截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1100,
+    "denseSectionChars": 700,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["实习目的", "实习任务"],

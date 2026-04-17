@@ -141,6 +141,9 @@
         "full": { "$ref": "#/$defs/detailProfile" }
       }
     },
+    "paginationRiskThresholds": {
+      "$ref": "#/$defs/paginationRiskThresholds"
+    },
     "forbiddenPatterns": {
       "type": "array",
       "items": {
@@ -222,6 +225,28 @@
             "type": "string",
             "minLength": 1
           }
+        }
+      }
+    },
+    "paginationRiskThresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "longSectionChars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denseSectionChars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denseSectionParagraphs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "figureClusterRefs": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

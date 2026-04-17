@@ -72,7 +72,7 @@
 - `internship-report` 覆盖实习目的、实习单位与环境、实习任务与要求、实习过程与内容、实习成果、问题分析与改进、实习总结
 - `software-test-report` 覆盖测试目标、测试环境、测试范围与依据、测试用例设计与执行、测试结果、缺陷分析与改进、测试总结
 - `deployment-report` 覆盖部署目标、部署环境、部署方案与架构、部署步骤与配置、验证结果、问题处理与回滚预案、部署总结
-- profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、图注规则、图片落位优先级和复合模板填充规则
+- profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、分页风险阈值、图注规则、图片落位优先级和复合模板填充规则
 - 模板适配能力也被抽象出来，可以用 `check-report-profile-template-fit.ps1` 诊断新模板缺字段、缺章节、缺 alias 或是否需要新增复合填充规则
 - 插图流程已经支持按 profile 识别章节、生成图片落位预案、写入图注、连续图片 2 列分组布局，以及最终 layout check
 - 构建过程现在会写出 `summary.json`、`pipeline-trace.json`、`pipeline-trace.md`、`image-placement-plan.md` 和 `layout-check.json`，方便复盘每次运行到底用了什么输入、生成了什么产物
@@ -100,6 +100,7 @@
 | `validationPassed` | 没有 error 时为 `true`；pagination risk 目前是 warning，不会单独导致失败 |
 | `validationErrorCount` / `validationWarningCount` | validation finding 的 error / warning 数量 |
 | `validationPaginationRiskCount` | `category = pagination` 的风险 warning 数量 |
+| `validationPaginationRiskThresholds` | 当前使用的分页风险阈值，来自 active report profile 或外部 requirements |
 | `validationStructuralIssueCount` | `category = structure` 的结构问题数量 |
 | `validationErrorCodes` / `validationWarningCodes` | 去重后的机器可读 code 列表 |
 | `validationWarningSummary` | warning 的轻量摘要，包含 `severity`、`code`、`category`、`message` |
@@ -125,6 +126,8 @@
 | `pagination-risk-long-section` | warning | 单个章节正文较长，进入 Word/WPS 模板后更容易跨页 |
 | `pagination-risk-dense-section-block` | warning | 单个章节文本密集、段落数少，分页时容易形成大块断裂 |
 | `pagination-risk-figure-cluster` | warning | 单个章节引用较多图片，图片和图注可能造成分页压力 |
+
+这些分页风险阈值可以在 profile 的 `paginationRiskThresholds` 里调整。字段包括 `longSectionChars`、`denseSectionChars`、`denseSectionParagraphs` 和 `figureClusterRefs`；`validate-report-draft.ps1` 的 `summary.paginationRiskThresholds` 会写出本次实际使用的值。
 
 ## 快速开始
 
@@ -233,6 +236,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - `generate-docx-field-map.ps1` 的 JSON 输出现在会额外带 `diagnostics` 和 `summary.diagnosticCountsByCode`，用于解释模板里哪些章节标题、metadata 标签或复合正文单元格没有命中自动映射规则
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 新增 report profile 时，可以先用 `scripts/new-report-profile.ps1` 生成 schema-valid 草稿，再按具体文档类型调整标题、alias、图注和 prompt 文案
+- 如果某类文档天然章节更长或图片更多，可以在 profile 里调高 `paginationRiskThresholds`，避免把正常结构误报成分页风险；反过来也可以调低，用于更早捕捉 WPS/Word 模板风险
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
 - 如果你还不想把新文档类型直接升级成内置 profile，可以先看 `examples/profile-presets/`：目前仓库提供 `weekly-report.json` 和 `meeting-minutes.json` 两份可直接试跑的自定义 preset，适合先验证“这条 pipeline 能不能复用”
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`

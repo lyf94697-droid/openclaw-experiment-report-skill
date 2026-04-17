@@ -871,6 +871,11 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileExtraSectionHeadings -Profile $reportProfile) -contains '实验内容') -Message 'Report profile extra section headings are missing 实验内容.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId 'steps' -BaseName 'setup-step') -eq '实验步骤截图') -Message 'Report profile image caption defaults are missing the steps caption.'
   Assert-True -Condition (@(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile).Count -ge 2) -Message 'Report profile field-map composite rules are missing.'
+  $reportProfilePaginationRiskThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $reportProfile
+  Assert-True -Condition ([int]$reportProfilePaginationRiskThresholds.longSectionChars -eq 900) -Message 'Report profile pagination-risk long-section threshold is missing.'
+  Assert-True -Condition ([int]$reportProfilePaginationRiskThresholds.denseSectionChars -eq 550) -Message 'Report profile pagination-risk dense-section threshold is missing.'
+  Assert-True -Condition ([int]$reportProfilePaginationRiskThresholds.denseSectionParagraphs -eq 2) -Message 'Report profile pagination-risk dense paragraph threshold is missing.'
+  Assert-True -Condition ([int]$reportProfilePaginationRiskThresholds.figureClusterRefs -eq 3) -Message 'Report profile pagination-risk figure-cluster threshold is missing.'
   $courseDesignProfile = Get-ReportProfile -ProfileName 'course-design-report' -RepoRoot $repoRoot
   Assert-True -Condition ([string]$courseDesignProfile.name -eq 'course-design-report') -Message 'Course-design profile loader returned an unexpected profile name.'
   Assert-True -Condition ([string]$courseDesignProfile.displayName -eq '课程设计报告') -Message 'Course-design profile loader returned an unexpected display name.'
@@ -907,6 +912,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$experimentRequirements.courseName -eq '计算机网络') -Message 'Auto requirements helper did not preserve the experiment-report course name.'
   Assert-True -Condition ([int]$experimentRequirements.minChars -eq 700) -Message 'Auto requirements helper did not use the experiment-report standard minChars.'
   Assert-True -Condition (@($experimentRequirements.requiredKeywords).Count -eq 3) -Message 'Auto requirements helper should keep unique course/title/extra keywords.'
+  Assert-True -Condition ([int]$experimentRequirements.paginationRiskThresholds.longSectionChars -eq 900) -Message 'Auto requirements helper did not include profile pagination-risk thresholds.'
   $experimentMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -ResolvedStudentName '张三' -ResolvedStudentId '20260001' -ResolvedClassName '计科 2201' -ResolvedTeacherName '李老师' -ResolvedExperimentProperty '③验证性实验' -ResolvedExperimentDate '2026-04-09' -ResolvedExperimentLocation '实验楼 A201') | ConvertFrom-Json
   Assert-True -Condition ([string]$experimentMetadata.姓名 -eq '张三') -Message 'Auto metadata helper did not emit the experiment-report student label.'
   Assert-True -Condition ([string]$experimentMetadata.日期 -eq '2026-04-09') -Message 'Auto metadata helper did not emit the experiment-report extra date label.'
@@ -971,6 +977,7 @@ URL: https://example.com/network-lab
   $exampleWeeklyPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\weekly-report.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$exampleWeeklyPreset.defaultStyleProfile -eq 'compact') -Message 'Weekly preset should demonstrate compact as the default style profile.'
   Assert-True -Condition ([string]$exampleWeeklyPreset.sectionFields[3].heading -eq '本周完成事项') -Message 'Weekly preset is missing the expected steps heading.'
+  Assert-True -Condition ([int]$exampleWeeklyPreset.paginationRiskThresholds.longSectionChars -eq 1200) -Message 'Weekly preset should demonstrate custom pagination-risk thresholds.'
   $exampleMeetingPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\meeting-minutes.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$exampleMeetingPreset.defaultStyleProfile -eq 'default') -Message 'Meeting-minutes preset should demonstrate default as the default style profile.'
   Assert-True -Condition ([string]$exampleMeetingPreset.sectionFields[3].heading -eq '讨论过程与决议') -Message 'Meeting-minutes preset is missing the expected steps heading.'
@@ -991,6 +998,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.requirementsPath)) -Message 'Weekly preset sample runner did not create requirements.auto.json.'
   $weeklyPresetRequirements = (Get-Content -LiteralPath ([string]$weeklyPresetSample.requirementsPath) -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition (@($weeklyPresetRequirements.sections | Where-Object { [string]$_.name -eq '本周完成事项' }).Count -eq 1) -Message 'Weekly preset sample requirements are missing the expected completion section.'
+  Assert-True -Condition ([int]$weeklyPresetRequirements.paginationRiskThresholds.longSectionChars -eq 1200) -Message 'Weekly preset sample requirements did not preserve custom pagination-risk thresholds.'
   $meetingPresetSample = @($profilePresetSamples.generated | Where-Object { [string]$_.reportProfileName -eq 'meeting-minutes' })[0]
   Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPresetSample.promptPath)) -Message 'Meeting-minutes preset sample runner did not create prompt.txt.'
   $meetingPresetPrompt = Get-Content -LiteralPath ([string]$meetingPresetSample.promptPath) -Raw -Encoding UTF8
@@ -1030,6 +1038,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$generatedWeeklyProfile.name -eq 'weekly-report') -Message 'Profile scaffold generator wrote an unexpected profile name.'
   Assert-True -Condition ([string]$generatedWeeklyProfile.displayName -eq '周报') -Message 'Profile scaffold generator wrote an unexpected display name.'
   Assert-True -Condition ([string]$generatedWeeklyProfile.sectionFields[3].heading -eq '完成事项') -Message 'Profile scaffold generator did not preserve the steps heading.'
+  Assert-True -Condition ([int]$generatedWeeklyProfile.paginationRiskThresholds.longSectionChars -eq 900) -Message 'Profile scaffold generator did not include pagination-risk thresholds.'
   $generatedWeeklyProfileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -ProfilePath $newReportProfilePath -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$generatedWeeklyProfileValidation.passed) -Message 'Generated weekly profile failed standalone validation.'
   $results.Add('report profile scaffold generator OK') | Out-Null
@@ -1074,6 +1083,7 @@ URL: https://example.com/network-lab
     $generatedRequirements = (Get-Content -LiteralPath (Join-Path $reportInputsOutputDir 'requirements.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition ([int]$generatedRequirements.minChars -eq 1400) -Message 'Report-input generation requirements are missing the expected course-design minChars.'
     Assert-True -Condition (@($generatedRequirements.sections | Where-Object { $_.name -eq '方案设计与实现' }).Count -eq 1) -Message 'Report-input generation requirements are missing the course-design implementation section.'
+    Assert-True -Condition ([int]$generatedRequirements.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Report-input generation requirements are missing profile pagination-risk thresholds.'
   } finally {
     $env:AGENTS_HOME = $originalInputsAgentsHome
   }
@@ -1300,6 +1310,60 @@ arp -a
   Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Experiment structural-risk fixture should report pagination-risk-dense-section-block.'
   Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Experiment structural-risk fixture should report pagination-risk-figure-cluster.'
   $results.Add('experiment structural validation OK') | Out-Null
+
+  $experimentPaginationRiskReportPath = Join-Path $tempRoot 'experiment-pagination-risk-report.md'
+  @(
+    '计算机网络实验报告',
+    '',
+    '课程名称：计算机网络',
+    '实验名称：局域网搭建与常用 DOS 命令使用',
+    '',
+    '一、实验目的',
+    '本节说明局域网搭建实验的验证目标，并明确需要通过命令观察网络参数、地址规划和主机连通状态之间的对应关系。',
+    '为了保证后续分析有依据，报告还需要把网络配置目的与命令验证思路联系起来，而不是只给出结论。',
+    '',
+    '二、实验环境',
+    '实验环境包括两台处于同一网段的虚拟机、一台二层交换设备以及用于查看网络参数的 DOS 命令窗口，所有节点都保持固定地址配置。',
+    '在操作前先确认虚拟机网卡模式、交换连接关系和主机名设置一致，以便后续步骤能够稳定复现。',
+    '',
+    '三、实验原理或任务要求',
+    '同一局域网内的主机需要具备一致的网络号和正确的子网掩码，通信过程中可以通过 ICMP 回显和 ARP 地址解析观察链路是否正常。',
+    '任务要求依次完成地址配置、ipconfig 参数检查、ping 连通验证和 arp 缓存查看，并结合输出解释局域网通信是否建立。',
+    '',
+    '四、实验步骤',
+    '先配置两台主机的静态地址和子网掩码，再分别执行 ipconfig、ping 与 arp -a，对照输出结果检查网络参数、邻居缓存和主机互通状态是否符合预期。',
+    '',
+    '五、实验结果',
+    $experimentDenseResults,
+    '',
+    '六、问题分析',
+    '如果 ping 不通，应优先检查 IP 地址、子网掩码、虚拟网卡模式和防火墙策略，再结合 arp 输出判断是否已经完成地址解析。',
+    '如果只观察单次 ping 结果而忽略 ipconfig 和 arp 信息，可能遗漏网卡选错、地址冲突或缓存未更新等问题。',
+    '',
+    '七、实验总结',
+    '本次实验完成了局域网搭建和常用 DOS 命令验证，能够从地址配置、连通测试和缓存记录三个角度说明实验结果。',
+    '通过把命令输出与配置步骤逐项对应，进一步理解了局域网通信中地址规划、协议验证和故障定位之间的关系。'
+  ) | Set-Content -LiteralPath $experimentPaginationRiskReportPath -Encoding UTF8
+  $experimentPaginationRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $experimentPaginationRiskReportPath -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$experimentPaginationRiskValidation.passed) -Message 'Experiment pagination-risk fixture should pass with warnings only.'
+  Assert-True -Condition ([int]$experimentPaginationRiskValidation.summary.paginationRiskCount -ge 3) -Message 'Experiment pagination-risk fixture should surface default pagination warnings.'
+  Assert-True -Condition ([int]$experimentPaginationRiskValidation.summary.paginationRiskThresholds.longSectionChars -eq 900) -Message 'Validation summary should expose default pagination-risk thresholds.'
+
+  $quietPaginationProfilePath = Join-Path $tempRoot 'experiment-report-quiet-pagination.json'
+  $quietPaginationProfile = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\experiment-report.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  $quietPaginationProfile.name = 'experiment-report-quiet-pagination'
+  $quietPaginationProfile.paginationRiskThresholds = [pscustomobject]@{
+    longSectionChars = 99999
+    denseSectionChars = 99999
+    denseSectionParagraphs = 1
+    figureClusterRefs = 999
+  }
+  $quietPaginationProfile | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $quietPaginationProfilePath -Encoding UTF8
+  $quietPaginationValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $experimentPaginationRiskReportPath -ReportProfilePath $quietPaginationProfilePath -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$quietPaginationValidation.passed) -Message 'Custom pagination-threshold profile should keep validation passing.'
+  Assert-True -Condition ([int]$quietPaginationValidation.summary.paginationRiskCount -eq 0) -Message 'Custom pagination-threshold profile should suppress pagination warnings for the same report.'
+  Assert-True -Condition ([int]$quietPaginationValidation.summary.paginationRiskThresholds.longSectionChars -eq 99999) -Message 'Validation summary should expose custom pagination-risk thresholds.'
+  $results.Add('profile pagination-risk thresholds OK') | Out-Null
 
   $referenceTextPath = Join-Path $tempRoot 'tutorial-reference.txt'
   @'

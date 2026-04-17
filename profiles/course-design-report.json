@@ -84,6 +84,12 @@
       { "pattern": "analysis|bug|error|异常|问题", "caption": "问题与改进截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 650,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["设计目标", "需求分析"],
