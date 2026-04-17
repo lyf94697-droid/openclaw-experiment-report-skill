@@ -158,6 +158,8 @@ Good fit because they still benefit from:
 
 ### 5. Weekly And Monthly Reports
 
+Status: built-in `weekly-report` profile is in place; `monthly-report` remains future work.
+
 Good fit when the structure is profile-driven rather than free-form:
 
 - progress
@@ -184,8 +186,9 @@ The expansion order should stay disciplined:
 5. `internship-report`
 6. `weekly-report`
 7. `meeting-minutes`
+8. `monthly-report`
 
-This order maximizes reuse and keeps the repository coherent.
+The first six are now built-in. The next adjacent candidate in this order is `meeting-minutes`, followed by `monthly-report` if a reusable preset proves out.
 
 ## Supporting Platform Work
 
@@ -220,6 +223,7 @@ Alongside new profiles, the repository should keep investing in a few shared cap
 
 Implemented baseline:
 
+- `profiles/weekly-report.json`
 - `examples/profile-presets/weekly-report.json`
 - `examples/profile-presets/meeting-minutes.json`
 - `scripts/run-profile-preset-samples.ps1`
@@ -227,7 +231,7 @@ Implemented baseline:
 - `.github/workflows/roadmap-triage.yml`
 - schema-backed `paginationRiskThresholds` in report profiles and preset examples
 
-These stay outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles.
+`meeting-minutes` still stays outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles. `weekly-report` has crossed that threshold and now lives in `profiles/`, while the preset copy remains as a reusable example snapshot and sample-runner input.
 
 ## Non-Goals For Now
 

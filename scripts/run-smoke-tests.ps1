@@ -679,6 +679,7 @@ try {
       (Join-Path $repoRoot 'profiles\internship-report.json'),
       (Join-Path $repoRoot 'profiles\software-test-report.json'),
       (Join-Path $repoRoot 'profiles\deployment-report.json'),
+      (Join-Path $repoRoot 'profiles\weekly-report.json'),
       (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\analyze-roadmap-next-step.ps1'),
@@ -910,6 +911,15 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $deploymentProfile) -contains '部署项目') -Message 'Deployment profile metadata prefixes are missing 部署项目.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $deploymentProfile) -contains '部署步骤与配置') -Message 'Deployment profile required headings are missing 部署步骤与配置.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $deploymentProfile -SectionId 'result' -BaseName 'health-result') -eq '验证结果截图') -Message 'Deployment profile image caption defaults are missing the result caption.'
+  $weeklyReportProfile = Get-ReportProfile -ProfileName 'weekly-report' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$weeklyReportProfile.name -eq 'weekly-report') -Message 'Weekly-report profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$weeklyReportProfile.displayName -eq '周报') -Message 'Weekly-report profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $weeklyReportProfile) -eq 'compact') -Message 'Weekly-report profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $weeklyReportProfile) -contains '周报主题') -Message 'Weekly-report profile metadata prefixes are missing 周报主题.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $weeklyReportProfile) -contains '本周完成事项') -Message 'Weekly-report profile required headings are missing 本周完成事项.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $weeklyReportProfile -SectionId 'result' -BaseName 'demo-result') -eq '阶段成果截图') -Message 'Weekly-report profile image caption defaults are missing the result caption.'
+  $weeklyPaginationThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $weeklyReportProfile
+  Assert-True -Condition ([int]$weeklyPaginationThresholds.longSectionChars -eq 1200) -Message 'Weekly-report profile pagination-risk thresholds are missing.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -966,13 +976,24 @@ URL: https://example.com/network-lab
   $deploymentMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '云平台运维实践' -ResolvedExperimentName '校园门户系统容器化部署' -Profile $deploymentProfile -ResolvedStudentName '刘洋' -ResolvedStudentId '20264567' -ResolvedClassName '网工 2301' -ResolvedTeacherName '孙老师' -ResolvedExperimentProperty '系统部署' -ResolvedExperimentDate '2026-04-12' -ResolvedExperimentLocation 'Ubuntu 22.04 / Docker 26 / Nginx 1.24') | ConvertFrom-Json
   Assert-True -Condition ([string]$deploymentMetadata.学生姓名 -eq '刘洋') -Message 'Auto metadata helper did not emit the deployment student label.'
   Assert-True -Condition ([string]$deploymentMetadata.部署项目 -eq '校园门户系统容器化部署') -Message 'Auto metadata helper did not emit the deployment project label.'
+  $weeklyPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代周报' -Profile $weeklyReportProfile -DetailLevel 'full'
+  Assert-True -Condition ($weeklyPromptText -match '周报 body') -Message 'Auto prompt helper did not use the weekly-report display name.'
+  Assert-True -Condition ($weeklyPromptText -match '项目名称: 校园导览小程序') -Message 'Auto prompt helper did not emit the weekly-report project label.'
+  Assert-True -Condition ($weeklyPromptText -match '周报主题: 第 6 周迭代周报') -Message 'Auto prompt helper did not emit the weekly-report title label.'
+  Assert-True -Condition ($weeklyPromptText -match '本周完成事项') -Message 'Auto prompt helper did not include weekly-report required headings.'
+  $weeklyRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代周报' -Profile $weeklyReportProfile -ExtraKeywords @('迭代', '校园导览小程序') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$weeklyRequirements.minChars -eq 1400) -Message 'Auto requirements helper did not use the weekly-report full minChars.'
+  Assert-True -Condition (@($weeklyRequirements.sections | Where-Object { $_.name -eq '本周完成事项' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the weekly-report completion section heading.'
+  $weeklyMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代周报' -Profile $weeklyReportProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '项目周报' -ResolvedExperimentDate '第 6 周' -ResolvedExperimentLocation 'GitHub + 飞书 + 本地开发环境') | ConvertFrom-Json
+  Assert-True -Condition ([string]$weeklyMetadata.提交人 -eq '李四') -Message 'Auto metadata helper did not emit the weekly-report owner label.'
+  Assert-True -Condition ([string]$weeklyMetadata.周报主题 -eq '第 6 周迭代周报') -Message 'Auto metadata helper did not emit the weekly-report title label.'
   $results.Add('report profile loader OK') | Out-Null
 
   $reportProfileSchema = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\report-profile.schema.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$reportProfileSchema.title -eq 'OpenClaw report profile') -Message 'Report profile schema did not parse.'
   $profileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$profileValidation.passed) -Message 'Report profile validation failed.'
-  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 5) -Message 'Report profile validation did not cover built-in profiles.'
+  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 6) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
 
@@ -1090,6 +1111,38 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([int]$generatedRequirements.minChars -eq 1400) -Message 'Report-input generation requirements are missing the expected course-design minChars.'
     Assert-True -Condition (@($generatedRequirements.sections | Where-Object { $_.name -eq '方案设计与实现' }).Count -eq 1) -Message 'Report-input generation requirements are missing the course-design implementation section.'
     Assert-True -Condition ([int]$generatedRequirements.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Report-input generation requirements are missing profile pagination-risk thresholds.'
+
+    $weeklyInputsOutputDir = Join-Path $tempRoot 'weekly-report-inputs-output'
+    & (Join-Path $repoRoot 'scripts\generate-report-inputs.ps1') `
+      -CourseName '校园导览小程序' `
+      -ExperimentName '第 6 周迭代周报' `
+      -StudentName '李四' `
+      -StudentId '20261234' `
+      -ClassName '软工 2302' `
+      -TeacherName '王老师' `
+      -ExperimentProperty '项目周报' `
+      -ExperimentDate '第 6 周' `
+      -ExperimentLocation 'GitHub + 飞书 + 本地开发环境' `
+      -ReportProfileName 'weekly-report' `
+      -RequiredKeywords @('迭代', '阶段成果') `
+      -OutputDir $weeklyInputsOutputDir `
+      -DetailLevel full | Out-Null
+    $weeklyInputsSummaryPath = Join-Path $weeklyInputsOutputDir 'report-inputs-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $weeklyInputsSummaryPath) -Message 'Weekly report-input generation did not create the summary JSON.'
+    $weeklyInputsSummary = (Get-Content -LiteralPath $weeklyInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$weeklyInputsSummary.reportProfileName -eq 'weekly-report') -Message 'Weekly report-input generation summary is missing the expected profile name.'
+    Assert-True -Condition ([string]$weeklyInputsSummary.reportProfileDisplayName -eq '周报') -Message 'Weekly report-input generation summary is missing the expected display name.'
+    Assert-True -Condition ((Split-Path -Leaf ([string]$weeklyInputsSummary.defaultsPath)) -eq 'weekly-report.defaults.json') -Message 'Weekly report-input generation should persist defaults under the profile-specific defaults file.'
+    $weeklyGeneratedPrompt = Get-Content -LiteralPath (Join-Path $weeklyInputsOutputDir 'prompt.txt') -Raw -Encoding UTF8
+    Assert-True -Condition ($weeklyGeneratedPrompt -match '周报 body') -Message 'Weekly report-input generation did not emit the expected prompt body.'
+    Assert-True -Condition ($weeklyGeneratedPrompt -match '周报主题: 第 6 周迭代周报') -Message 'Weekly report-input generation did not emit the expected title label.'
+    $weeklyGeneratedMetadata = (Get-Content -LiteralPath (Join-Path $weeklyInputsOutputDir 'metadata.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$weeklyGeneratedMetadata.提交人 -eq '李四') -Message 'Weekly report-input generation metadata is missing the owner label.'
+    Assert-True -Condition ([string]$weeklyGeneratedMetadata.周报主题 -eq '第 6 周迭代周报') -Message 'Weekly report-input generation metadata is missing the title label.'
+    $weeklyGeneratedRequirements = (Get-Content -LiteralPath (Join-Path $weeklyInputsOutputDir 'requirements.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([int]$weeklyGeneratedRequirements.minChars -eq 1400) -Message 'Weekly report-input generation requirements are missing the expected minChars.'
+    Assert-True -Condition (@($weeklyGeneratedRequirements.sections | Where-Object { $_.name -eq '本周完成事项' }).Count -eq 1) -Message 'Weekly report-input generation requirements are missing the completion section.'
+    Assert-True -Condition ([int]$weeklyGeneratedRequirements.paginationRiskThresholds.longSectionChars -eq 1200) -Message 'Weekly report-input generation requirements are missing pagination-risk thresholds.'
   } finally {
     $env:AGENTS_HOME = $originalInputsAgentsHome
   }
@@ -1773,6 +1826,56 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$deploymentValidation.reportProfileName -eq 'deployment-report') -Message 'Deployment report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$deploymentValidation.summary.sectionCount -ge 7) -Message 'Deployment report validation did not load the expected section rules.'
   $results.Add('deployment profile validation OK') | Out-Null
+
+  $weeklyReportPath = Join-Path $tempRoot 'weekly-report.md'
+  @'
+项目周报
+
+项目名称：校园导览小程序
+周报主题：第 6 周迭代周报
+提交人：李四
+工号/学号：20261234
+审核人：王老师
+报告类型：项目周报
+周次：第 6 周
+工作环境：GitHub + 飞书 + 本地开发环境
+
+一、工作目标
+本周工作目标是把校园导览小程序从页面原型推进到可演示版本，重点完成首页分类、地点检索、详情展示和基础路线提示四个关键路径。
+为了让周报能够服务后续复盘，团队还要求每项进展都对应明确输入、执行动作和可检查产出，而不是只记录笼统的完成状态。
+
+二、协作环境
+本周协作环境以 GitHub 仓库、飞书任务看板和本地微信开发者工具为主，需求拆分、接口字段、页面截图和问题记录都集中到同一迭代空间中维护。
+开发过程中前端使用本地 mock 数据先行验证交互，后端接口按地点分类、关键词检索和详情查询三个方向分批补齐，保证每天都能形成可运行的小版本。
+
+三、本周任务与输入
+本周输入包括课程设计需求说明、上周确定的页面草图、地点基础数据表和老师对演示流程提出的反馈。任务拆分时先把必须演示的用户路径列为最高优先级，再处理页面细节和异常提示。
+团队把工作拆成首页信息架构、搜索联想、详情页字段、收藏状态和路线提示五组任务，并约定每个任务完成后都需要提交截图、提交记录和一段简短说明，便于周末集中验收。
+
+四、本周完成事项
+本周已经完成首页分类卡片、地点列表、关键词搜索和地点详情页的主要交互。首页能够按教学楼、生活服务、实验室和公共设施分类展示地点，搜索页可以根据关键字返回匹配结果，详情页能展示开放时间、位置说明和注意事项。
+后端接口完成了地点列表和详情查询的 mock 到本地服务切换，前端也补充了加载中、无结果和请求失败三种状态。为了保证演示稳定，还增加了基础缓存策略，避免重复进入页面时出现明显闪烁。
+除功能开发外，本周还整理了测试数据和演示脚本，把关键页面截图归档到迭代目录中，并在飞书看板上标记了已完成、待复核和延期处理三类任务状态。
+
+五、阶段成果
+阶段成果是形成了一个可以端到端演示的校园导览小程序版本。用户可以从首页选择分类，进入列表后查看地点信息，也可以通过搜索直接定位教学楼或实验室，整体路径已经能够覆盖课程设计展示的核心要求。
+从验收角度看，本周交付物包括可运行前端页面、本地接口服务、地点数据样例、页面截图和任务状态记录。当前版本虽然还没有接入真实地图服务，但已经能够证明信息组织、查询逻辑和详情展示方案可行。
+
+六、风险与改进
+当前主要风险在于地点数据仍然偏少，搜索排序规则也还比较简单，后续如果数据量增加，可能出现同名地点排序不稳定或无关地点靠前的问题。
+另一个风险是路线提示还停留在静态文本阶段，没有和地图组件形成联动。下周需要优先验证地图组件接入成本，并补充异常情况下的提示文案，避免演示时因为接口延迟或数据缺失影响观感。
+
+七、下周计划
+下周计划首先补齐地图组件接入和路线展示，把详情页中的位置信息与可视化地图联动起来。随后继续完善地点数据、收藏功能和搜索排序，使用户能够更快找到常用地点。
+在交付准备方面，下周还需要完成一次完整演示彩排，记录操作步骤、页面截图和已知问题，并根据老师反馈决定是否压缩功能范围，保证最终提交版本稳定可讲解。
+'@ | Set-Content -LiteralPath $weeklyReportPath -Encoding UTF8
+
+  $weeklyValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $weeklyReportPath -ReportProfileName 'weekly-report' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$weeklyValidation.passed) -Message 'Weekly report validation should pass for the weekly-report profile.'
+  Assert-True -Condition ([string]$weeklyValidation.reportProfileName -eq 'weekly-report') -Message 'Weekly report validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$weeklyValidation.summary.sectionCount -ge 7) -Message 'Weekly report validation did not load the expected section rules.'
+  Assert-True -Condition ([int]$weeklyValidation.summary.paginationRiskThresholds.longSectionChars -eq 1200) -Message 'Weekly report validation did not use the weekly pagination thresholds.'
+  $results.Add('weekly-report profile validation OK') | Out-Null
 
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
@@ -3303,6 +3406,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\internship-report.json')) -Message 'Install script did not copy the internship-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\software-test-report.json')) -Message 'Install script did not copy the software-test-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\deployment-report.json')) -Message 'Install script did not copy the deployment-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\weekly-report.json')) -Message 'Install script did not copy the weekly-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'

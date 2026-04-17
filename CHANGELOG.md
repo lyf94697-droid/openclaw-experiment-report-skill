@@ -14,6 +14,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added `scripts/new-report-profile.ps1` to scaffold schema-valid report profiles before manual profile tuning.
 - Added the built-in `software-test-report` profile for software testing reports with test-case, result, and defect-analysis sections.
 - Added the built-in `deployment-report` profile for deployment and operations reports with deployment, verification, and rollback sections.
+- Added the built-in `weekly-report` profile for structured project weekly reports with progress, deliverables, risk, and next-step sections.
 - Added `examples/profile-presets/` with reusable `weekly-report` and `meeting-minutes` custom profile presets for adjacent document experiments.
 - Added `scripts/run-profile-preset-samples.ps1` to generate prompt, metadata, and requirements sample bundles from profile preset examples.
 - Added a Markdown index output to `scripts/run-profile-preset-samples.ps1` for faster preview of generated preset sample bundles.
@@ -38,6 +39,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Propagated structural validation and pagination-risk summaries through URL and Feishu wrapper outputs.
 - Propagated profile pagination-risk thresholds through generated requirements, validation JSON, build summaries, and wrapper traces.
 - Added remediation guidance to validation findings and warning summaries so machine-readable outputs include the next repair action.
+- Expanded smoke coverage so `weekly-report` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, and install packaging.
 - Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
 - Added smoke coverage for template-frame docx generation and wrapper summary propagation.

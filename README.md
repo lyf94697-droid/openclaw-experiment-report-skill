@@ -66,18 +66,19 @@
 
 仓库现在的核心变化，是从“实验报告专用脚本”扩展成“同一条报告构建流水线 + 可切换 report profile”。
 
-- 已内置五类报告 profile：`experiment-report`、`course-design-report`、`internship-report`、`software-test-report`、`deployment-report`
+- 已内置六类报告 profile：`experiment-report`、`course-design-report`、`internship-report`、`software-test-report`、`deployment-report`、`weekly-report`
 - `experiment-report` 覆盖常见实验目的、实验环境、实验原理或任务要求、实验步骤、实验结果、问题分析、实验总结
 - `course-design-report` 覆盖设计目标、开发环境、需求分析、方案设计与实现、运行结果、问题与改进、设计总结
 - `internship-report` 覆盖实习目的、实习单位与环境、实习任务与要求、实习过程与内容、实习成果、问题分析与改进、实习总结
 - `software-test-report` 覆盖测试目标、测试环境、测试范围与依据、测试用例设计与执行、测试结果、缺陷分析与改进、测试总结
 - `deployment-report` 覆盖部署目标、部署环境、部署方案与架构、部署步骤与配置、验证结果、问题处理与回滚预案、部署总结
+- `weekly-report` 覆盖工作目标、协作环境、本周任务与输入、本周完成事项、阶段成果、风险与改进、下周计划
 - profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、分页风险阈值、图注规则、图片落位优先级和复合模板填充规则
 - 模板适配能力也被抽象出来，可以用 `check-report-profile-template-fit.ps1` 诊断新模板缺字段、缺章节、缺 alias 或是否需要新增复合填充规则
 - 插图流程已经支持按 profile 识别章节、生成图片落位预案、写入图注、连续图片 2 列分组布局，以及最终 layout check
 - 构建过程现在会写出 `summary.json`、`pipeline-trace.json`、`pipeline-trace.md`、`image-placement-plan.md` 和 `layout-check.json`，方便复盘每次运行到底用了什么输入、生成了什么产物
 - validation 从“检查有没有章节”扩展到 profile-specific structural validation，包括缺必需章节、章节顺序异常、重复标题、空节、占位符节、过短章节和分页风险 warning
-- 现阶段仍然优先服务学校报告类文档，不急着扩到完全自由格式的周报、月报或项目文档
+- 现阶段仍然优先服务学校报告类文档；`weekly-report` 已经作为结构稳定、能被 smoke 覆盖的相邻场景纳入内置 profile
 
 ## Validation 与风险输出
 
@@ -225,7 +226,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
 - 如果你想额外生成保留模板表格边框的一体版，可以对 `build-report.ps1` 传 `-CreateTemplateFrameDocx`，或对 `build-report-from-url.ps1` / `build-report-from-feishu.ps1` 传 `-CreateTemplateFrameDocx`；wrapper 会把普通最终稿写到 `finalDocxPath`，把边框版写到 `templateFrameDocxPath`
 - 自动生成正文、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
-- 仓库现在内置五个 profile：`experiment-report`、`course-design-report`、`internship-report`、`software-test-report` 和 `deployment-report`；如果你要生成课程设计报告、专业实习报告、软件测试报告或部署运维报告，可以直接传对应的 `-ReportProfileName`
+- 仓库现在内置六个 profile：`experiment-report`、`course-design-report`、`internship-report`、`software-test-report`、`deployment-report` 和 `weekly-report`；如果你要生成课程设计报告、专业实习报告、软件测试报告、部署运维报告或结构化项目周报，可以直接传对应的 `-ReportProfileName`
 - `build-report-from-url.ps1` 的自动 prompt 也会跟随 active report profile 调整文案，像 `课程名称` / `课题名称` 这类字段标签会直接从 profile 里取，而不再固定写成实验报告措辞
 - 最近一次保存的 `CourseName` / `ExperimentName` 默认值现在会按 report profile 隔离保存，`course-design-report` 不会再复用 `experiment-report` 的最近一次题目
 - 如果你只想先拿到自动生成的输入物，不想立刻跑 OpenClaw 或 `docx` 流水线，可以先运行 `scripts/generate-report-inputs.ps1`，它会单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json` 和一份 summary
@@ -240,7 +241,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 新增 report profile 时，可以先用 `scripts/new-report-profile.ps1` 生成 schema-valid 草稿，再按具体文档类型调整标题、alias、图注和 prompt 文案
 - 如果某类文档天然章节更长或图片更多，可以在 profile 里调高 `paginationRiskThresholds`，避免把正常结构误报成分页风险；反过来也可以调低，用于更早捕捉 WPS/Word 模板风险
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
-- 如果你还不想把新文档类型直接升级成内置 profile，可以先看 `examples/profile-presets/`：目前仓库提供 `weekly-report.json` 和 `meeting-minutes.json` 两份可直接试跑的自定义 preset，适合先验证“这条 pipeline 能不能复用”
+- 如果你还不想把新文档类型直接升级成内置 profile，可以先看 `examples/profile-presets/`：目前保留 `meeting-minutes.json` 作为相邻文档类型的自定义 preset，并保留 `weekly-report.json` 作为 path-based 示例快照，适合先验证“这条 pipeline 能不能复用”
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
@@ -252,21 +253,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 生成最终 `docx` 后会写出 `layout-check.json`，检查图片数、图注数、残留占位符和常见实验报告章节，summary 里也会记录 `layoutCheckPassed`、错误数和警告数
 - `layout-check.json` 会检查图注编号是否连续，summary 里会给出 `layoutCheckMessage`，便于不打开 JSON 也能快速判断排版是否过关
 
-例如，先用外部 preset 验证周报是否适合这条流水线：
+例如，直接用内置 `weekly-report` 生成周报输入包：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
-  -ReportProfilePath ".\examples\profile-presets\weekly-report.json" `
+  -ReportProfileName "weekly-report" `
   -CourseName "校园导览小程序" `
   -ExperimentName "第 6 周迭代周报" `
   -StudentName "李四" `
   -StudentId "20261234" `
   -ClassName "软工 2302" `
   -TeacherName "王老师" `
+  -ExperimentProperty "项目周报" `
   -ExperimentDate "第 6 周" `
   -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
   -DetailLevel full `
-  -OutputDir ".\tests-output\weekly-preset-sample"
+  -OutputDir ".\tests-output\weekly-report-sample"
 ```
 
 如果你想同时生成全部示例 preset 的样例输入包：
@@ -312,7 +314,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\analyze-roadmap-next-step.ps1
 ## 项目现状
 
 当前版本已经可以跑通一条完整的学校报告类文档工作流：生成正文、填模板、插图片、补图注、做最终排版。  
-实验报告、课程设计报告、专业实习报告、软件测试报告和部署运维报告已经进入内置 profile 范围，并且都有 smoke 覆盖。
+实验报告、课程设计报告、专业实习报告、软件测试报告、部署运维报告和结构化项目周报已经进入内置 profile 范围，并且都有 smoke 覆盖。
 仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把 profile-driven 这条链路做得更稳、更好用、更容易复现。
 
 ## Roadmap

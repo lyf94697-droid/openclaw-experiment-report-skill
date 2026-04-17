@@ -1,10 +1,10 @@
 # Custom Profile Presets
 
-This directory contains example report-profile presets for adjacent document types that are not promoted to built-in profiles yet.
+This directory contains example report-profile presets for adjacent document types that still benefit from `-ReportProfilePath`, including snapshots that mirror a built-in profile.
 
 Current examples:
 
-- `weekly-report.json`
+- `weekly-report.json` (kept as a path-based example snapshot; a built-in profile also exists under `profiles/`)
 - `meeting-minutes.json`
 
 Recommended workflow:
@@ -21,20 +21,20 @@ Recommended workflow:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
-     -ReportProfilePath ".\examples\profile-presets\weekly-report.json" `
-     -CourseName "校园导览小程序" `
-     -ExperimentName "第 6 周迭代周报" `
-     -StudentName "李四" `
+     -ReportProfilePath ".\examples\profile-presets\meeting-minutes.json" `
+     -CourseName "Campus Navigation App" `
+     -ExperimentName "Iteration Review Meeting" `
+     -StudentName "Li Si" `
      -StudentId "20261234" `
-     -ClassName "软工 2302" `
-     -TeacherName "王老师" `
-     -ExperimentDate "第 6 周" `
-     -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
+     -ClassName "SE 2302" `
+     -TeacherName "Wang" `
+     -ExperimentDate "2026-04-12" `
+     -ExperimentLocation "GitHub + Feishu + Meeting Room" `
      -DetailLevel full `
-     -OutputDir ".\tests-output\weekly-preset-sample"
+     -OutputDir ".\tests-output\meeting-minutes-sample"
    ```
 
-3. If the preset works for your document family, either keep using it through `-ReportProfilePath` or move a copy into `profiles/` and continue tuning aliases, captions, and prompt guidance.
+3. If the preset works for your document family, either keep using it through `-ReportProfilePath` or move a copy into `profiles/` and continue tuning aliases, captions, and prompt guidance until it is ready for built-in promotion.
 
 Each preset can also tune `paginationRiskThresholds` so validation warnings match the document family's normal section length and screenshot density.
 
@@ -54,4 +54,4 @@ That command writes one subdirectory per preset, each containing:
 
 It also writes a top-level `profile-preset-samples.md` index so you can quickly preview all generated sample bundles without opening each JSON file.
 
-These presets are intentionally examples, not built-in defaults. They are meant to shorten the path from "this repo is close to my document type" to "I can prototype my own profile today".
+These presets are intentionally examples. `meeting-minutes` still represents an external adjacent document type, while `weekly-report` stays here as a reusable path-based sample even though a built-in profile now exists.
