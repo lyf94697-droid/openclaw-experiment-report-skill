@@ -648,6 +648,8 @@ try {
       (Join-Path $repoRoot '.github\ISSUE_TEMPLATE\config.yml'),
       (Join-Path $repoRoot '.github\pull_request_template.md'),
       (Join-Path $repoRoot '.github\workflows\quality.yml'),
+      (Join-Path $repoRoot '.github\workflows\roadmap-triage.yml'),
+      (Join-Path $repoRoot '.github\workflows\smoke-tests.yml'),
       (Join-Path $repoRoot 'demo\README.md'),
       (Join-Path $repoRoot 'demo\assets\step-network-config.png'),
       (Join-Path $repoRoot 'demo\assets\step-ipconfig.png'),
@@ -673,6 +675,7 @@ try {
       (Join-Path $repoRoot 'profiles\deployment-report.json'),
       (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
+      (Join-Path $repoRoot 'scripts\analyze-roadmap-next-step.ps1'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
       (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1'),
@@ -993,6 +996,21 @@ URL: https://example.com/network-lab
   $meetingPresetPrompt = Get-Content -LiteralPath ([string]$meetingPresetSample.promptPath) -Raw -Encoding UTF8
   Assert-True -Condition ($meetingPresetPrompt -match '会议纪要 body') -Message 'Meeting-minutes preset sample prompt is missing the profile display name.'
   $results.Add('profile preset sample runner OK') | Out-Null
+
+  $roadmapTriageOutputDir = Join-Path $tempRoot 'roadmap-triage'
+  $roadmapTriage = (& (Join-Path $repoRoot 'scripts\analyze-roadmap-next-step.ps1') -OutputDir $roadmapTriageOutputDir -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$roadmapTriage.jsonPath)) -Message 'Roadmap triage did not write JSON output.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$roadmapTriage.markdownPath)) -Message 'Roadmap triage did not write markdown output.'
+  Assert-True -Condition ([int]$roadmapTriage.summary.candidateCount -ge 1) -Message 'Roadmap triage should find at least one roadmap candidate.'
+  Assert-True -Condition ([int]$roadmapTriage.summary.topCandidateCount -ge 1) -Message 'Roadmap triage should expose at least one top candidate.'
+  $roadmapTriageMarkdown = Get-Content -LiteralPath ([string]$roadmapTriage.markdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($roadmapTriageMarkdown -match 'Roadmap Daily Triage') -Message 'Roadmap triage markdown is missing the expected title.'
+  Assert-True -Condition ($roadmapTriageMarkdown -match 'Smoke-Coverable') -Message 'Roadmap triage markdown is missing the smoke-coverable section.'
+  $roadmapTriageWorkflow = Get-Content -LiteralPath (Join-Path $repoRoot '.github\workflows\roadmap-triage.yml') -Raw -Encoding UTF8
+  Assert-True -Condition ($roadmapTriageWorkflow -match 'schedule:') -Message 'Roadmap triage workflow is missing a schedule trigger.'
+  Assert-True -Condition ($roadmapTriageWorkflow -match 'workflow_dispatch:') -Message 'Roadmap triage workflow is missing a manual trigger.'
+  Assert-True -Condition ($roadmapTriageWorkflow -match 'analyze-roadmap-next-step\.ps1') -Message 'Roadmap triage workflow does not run the analyzer script.'
+  $results.Add('roadmap daily triage automation OK') | Out-Null
 
   $newReportProfilePath = Join-Path $tempRoot 'weekly-report.json'
   $newReportProfileResult = (& (Join-Path $repoRoot 'scripts\new-report-profile.ps1') `
@@ -3214,6 +3232,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\roadmap-triage.yml')) -Message 'Install script did not copy the roadmap triage workflow.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\smoke-tests.yml')) -Message 'Install script did not copy the smoke-tests workflow.'
   $results.Add('install script first install OK') | Out-Null
 
   & (Join-Path $repoRoot 'scripts\install-skill.ps1') -TargetDir $installTarget -Force | Out-Null

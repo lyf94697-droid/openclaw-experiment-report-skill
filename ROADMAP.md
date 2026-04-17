@@ -221,6 +221,8 @@ Implemented baseline:
 - `examples/profile-presets/weekly-report.json`
 - `examples/profile-presets/meeting-minutes.json`
 - `scripts/run-profile-preset-samples.ps1`
+- `scripts/analyze-roadmap-next-step.ps1`
+- `.github/workflows/roadmap-triage.yml`
 
 These stay outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles.
 

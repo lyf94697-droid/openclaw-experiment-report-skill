@@ -293,6 +293,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-profile-preset-samples.ps
 powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 ```
 
+仓库还包含一个每天运行的 roadmap triage 自动化：`.github/workflows/roadmap-triage.yml`。它会调用 `scripts/analyze-roadmap-next-step.ps1`，读取 [ROADMAP.md](ROADMAP.md)，输出下一批更适合小步实现、且能被 smoke 覆盖的候选升级点。
+
+本地也可以直接运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\analyze-roadmap-next-step.ps1 `
+  -OutputDir ".\tests-output\roadmap-triage" `
+  -Format markdown
+```
+
 ## 项目现状
 
 当前版本已经可以跑通一条完整的学校报告类文档工作流：生成正文、填模板、插图片、补图注、做最终排版。  
