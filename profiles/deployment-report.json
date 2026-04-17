@@ -90,6 +90,11 @@
     "denseSectionParagraphs": 2,
     "figureClusterRefs": 4
   },
+  "paginationRiskRemediations": {
+    "pagination-risk-long-section": "Split the deployment walkthrough into prerequisites, environment setup, service configuration, startup order, verification, and rollback subsections before building, or raise paginationRiskThresholds.longSectionChars if long runbook-style deployment sections are expected.",
+    "pagination-risk-dense-section-block": "Separate commands, configuration snippets, log observations, and operational explanation into distinct paragraphs or lists so Word/WPS can paginate the deployment process safely.",
+    "pagination-risk-figure-cluster": "Spread deployment screenshots across '部署步骤与配置', '验证结果', and '问题处理与回滚预案', or group them by service/component before layout if a release run normally needs many evidence screenshots."
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["部署目标", "部署方案"],

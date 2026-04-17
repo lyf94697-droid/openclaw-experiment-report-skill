@@ -323,6 +323,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 新增 report profile 时，可以先用 `scripts/new-report-profile.ps1` 生成 schema-valid 草稿，再按具体文档类型调整标题、alias、图注和 prompt 文案
 - 如果某类文档天然章节更长或图片更多，可以在 profile 里调高 `paginationRiskThresholds`，避免把正常结构误报成分页风险；反过来也可以调低，用于更早捕捉 WPS/Word 模板风险
 - 如果某类文档不仅阈值不同，分页风险的修复方式也不同，可以在 profile 里追加 `paginationRiskRemediations`；这些建议会继续透传到自动生成的 requirements、validation JSON、`build-report` summary 和 wrapper summary
+- 其中 `software-test-report` 会把分页建议聚焦到测试用例、预期/实际结果、缺陷证据和截图分组；`deployment-report` 会把分页建议聚焦到部署前置条件、配置命令、日志观察、验证结果和回滚预案
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
 - 如果你想沿用 path-based 方式试跑或继续做 profile 分叉，可以先看 `examples/profile-presets/`：目前保留 `weekly-report.json`、`meeting-minutes.json` 和 `monthly-report.json` 三份示例快照；对应的 built-in profile 也都已经在 `profiles/` 下可直接使用，这些快照更适合验证“这条 pipeline 能不能复用”或继续做定制分叉
 - 如果你把 `report-inputs-summary.json` 连同 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、参考文本一起提交到仓库，`build-report-from-url.ps1` / `build-report-from-feishu.ps1` 现在会把 summary 里的相对路径按 summary 文件所在目录解析；checked-in prepared-summary bundle 不再要求保留原来的临时生成目录

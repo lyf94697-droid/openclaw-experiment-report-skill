@@ -47,6 +47,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Expanded smoke coverage so `weekly-report` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, and install packaging.
 - Expanded smoke coverage so `meeting-minutes` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, install packaging, and roadmap-triage expectations.
 - Expanded smoke coverage so `monthly-report` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, install packaging, and roadmap-triage expectations.
+- Expanded profile-specific pagination-risk remediations and warning fixtures for `software-test-report` and `deployment-report`.
 - Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
 - Propagated profile-specific pagination-risk remediations through generated requirements, validation summaries, build summaries, and wrapper traces.

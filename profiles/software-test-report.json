@@ -90,6 +90,11 @@
     "denseSectionParagraphs": 2,
     "figureClusterRefs": 4
   },
+  "paginationRiskRemediations": {
+    "pagination-risk-long-section": "Split long test execution content by module, feature, case group, or priority before building, or raise paginationRiskThresholds.longSectionChars if a compact test-matrix narrative is expected.",
+    "pagination-risk-dense-section-block": "Separate preconditions, input data, execution steps, expected results, actual results, and defect notes into distinct paragraphs or list items before layout.",
+    "pagination-risk-figure-cluster": "Spread evidence screenshots across '测试用例设计与执行', '测试结果', and '缺陷分析与改进', or group pass/fail screenshots by case group before layout."
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["测试目标", "测试范围"],

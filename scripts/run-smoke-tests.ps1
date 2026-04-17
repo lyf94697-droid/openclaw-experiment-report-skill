@@ -1028,6 +1028,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $softwareTestProfile) -contains '测试项目') -Message 'Software-test profile metadata prefixes are missing 测试项目.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $softwareTestProfile) -contains '测试用例设计与执行') -Message 'Software-test profile required headings are missing 测试用例设计与执行.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $softwareTestProfile -SectionId 'result' -BaseName 'result-pass') -eq '测试结果截图') -Message 'Software-test profile image caption defaults are missing the result caption.'
+  $softwareTestPaginationRemediations = Get-ReportProfilePaginationRiskRemediations -Profile $softwareTestProfile
+  Assert-True -Condition ([string]$softwareTestPaginationRemediations.'pagination-risk-long-section' -match 'case group') -Message 'Software-test profile pagination-risk remediations are missing the long-section override.'
+  Assert-True -Condition ([string]$softwareTestPaginationRemediations.'pagination-risk-dense-section-block' -match 'expected results, actual results') -Message 'Software-test profile pagination-risk remediations are missing the dense-section override.'
+  Assert-True -Condition ([string]$softwareTestPaginationRemediations.'pagination-risk-figure-cluster' -match '测试结果') -Message 'Software-test profile pagination-risk remediations are missing the figure-cluster override.'
   $deploymentProfile = Get-ReportProfile -ProfileName 'deployment-report' -RepoRoot $repoRoot
   Assert-True -Condition ([string]$deploymentProfile.name -eq 'deployment-report') -Message 'Deployment profile loader returned an unexpected profile name.'
   Assert-True -Condition ([string]$deploymentProfile.displayName -eq '部署运维报告') -Message 'Deployment profile loader returned an unexpected display name.'
@@ -1035,6 +1039,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $deploymentProfile) -contains '部署项目') -Message 'Deployment profile metadata prefixes are missing 部署项目.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $deploymentProfile) -contains '部署步骤与配置') -Message 'Deployment profile required headings are missing 部署步骤与配置.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $deploymentProfile -SectionId 'result' -BaseName 'health-result') -eq '验证结果截图') -Message 'Deployment profile image caption defaults are missing the result caption.'
+  $deploymentPaginationRemediations = Get-ReportProfilePaginationRiskRemediations -Profile $deploymentProfile
+  Assert-True -Condition ([string]$deploymentPaginationRemediations.'pagination-risk-long-section' -match 'rollback subsections') -Message 'Deployment profile pagination-risk remediations are missing the long-section override.'
+  Assert-True -Condition ([string]$deploymentPaginationRemediations.'pagination-risk-dense-section-block' -match 'commands, configuration snippets') -Message 'Deployment profile pagination-risk remediations are missing the dense-section override.'
+  Assert-True -Condition ([string]$deploymentPaginationRemediations.'pagination-risk-figure-cluster' -match '验证结果') -Message 'Deployment profile pagination-risk remediations are missing the figure-cluster override.'
   $weeklyReportProfile = Get-ReportProfile -ProfileName 'weekly-report' -RepoRoot $repoRoot
   Assert-True -Condition ([string]$weeklyReportProfile.name -eq 'weekly-report') -Message 'Weekly-report profile loader returned an unexpected profile name.'
   Assert-True -Condition ([string]$weeklyReportProfile.displayName -eq '周报') -Message 'Weekly-report profile loader returned an unexpected display name.'
@@ -1108,6 +1116,9 @@ URL: https://example.com/network-lab
   $softwareTestRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '软件测试技术' -ResolvedExperimentName '图书管理系统功能测试' -Profile $softwareTestProfile -ExtraKeywords @('登录测试', '图书管理系统功能测试') -DetailLevel 'full') | ConvertFrom-Json
   Assert-True -Condition ([int]$softwareTestRequirements.minChars -eq 1600) -Message 'Auto requirements helper did not use the software-test full minChars.'
   Assert-True -Condition (@($softwareTestRequirements.sections | Where-Object { $_.name -eq '测试用例设计与执行' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the software-test case section heading.'
+  Assert-True -Condition ([string]$softwareTestRequirements.paginationRiskRemediations.'pagination-risk-long-section' -match 'case group') -Message 'Auto requirements helper did not carry the software-test long-section remediation.'
+  Assert-True -Condition ([string]$softwareTestRequirements.paginationRiskRemediations.'pagination-risk-dense-section-block' -match 'expected results, actual results') -Message 'Auto requirements helper did not carry the software-test dense-section remediation.'
+  Assert-True -Condition ([string]$softwareTestRequirements.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '缺陷分析与改进') -Message 'Auto requirements helper did not carry the software-test figure-cluster remediation.'
   $softwareTestMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件测试技术' -ResolvedExperimentName '图书管理系统功能测试' -Profile $softwareTestProfile -ResolvedStudentName '赵强' -ResolvedStudentId '20263456' -ResolvedClassName '软工 2304' -ResolvedTeacherName '陈老师' -ResolvedExperimentProperty '功能测试' -ResolvedExperimentDate '2026-04-10' -ResolvedExperimentLocation 'Chrome 122 / Windows 11 / MySQL 8.0') | ConvertFrom-Json
   Assert-True -Condition ([string]$softwareTestMetadata.学生姓名 -eq '赵强') -Message 'Auto metadata helper did not emit the software-test student label.'
   Assert-True -Condition ([string]$softwareTestMetadata.测试项目 -eq '图书管理系统功能测试') -Message 'Auto metadata helper did not emit the software-test project label.'
@@ -1119,6 +1130,9 @@ URL: https://example.com/network-lab
   $deploymentRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '云平台运维实践' -ResolvedExperimentName '校园门户系统容器化部署' -Profile $deploymentProfile -ExtraKeywords @('Docker', 'Nginx', '校园门户系统容器化部署') -DetailLevel 'full') | ConvertFrom-Json
   Assert-True -Condition ([int]$deploymentRequirements.minChars -eq 1600) -Message 'Auto requirements helper did not use the deployment full minChars.'
   Assert-True -Condition (@($deploymentRequirements.sections | Where-Object { $_.name -eq '部署步骤与配置' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the deployment steps section heading.'
+  Assert-True -Condition ([string]$deploymentRequirements.paginationRiskRemediations.'pagination-risk-long-section' -match 'rollback subsections') -Message 'Auto requirements helper did not carry the deployment long-section remediation.'
+  Assert-True -Condition ([string]$deploymentRequirements.paginationRiskRemediations.'pagination-risk-dense-section-block' -match 'commands, configuration snippets') -Message 'Auto requirements helper did not carry the deployment dense-section remediation.'
+  Assert-True -Condition ([string]$deploymentRequirements.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '问题处理与回滚预案') -Message 'Auto requirements helper did not carry the deployment figure-cluster remediation.'
   $deploymentMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '云平台运维实践' -ResolvedExperimentName '校园门户系统容器化部署' -Profile $deploymentProfile -ResolvedStudentName '刘洋' -ResolvedStudentId '20264567' -ResolvedClassName '网工 2301' -ResolvedTeacherName '孙老师' -ResolvedExperimentProperty '系统部署' -ResolvedExperimentDate '2026-04-12' -ResolvedExperimentLocation 'Ubuntu 22.04 / Docker 26 / Nginx 1.24') | ConvertFrom-Json
   Assert-True -Condition ([string]$deploymentMetadata.学生姓名 -eq '刘洋') -Message 'Auto metadata helper did not emit the deployment student label.'
   Assert-True -Condition ([string]$deploymentMetadata.部署项目 -eq '校园门户系统容器化部署') -Message 'Auto metadata helper did not emit the deployment project label.'
@@ -2029,6 +2043,54 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([bool]$softwareTestValidation.passed) -Message 'Software-test report validation should pass for the software-test profile.'
   Assert-True -Condition ([string]$softwareTestValidation.reportProfileName -eq 'software-test-report') -Message 'Software-test report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$softwareTestValidation.summary.sectionCount -ge 7) -Message 'Software-test report validation did not load the expected section rules.'
+  Assert-True -Condition ([string]$softwareTestValidation.summary.paginationRiskRemediations.'pagination-risk-dense-section-block' -match 'expected results, actual results') -Message 'Software-test validation summary should expose the custom dense-section remediation.'
+
+  $softwareTestRiskDenseBlock = ((@('本轮测试把登录、查询、借阅、归还、库存边界、接口异常、重复提交、弱网提示、数据库状态核对和页面反馈串成同一组回归证据。') * 32) -join '') + '见图1、图2、图3、图4、图5。'
+  $softwareTestRiskReportPath = Join-Path $tempRoot 'software-test-report-pagination-risk.md'
+  @(
+    '软件测试报告',
+    '',
+    '课程名称：软件测试技术',
+    '测试项目：图书管理系统功能测试',
+    '学生姓名：赵强',
+    '学号：20263456',
+    '指导教师：陈老师',
+    '测试类型：功能测试',
+    '测试时间：2026-04-10',
+    '测试环境：Chrome 122 / Windows 11 / MySQL 8.0',
+    '',
+    '一、测试目标',
+    '测试目标是验证图书管理系统的登录、查询、借阅和归还主流程是否满足课程验收要求，并观察异常输入下的提示是否清晰。',
+    '',
+    '二、测试环境',
+    '测试环境使用 Windows 11、Chrome 浏览器、本地 Node.js 服务和 MySQL 测试库，测试前会清理浏览器缓存并重置样例数据。',
+    '',
+    '三、测试范围与依据',
+    '测试范围覆盖账号登录、图书检索、借阅登记、归还确认、库存更新和错误提示展示，依据来自需求说明、页面原型和接口字段约定。',
+    '',
+    '四、测试用例设计与执行',
+    $softwareTestRiskDenseBlock,
+    '',
+    '五、测试结果',
+    '本轮测试执行后，登录、查询、正常借阅和正常归还流程均可通过，异常输入场景能够返回提示，测试结果具备继续修复、复测、回归统计和课堂验收说明的依据。',
+    '',
+    '六、缺陷分析与改进',
+    '当前缺陷主要集中在库存边界和接口超时提示上，建议把前置条件、输入数据、预期结果、实际结果和缺陷备注分开记录，避免测试证据挤在同一段中。',
+    '',
+    '七、测试总结',
+    '本次测试说明核心业务流程已经可用，后续应继续补充弱网、并发借阅和重复提交等回归用例，并把截图证据按用例组分散到对应章节。'
+  ) | Set-Content -LiteralPath $softwareTestRiskReportPath -Encoding UTF8
+  $softwareTestRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $softwareTestRiskReportPath -ReportProfileName 'software-test-report' -Format json | Out-String) | ConvertFrom-Json
+  $softwareTestRiskWarningCodes = @($softwareTestRiskValidation.summary.warningCodes | ForEach-Object { [string]$_ })
+  $softwareTestRiskLongFinding = @($softwareTestRiskValidation.findings | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  Assert-True -Condition ([bool]$softwareTestRiskValidation.passed) -Message 'Software-test pagination-risk fixture should pass with warnings only.'
+  Assert-True -Condition ([int]$softwareTestRiskValidation.summary.paginationRiskCount -ge 3) -Message 'Software-test pagination-risk fixture should surface profile warnings.'
+  Assert-True -Condition ($softwareTestRiskWarningCodes -contains 'pagination-risk-long-section') -Message 'Software-test pagination-risk fixture should report pagination-risk-long-section.'
+  Assert-True -Condition ($softwareTestRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Software-test pagination-risk fixture should report pagination-risk-dense-section-block.'
+  Assert-True -Condition ($softwareTestRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Software-test pagination-risk fixture should report pagination-risk-figure-cluster.'
+  Assert-True -Condition ([string]$softwareTestRiskValidation.summary.paginationRiskRemediations.'pagination-risk-long-section' -match 'case group') -Message 'Software-test validation summary should expose the custom long-section remediation.'
+  Assert-True -Condition ([string]$softwareTestRiskValidation.summary.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '缺陷分析与改进') -Message 'Software-test validation summary should expose the custom figure-cluster remediation.'
+  Assert-True -Condition ([string]$softwareTestRiskLongFinding.remediation -match 'case group') -Message 'Software-test validation finding should use the custom long-section remediation.'
   $results.Add('software-test profile validation OK') | Out-Null
 
   $deploymentReportPath = Join-Path $tempRoot 'deployment-report.md'
@@ -2078,6 +2140,54 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([bool]$deploymentValidation.passed) -Message 'Deployment report validation should pass for the deployment profile.'
   Assert-True -Condition ([string]$deploymentValidation.reportProfileName -eq 'deployment-report') -Message 'Deployment report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$deploymentValidation.summary.sectionCount -ge 7) -Message 'Deployment report validation did not load the expected section rules.'
+  Assert-True -Condition ([string]$deploymentValidation.summary.paginationRiskRemediations.'pagination-risk-dense-section-block' -match 'commands, configuration snippets') -Message 'Deployment validation summary should expose the custom dense-section remediation.'
+
+  $deploymentRiskDenseBlock = ((@('部署过程把镜像构建、环境变量、端口映射、数据卷挂载、Nginx 代理、服务启动、日志检查、健康检查、回滚标签和恢复验证串成同一条发布证据链。') * 30) -join '') + '见图1、图2、图3、图4、图5。'
+  $deploymentRiskReportPath = Join-Path $tempRoot 'deployment-report-pagination-risk.md'
+  @(
+    '部署运维报告',
+    '',
+    '课程名称：云平台运维实践',
+    '部署项目：校园门户系统容器化部署',
+    '学生姓名：刘洋',
+    '学号：20264567',
+    '指导教师：孙老师',
+    '部署类型：系统部署',
+    '部署时间：2026-04-12',
+    '部署环境：Ubuntu 22.04 / Docker 26 / Nginx 1.24',
+    '',
+    '一、部署目标',
+    '部署目标是把校园门户系统迁移到容器化运行环境中，使前端、后端和数据库能够形成可访问、可验证、可回滚的完整链路。',
+    '',
+    '二、部署环境',
+    '部署环境包括 Ubuntu 服务器、Docker Compose、Nginx、MySQL 和后端应用镜像，部署前已检查端口、防火墙、环境变量和初始化脚本。',
+    '',
+    '三、部署方案与架构',
+    '部署方案采用 Nginx 反向代理加多容器编排，前端、后端和数据库通过服务名互相访问，并通过环境变量和挂载卷降低重发版成本。',
+    '',
+    '四、部署步骤与配置',
+    $deploymentRiskDenseBlock,
+    '',
+    '五、验证结果',
+    '验证结果显示门户首页、登录接口和健康检查地址均可访问，容器日志没有持续报错，后端服务重启后能够在短时间内恢复，并能继续支撑课堂演示和发布复盘。',
+    '',
+    '六、问题处理与回滚预案',
+    '当前风险集中在数据库初始化等待和发布回滚路径上，建议把命令、配置片段、日志观察和操作解释分开记录，并把截图分散到验证和回滚章节。',
+    '',
+    '七、部署总结',
+    '本次部署梳理了镜像构建、compose 编排、Nginx 代理、健康检查和回滚预案，后续应继续补充监控告警、证书续期和自动化发布脚本。'
+  ) | Set-Content -LiteralPath $deploymentRiskReportPath -Encoding UTF8
+  $deploymentRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $deploymentRiskReportPath -ReportProfileName 'deployment-report' -Format json | Out-String) | ConvertFrom-Json
+  $deploymentRiskWarningCodes = @($deploymentRiskValidation.summary.warningCodes | ForEach-Object { [string]$_ })
+  $deploymentRiskLongFinding = @($deploymentRiskValidation.findings | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  Assert-True -Condition ([bool]$deploymentRiskValidation.passed) -Message 'Deployment pagination-risk fixture should pass with warnings only.'
+  Assert-True -Condition ([int]$deploymentRiskValidation.summary.paginationRiskCount -ge 3) -Message 'Deployment pagination-risk fixture should surface profile warnings.'
+  Assert-True -Condition ($deploymentRiskWarningCodes -contains 'pagination-risk-long-section') -Message 'Deployment pagination-risk fixture should report pagination-risk-long-section.'
+  Assert-True -Condition ($deploymentRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Deployment pagination-risk fixture should report pagination-risk-dense-section-block.'
+  Assert-True -Condition ($deploymentRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Deployment pagination-risk fixture should report pagination-risk-figure-cluster.'
+  Assert-True -Condition ([string]$deploymentRiskValidation.summary.paginationRiskRemediations.'pagination-risk-long-section' -match 'rollback subsections') -Message 'Deployment validation summary should expose the custom long-section remediation.'
+  Assert-True -Condition ([string]$deploymentRiskValidation.summary.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '问题处理与回滚预案') -Message 'Deployment validation summary should expose the custom figure-cluster remediation.'
+  Assert-True -Condition ([string]$deploymentRiskLongFinding.remediation -match 'rollback subsections') -Message 'Deployment validation finding should use the custom long-section remediation.'
   $results.Add('deployment profile validation OK') | Out-Null
 
   $weeklyReportPath = Join-Path $tempRoot 'weekly-report.md'

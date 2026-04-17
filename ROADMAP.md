@@ -236,6 +236,7 @@ Implemented baseline:
 - `.github/workflows/roadmap-triage.yml`
 - schema-backed `paginationRiskThresholds` in report profiles and preset examples
 - profile-specific `paginationRiskRemediations` propagated through generated requirements, validation summaries, and wrapper traces
+- `software-test-report` and `deployment-report` now carry profile-specific pagination remediation guidance for test evidence, deployment commands, verification screenshots, and rollback-heavy sections
 - `examples/monthly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - smoke coverage for replaying a checked-in monthly prepared-summary bundle through `build-report-from-url.ps1`
 
