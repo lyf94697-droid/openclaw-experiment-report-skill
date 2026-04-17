@@ -1,0 +1,924 @@
+﻿Set-StrictMode -Version Latest
+
+function Resolve-ReportProfilePath {
+  param(
+    [AllowNull()]
+    [string]$ProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ProfilePath,
+
+    [AllowNull()]
+    [string]$RepoRoot
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($ProfilePath)) {
+    return (Resolve-Path -LiteralPath $ProfilePath).Path
+  }
+
+  if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+  }
+
+  if ([string]::IsNullOrWhiteSpace($ProfileName)) {
+    $ProfileName = "experiment-report"
+  }
+
+  return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot ("profiles\{0}.json" -f $ProfileName)))
+}
+
+function Get-ReportProfile {
+  param(
+    [AllowNull()]
+    [string]$ProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ProfilePath,
+
+    [AllowNull()]
+    [string]$RepoRoot
+  )
+
+  $resolvedProfilePath = Resolve-ReportProfilePath -ProfileName $ProfileName -ProfilePath $ProfilePath -RepoRoot $RepoRoot
+  if (-not (Test-Path -LiteralPath $resolvedProfilePath -PathType Leaf)) {
+    throw "Report profile was not found: $resolvedProfilePath"
+  }
+
+  $raw = Get-Content -LiteralPath $resolvedProfilePath -Raw -Encoding UTF8
+  if ([string]::IsNullOrWhiteSpace($raw)) {
+    throw "Report profile is empty: $resolvedProfilePath"
+  }
+
+  $profile = $raw | ConvertFrom-Json
+  if ($null -eq $profile) {
+    throw "Report profile did not parse: $resolvedProfilePath"
+  }
+  if (-not ($profile.PSObject.Properties.Name -contains "metadataFields") -or @($profile.metadataFields).Count -eq 0) {
+    throw "Report profile is missing metadataFields: $resolvedProfilePath"
+  }
+  if (-not ($profile.PSObject.Properties.Name -contains "sectionFields") -or @($profile.sectionFields).Count -eq 0) {
+    throw "Report profile is missing sectionFields: $resolvedProfilePath"
+  }
+  if (-not ($profile.PSObject.Properties.Name -contains "detailProfiles")) {
+    throw "Report profile is missing detailProfiles: $resolvedProfilePath"
+  }
+
+  Add-Member -InputObject $profile -MemberType NoteProperty -Name resolvedProfilePath -Value $resolvedProfilePath -Force
+  if (-not ($profile.PSObject.Properties.Name -contains "name") -or [string]::IsNullOrWhiteSpace([string]$profile.name)) {
+    Add-Member -InputObject $profile -MemberType NoteProperty -Name name -Value ([System.IO.Path]::GetFileNameWithoutExtension($resolvedProfilePath)) -Force
+  }
+
+  return $profile
+}
+
+function Resolve-PreparedInputsLinkedPath {
+  param(
+    [AllowNull()]
+    [string]$Path,
+
+    [AllowNull()]
+    [string]$BaseDirectory
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return $null
+  }
+
+  if ([System.IO.Path]::IsPathRooted($Path) -or [string]::IsNullOrWhiteSpace($BaseDirectory)) {
+    return [System.IO.Path]::GetFullPath($Path)
+  }
+
+  return [System.IO.Path]::GetFullPath((Join-Path $BaseDirectory $Path))
+}
+
+function Resolve-PreparedInputsLinkedPathList {
+  param(
+    [AllowNull()]
+    [object]$Paths,
+
+    [AllowNull()]
+    [string]$BaseDirectory
+  )
+
+  $resolvedPaths = New-Object System.Collections.Generic.List[string]
+  foreach ($pathItem in @($Paths)) {
+    $pathText = [string]$pathItem
+    if (-not [string]::IsNullOrWhiteSpace($pathText)) {
+      [void]$resolvedPaths.Add((Resolve-PreparedInputsLinkedPath -Path $pathText -BaseDirectory $BaseDirectory))
+    }
+  }
+
+  return @($resolvedPaths)
+}
+
+function Resolve-PreparedInputsSummaryLinkedPaths {
+  param(
+    [AllowNull()]
+    [psobject]$Summary,
+
+    [AllowNull()]
+    [string]$PreparedInputsSummaryPath
+  )
+
+  if ($null -eq $Summary -or [string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath)) {
+    return $Summary
+  }
+
+  $summaryDirectory = Split-Path -Parent $PreparedInputsSummaryPath
+  if ([string]::IsNullOrWhiteSpace($summaryDirectory)) {
+    return $Summary
+  }
+
+  foreach ($propertyName in @(
+      "outputDir",
+      "reportProfilePath",
+      "promptPath",
+      "metadataPath",
+      "requirementsPath",
+      "defaultsPath"
+    )) {
+    if ($Summary.PSObject.Properties.Name -contains $propertyName) {
+      $resolvedPath = Resolve-PreparedInputsLinkedPath -Path ([string]$Summary.$propertyName) -BaseDirectory $summaryDirectory
+      Add-Member -InputObject $Summary -MemberType NoteProperty -Name $propertyName -Value $resolvedPath -Force
+    }
+  }
+
+  foreach ($propertyName in @("referenceTextPaths", "fetchedReferenceTextPaths")) {
+    if ($Summary.PSObject.Properties.Name -contains $propertyName) {
+      $resolvedPathList = Resolve-PreparedInputsLinkedPathList -Paths $Summary.$propertyName -BaseDirectory $summaryDirectory
+      Add-Member -InputObject $Summary -MemberType NoteProperty -Name $propertyName -Value $resolvedPathList -Force
+    }
+  }
+
+  return $Summary
+}
+
+function Resolve-PreparedInputsSummaryContext {
+  param(
+    [AllowNull()]
+    [string]$PreparedInputsSummaryPath,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath,
+
+    [bool]$ReportProfileNameProvided = $false,
+
+    [bool]$ReportProfilePathProvided = $false,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full",
+
+    [bool]$DetailLevelProvided = $false
+  )
+
+  $resolvedPreparedInputsSummaryPath = if ([string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath)) {
+    $null
+  } else {
+    (Resolve-Path -LiteralPath $PreparedInputsSummaryPath).Path
+  }
+
+  $preparedInputsSummary = if (-not [string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
+    $loadedPreparedInputsSummary = (Get-Content -LiteralPath $resolvedPreparedInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Resolve-PreparedInputsSummaryLinkedPaths -Summary $loadedPreparedInputsSummary -PreparedInputsSummaryPath $resolvedPreparedInputsSummaryPath
+  } else {
+    $null
+  }
+
+  $useSummaryProfile = ($null -ne $preparedInputsSummary) -and (-not $ReportProfileNameProvided) -and (-not $ReportProfilePathProvided)
+  $effectiveReportProfileName = if ($useSummaryProfile -and $preparedInputsSummary.PSObject.Properties.Name -contains "reportProfileName" -and -not [string]::IsNullOrWhiteSpace([string]$preparedInputsSummary.reportProfileName)) {
+    [string]$preparedInputsSummary.reportProfileName
+  } else {
+    $ReportProfileName
+  }
+  $effectiveReportProfilePath = if ($useSummaryProfile -and $preparedInputsSummary.PSObject.Properties.Name -contains "reportProfilePath" -and -not [string]::IsNullOrWhiteSpace([string]$preparedInputsSummary.reportProfilePath)) {
+    [string]$preparedInputsSummary.reportProfilePath
+  } else {
+    $ReportProfilePath
+  }
+  $effectiveDetailLevel = if (-not $DetailLevelProvided -and $null -ne $preparedInputsSummary -and $preparedInputsSummary.PSObject.Properties.Name -contains "detailLevel" -and -not [string]::IsNullOrWhiteSpace([string]$preparedInputsSummary.detailLevel)) {
+    [string]$preparedInputsSummary.detailLevel
+  } else {
+    $DetailLevel
+  }
+
+  return [pscustomobject]@{
+    resolvedPreparedInputsSummaryPath = $resolvedPreparedInputsSummaryPath
+    summary = $preparedInputsSummary
+    reportProfileName = $effectiveReportProfileName
+    reportProfilePath = $effectiveReportProfilePath
+    detailLevel = $effectiveDetailLevel
+  }
+}
+
+function Get-ReportProfileLabels {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $labels = [ordered]@{}
+
+  foreach ($field in @($Profile.metadataFields)) {
+    $key = [string]$field.key
+    if (-not [string]::IsNullOrWhiteSpace($key)) {
+      $labels[$key] = [string]$field.label
+    }
+  }
+
+  foreach ($field in @($Profile.sectionFields)) {
+    $key = [string]$field.key
+    if (-not [string]::IsNullOrWhiteSpace($key)) {
+      $labels[$key] = [string]$field.heading
+    }
+  }
+
+  $extraLabelFields = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels"
+  foreach ($field in $(if ($null -eq $extraLabelFields) { @() } else { @($extraLabelFields) })) {
+    $key = [string]$field.key
+    if (-not [string]::IsNullOrWhiteSpace($key)) {
+      $labels[$key] = [string]$field.label
+    }
+  }
+
+  return $labels
+}
+
+function Get-ReportProfileDisplayName {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [string]$Fallback = "报告"
+  )
+
+  $displayName = [string](Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "displayName")
+  if ([string]::IsNullOrWhiteSpace($displayName)) {
+    return $Fallback
+  }
+
+  return $displayName
+}
+
+function Get-ReportProfilePromptLabels {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $labels = Get-ReportProfileLabels -Profile $Profile
+  return [pscustomobject]@{
+    documentLabel = Get-ReportProfileDisplayName -Profile $Profile -Fallback "报告"
+    courseNameLabel = $(if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" })
+    titleNameLabel = $(if ($labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["ExperimentName"])) { [string]$labels["ExperimentName"] } else { "题目名称" })
+  }
+}
+
+function Get-ReportProfileMetadataIdFromKey {
+  param(
+    [AllowNull()]
+    [string]$Key
+  )
+
+  switch ([string]$Key) {
+    "Name" { return "student_name" }
+    "StudentId" { return "student_id" }
+    "ClassName" { return "class_name" }
+    "TeacherName" { return "teacher_name" }
+    "CourseName" { return "course_name" }
+    "ExperimentName" { return "experiment_name" }
+    "ExperimentProperty" { return "experiment_property" }
+    "ExperimentDate" { return "experiment_date" }
+    "ExperimentLocation" { return "experiment_location" }
+    "Date" { return "date" }
+    "College" { return "college" }
+    "Major" { return "major" }
+    default {
+      if ([string]::IsNullOrWhiteSpace($Key)) {
+        return ""
+      }
+
+      return (Normalize-ReportProfileLookupKey -Text $Key)
+    }
+  }
+}
+
+function ConvertTo-ReportProfilePlainHashtable {
+  param(
+    [AllowNull()]
+    [object]$InputObject
+  )
+
+  if ($null -eq $InputObject) {
+    return @{}
+  }
+
+  $table = @{}
+  if ($InputObject -is [System.Collections.IDictionary]) {
+    foreach ($key in $InputObject.Keys) {
+      $table[[string]$key] = $InputObject[$key]
+    }
+    return $table
+  }
+
+  foreach ($property in $InputObject.PSObject.Properties) {
+    $table[[string]$property.Name] = $property.Value
+  }
+
+  return $table
+}
+
+function ConvertTo-ReportProfileStringArray {
+  param(
+    [AllowNull()]
+    [object]$Value
+  )
+
+  if ($null -eq $Value) {
+    return @()
+  }
+
+  if (($Value -is [System.Collections.IEnumerable]) -and ($Value -isnot [string])) {
+    return @(
+      @($Value) |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+  }
+
+  if ([string]::IsNullOrWhiteSpace([string]$Value)) {
+    return @()
+  }
+
+  return @([string]$Value)
+}
+
+function Get-ReportProfileOptionalPropertyValue {
+  param(
+    [AllowNull()]
+    [object]$Object,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if ($null -eq $Object) {
+    return $null
+  }
+
+  $property = $Object.PSObject.Properties[$Name]
+  if ($null -eq $property) {
+    return $null
+  }
+
+  return $property.Value
+}
+
+function Get-ReportProfileSectionIdFromKey {
+  param(
+    [AllowNull()]
+    [string]$Key
+  )
+
+  switch ([string]$Key) {
+    "Purpose" { return "purpose" }
+    "Environment" { return "environment" }
+    "Theory" { return "theory" }
+    "Steps" { return "steps" }
+    "Results" { return "result" }
+    "Analysis" { return "analysis" }
+    "Summary" { return "summary" }
+    default {
+      if ([string]::IsNullOrWhiteSpace($Key)) {
+        return ""
+      }
+      return $Key.Trim().ToLowerInvariant()
+    }
+  }
+}
+
+function Get-ReportProfileSectionFields {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  return @($Profile.sectionFields)
+}
+
+function Get-ReportProfileSectionRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  return @(
+    @(Get-ReportProfileSectionFields -Profile $Profile) |
+      ForEach-Object {
+        $sectionId = Get-ReportProfileSectionIdFromKey -Key ([string]$_.key)
+        $heading = [string]$_.heading
+        $headingAliases = @(
+          @($_.aliases) |
+            ForEach-Object { [string]$_ } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+        if ($headingAliases.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($heading)) {
+          $headingAliases = @($heading)
+        }
+
+        $inputAliases = @(
+          @($headingAliases + @($heading, [string]$_.key, $sectionId)) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            Select-Object -Unique
+        )
+
+        [pscustomobject]@{
+          id = $sectionId
+          key = [string]$_.key
+          canonicalLabel = $heading
+          headingAliases = $headingAliases
+          inputAliases = $inputAliases
+        }
+      }
+  )
+}
+
+function Get-ReportProfileMetadataPrefixes {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  return @(
+    @(Get-ReportProfileMetadataRules -Profile $Profile) |
+      ForEach-Object { @([string]$_.canonicalLabel) + @($_.explicitAliases) } |
+      ForEach-Object { [string]$_ } |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+      Select-Object -Unique
+  )
+}
+
+function Get-ReportProfileMetadataRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $extraLabelFields = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraLabels"
+  return @(
+    @($Profile.metadataFields + $(if ($null -eq $extraLabelFields) { @() } else { @($extraLabelFields) })) |
+      ForEach-Object {
+        $metadataId = Get-ReportProfileMetadataIdFromKey -Key ([string]$_.key)
+        $canonicalLabel = [string]$_.label
+        $explicitAliases = @(
+          ConvertTo-ReportProfileStringArray -Value (Get-ReportProfileOptionalPropertyValue -Object $_ -Name "aliases")
+        )
+        $inputAliases = @(
+          @(@($canonicalLabel) + @($explicitAliases) + @([string]$_.key, $metadataId)) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            Select-Object -Unique
+        )
+
+        [pscustomobject]@{
+          id = $metadataId
+          key = [string]$_.key
+          canonicalLabel = $canonicalLabel
+          explicitAliases = $explicitAliases
+          inputAliases = $inputAliases
+        }
+      }
+  )
+}
+
+function Get-ReportProfileExtraSectionHeadings {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $extraHeadings = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "extraSectionHeadings"
+  return @(
+    ConvertTo-ReportProfileStringArray -Value $extraHeadings |
+      Select-Object -Unique
+  )
+}
+
+function Get-ReportProfileDefaultStyleProfile {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [string]$Fallback = "auto"
+  )
+
+  $resolvedFallback = if ([string]::IsNullOrWhiteSpace($Fallback)) { "auto" } else { $Fallback.Trim().ToLowerInvariant() }
+  $rawValue = [string](Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "defaultStyleProfile")
+  if ([string]::IsNullOrWhiteSpace($rawValue)) {
+    return $resolvedFallback
+  }
+
+  $normalized = $rawValue.Trim().ToLowerInvariant()
+  if (@("auto", "default", "compact", "school") -notcontains $normalized) {
+    throw "Report profile '$([string]$Profile.name)' has unsupported defaultStyleProfile '$rawValue'"
+  }
+
+  return $normalized
+}
+
+function Get-ReportProfilePaginationRiskThresholds {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $thresholds = [ordered]@{
+    longSectionChars = 900
+    denseSectionChars = 550
+    denseSectionParagraphs = 2
+    figureClusterRefs = 3
+  }
+
+  $configuredThresholds = ConvertTo-ReportProfilePlainHashtable -InputObject (Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "paginationRiskThresholds")
+  foreach ($key in @($thresholds.Keys)) {
+    if ($configuredThresholds.ContainsKey($key) -and $null -ne $configuredThresholds[$key] -and -not [string]::IsNullOrWhiteSpace([string]$configuredThresholds[$key])) {
+      $thresholds[$key] = [int]$configuredThresholds[$key]
+    }
+  }
+
+  return [pscustomobject]$thresholds
+}
+
+function Get-ReportProfilePaginationRiskRemediations {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $knownCodes = @(
+    "pagination-risk-long-section",
+    "pagination-risk-dense-section-block",
+    "pagination-risk-figure-cluster"
+  )
+  $configuredRemediations = ConvertTo-ReportProfilePlainHashtable -InputObject (Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "paginationRiskRemediations")
+  $remediations = [ordered]@{}
+
+  foreach ($code in $knownCodes) {
+    if ($configuredRemediations.ContainsKey($code) -and -not [string]::IsNullOrWhiteSpace([string]$configuredRemediations[$code])) {
+      $remediations[$code] = [string]$configuredRemediations[$code]
+    }
+  }
+
+  return [pscustomobject]$remediations
+}
+
+function Get-ReportProfileImagePlacementDefaults {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $imagePlacementDefaults = ConvertTo-ReportProfilePlainHashtable -InputObject (Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "imagePlacementDefaults")
+  $defaultCaptions = ConvertTo-ReportProfilePlainHashtable -InputObject $imagePlacementDefaults["defaultCaptions"]
+
+  return [pscustomobject]@{
+    fallbackSectionOrder = @(
+      ConvertTo-ReportProfileStringArray -Value $imagePlacementDefaults["fallbackSectionOrder"] |
+        ForEach-Object { Get-ReportProfileSectionIdFromKey -Key ([string]$_) } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique
+    )
+    defaultCaptions = $defaultCaptions
+    filenameCaptionRules = @($imagePlacementDefaults["filenameCaptionRules"])
+  }
+}
+
+function Get-ReportProfileFieldMapCompositeRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $rawRulesValue = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "fieldMapCompositeRules"
+  $rawRules = if ($null -eq $rawRulesValue) { @() } else { @($rawRulesValue) }
+  if ($rawRules.Count -eq 0) {
+    return @()
+  }
+
+  return @(
+    foreach ($rawRule in $rawRules) {
+      $ruleTable = ConvertTo-ReportProfilePlainHashtable -InputObject $rawRule
+      $matchAll = @(
+        ConvertTo-ReportProfileStringArray -Value $ruleTable["matchAll"] |
+          Select-Object -Unique
+      )
+      if ($matchAll.Count -eq 0) {
+        throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without matchAll."
+      }
+
+      $rawBlocks = @($ruleTable["blocks"])
+      if ($rawBlocks.Count -eq 0) {
+        throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without blocks."
+      }
+
+      $blocks = @(
+        foreach ($rawBlock in $rawBlocks) {
+          $blockTable = ConvertTo-ReportProfilePlainHashtable -InputObject $rawBlock
+          $sectionIds = New-Object System.Collections.Generic.List[string]
+
+          foreach ($sectionId in (ConvertTo-ReportProfileStringArray -Value $blockTable["sectionIds"])) {
+            $normalizedSectionId = Get-ReportProfileSectionIdFromKey -Key ([string]$sectionId)
+            if (-not [string]::IsNullOrWhiteSpace($normalizedSectionId) -and -not $sectionIds.Contains($normalizedSectionId)) {
+              $sectionIds.Add($normalizedSectionId) | Out-Null
+            }
+          }
+
+          foreach ($sectionKey in (ConvertTo-ReportProfileStringArray -Value $blockTable["sectionKeys"])) {
+            $normalizedSectionId = Get-ReportProfileSectionIdFromKey -Key ([string]$sectionKey)
+            if (-not [string]::IsNullOrWhiteSpace($normalizedSectionId) -and -not $sectionIds.Contains($normalizedSectionId)) {
+              $sectionIds.Add($normalizedSectionId) | Out-Null
+            }
+          }
+
+          if ($sectionIds.Count -eq 0) {
+            throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule block without sectionIds/sectionKeys."
+          }
+
+          [pscustomobject]@{
+            heading = [string]$blockTable["heading"]
+            sectionIds = @($sectionIds)
+          }
+        }
+      )
+
+      [pscustomobject]@{
+        matchAll = $matchAll
+        blocks = $blocks
+      }
+    }
+  )
+}
+
+function Normalize-ReportProfileLookupKey {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return ""
+  }
+
+  $normalized = $Text.ToLowerInvariant()
+  $normalized = $normalized -replace '\s+', ''
+  $normalized = $normalized -replace '[\p{P}\p{S}\uFF3F]+', ''
+  return $normalized
+}
+
+function Get-ReportProfileImageFallbackSectionOrder {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $configuredOrder = @(Get-ReportProfileImagePlacementDefaults -Profile $Profile).fallbackSectionOrder
+  if ($configuredOrder.Count -gt 0) {
+    return $configuredOrder
+  }
+
+  return @("steps", "result", "environment", "analysis", "summary", "purpose")
+}
+
+function Get-ReportProfileDefaultImageCaptionBody {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [AllowNull()]
+    [string]$SectionId,
+
+    [AllowNull()]
+    [string]$BaseName
+  )
+
+  $imagePlacementDefaults = Get-ReportProfileImagePlacementDefaults -Profile $Profile
+  $normalizedBaseName = Normalize-ReportProfileLookupKey -Text $BaseName
+
+  foreach ($rule in @($imagePlacementDefaults.filenameCaptionRules)) {
+    $ruleTable = ConvertTo-ReportProfilePlainHashtable -InputObject $rule
+    $pattern = [string]$ruleTable["pattern"]
+    $caption = [string]$ruleTable["caption"]
+    if (-not [string]::IsNullOrWhiteSpace($pattern) -and -not [string]::IsNullOrWhiteSpace($caption) -and $normalizedBaseName -match $pattern) {
+      return $caption
+    }
+  }
+
+  $defaultCaptions = $imagePlacementDefaults.defaultCaptions
+  if (-not [string]::IsNullOrWhiteSpace($SectionId) -and $defaultCaptions.ContainsKey($SectionId) -and -not [string]::IsNullOrWhiteSpace([string]$defaultCaptions[$SectionId])) {
+    return [string]$defaultCaptions[$SectionId]
+  }
+  if ($defaultCaptions.ContainsKey("default") -and -not [string]::IsNullOrWhiteSpace([string]$defaultCaptions["default"])) {
+    return [string]$defaultCaptions["default"]
+  }
+
+  switch ([string]$SectionId) {
+    "environment" { return "实验环境截图" }
+    "steps" { return "实验步骤截图" }
+    "result" { return "实验结果截图" }
+    "analysis" { return "问题分析截图" }
+    "summary" { return "实验总结截图" }
+    default { return "实验过程截图" }
+  }
+}
+
+function Get-ReportProfileRequiredHeadings {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  return @(
+    Get-ReportProfileSectionFields -Profile $Profile |
+      ForEach-Object { [string]$_.heading } |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  )
+}
+
+function Get-ReportProfileDetailProfile {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [Parameter(Mandatory = $true)]
+    [string]$DetailLevel
+  )
+
+  if (-not ($Profile.detailProfiles.PSObject.Properties.Name -contains $DetailLevel)) {
+    throw "Report profile '$([string]$Profile.name)' does not define detailProfiles.$DetailLevel"
+  }
+
+  return $Profile.detailProfiles.$DetailLevel
+}
+
+function New-ReportProfileAutoPromptText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full"
+  )
+
+  $promptLabels = Get-ReportProfilePromptLabels -Profile $Profile
+  $documentLabel = [string]$promptLabels.documentLabel
+  $courseNameLabel = [string]$promptLabels.courseNameLabel
+  $titleNameLabel = [string]$promptLabels.titleNameLabel
+  $requiredHeadings = (Get-ReportProfileRequiredHeadings -Profile $Profile) -join ", "
+  $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
+  $detailRequirements = @(
+    @($detailProfile.promptGuidance | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) |
+      ForEach-Object { "- {0}" -f [string]$_ }
+  ) -join [Environment]::NewLine
+
+  return @"
+Write a formal Chinese university $documentLabel body based on the reference webpages.
+
+${courseNameLabel}: $ResolvedCourseName
+${titleNameLabel}: $ResolvedExperimentName
+
+Requirements:
+- The report must begin by explicitly writing the Chinese $courseNameLabel and $titleNameLabel.
+- The report must include these Chinese headings: $requiredHeadings.
+- Use the webpages as procedural reference for background, theory, steps, and verification ideas, but do not copy them verbatim.
+- If the webpages are tutorial pages or lab guides, rewrite them into a submit-ready $documentLabel in natural Chinese.
+- If the webpages do not provide real screenshots, exact measured values, packet captures, teacher comments, or error logs, do not fabricate them. Write the result section as validation-oriented results instead.
+$($detailRequirements.Trim())
+- Return only the final Chinese $documentLabel body.
+"@
+}
+
+function New-ReportProfileAutoRequirementsJson {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [string[]]$ExtraKeywords,
+
+    [ValidateSet("standard", "full")]
+    [string]$DetailLevel = "full"
+  )
+
+  $keywordList = New-Object System.Collections.Generic.List[string]
+  [void]$keywordList.Add($ResolvedCourseName)
+  [void]$keywordList.Add($ResolvedExperimentName)
+
+  foreach ($keyword in @($ExtraKeywords)) {
+    if (-not [string]::IsNullOrWhiteSpace($keyword) -and -not $keywordList.Contains($keyword)) {
+      [void]$keywordList.Add($keyword)
+    }
+  }
+
+  $detailProfile = Get-ReportProfileDetailProfile -Profile $Profile -DetailLevel $DetailLevel
+  $sectionRequirements = foreach ($sectionField in (Get-ReportProfileSectionFields -Profile $Profile)) {
+    $minChars = 0
+    if ($null -ne $sectionField.minChars -and $sectionField.minChars.PSObject.Properties.Name -contains $DetailLevel) {
+      $minChars = [int]$sectionField.minChars.$DetailLevel
+    }
+
+    [pscustomobject]@{
+      name = [string]$sectionField.heading
+      aliases = @($sectionField.aliases | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+      minChars = $minChars
+    }
+  }
+
+  $requirements = [ordered]@{
+    courseName = $ResolvedCourseName
+    experimentName = $ResolvedExperimentName
+    minChars = [int]$detailProfile.minChars
+    sections = @($sectionRequirements)
+    requiredKeywords = @($keywordList)
+    forbiddenPatterns = @($Profile.forbiddenPatterns)
+    paginationRiskThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $Profile
+  }
+  $paginationRiskRemediations = Get-ReportProfilePaginationRiskRemediations -Profile $Profile
+  if (@($paginationRiskRemediations.PSObject.Properties).Count -gt 0) {
+    $requirements["paginationRiskRemediations"] = $paginationRiskRemediations
+  }
+
+  return ([pscustomobject]$requirements | ConvertTo-Json -Depth 6)
+}
+
+function New-ReportProfileAutoMetadataJson {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedCourseName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedExperimentName,
+
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [AllowNull()]
+    [string]$ResolvedStudentName,
+
+    [AllowNull()]
+    [string]$ResolvedStudentId,
+
+    [AllowNull()]
+    [string]$ResolvedClassName,
+
+    [AllowNull()]
+    [string]$ResolvedTeacherName,
+
+    [AllowNull()]
+    [string]$ResolvedExperimentProperty,
+
+    [AllowNull()]
+    [string]$ResolvedExperimentDate,
+
+    [AllowNull()]
+    [string]$ResolvedExperimentLocation
+  )
+
+  $labels = Get-ReportProfileLabels -Profile $Profile
+  $metadataValues = @{
+    Name = $ResolvedStudentName
+    StudentId = $ResolvedStudentId
+    ClassName = $ResolvedClassName
+    TeacherName = $ResolvedTeacherName
+    CourseName = $ResolvedCourseName
+    ExperimentName = $ResolvedExperimentName
+    ExperimentProperty = $ResolvedExperimentProperty
+    ExperimentDate = $ResolvedExperimentDate
+    ExperimentLocation = $ResolvedExperimentLocation
+  }
+
+  $metadata = [ordered]@{}
+  foreach ($field in @($Profile.metadataFields)) {
+    $key = [string]$field.key
+    if (-not [string]::IsNullOrWhiteSpace($key) -and $metadataValues.ContainsKey($key)) {
+      $metadata[[string]$field.label] = $metadataValues[$key]
+    }
+  }
+
+  if ($labels.Contains("Date")) {
+    $metadata[[string]$labels["Date"]] = $ResolvedExperimentDate
+  }
+
+  return ($metadata | ConvertTo-Json -Depth 4)
+}

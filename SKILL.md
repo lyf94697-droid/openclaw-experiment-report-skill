@@ -1,11 +1,12 @@
 ---
 name: experiment-report
-description: Write Chinese university lab reports from scratch or fit report content into a user-provided WPS, Word, or docx blank template. Use when the user asks for an experiment report, lab report, experiment summary, or a WPS, Word, or docx template to be filled from experiment topic, requirements, code, data, screenshots, tutorial pages, or results.
+description: Write Chinese university lab reports and nearby school report documents from scratch or fit report content into a user-provided WPS, Word, or docx blank template. Use when the user asks for an experiment report, lab report, course design report, internship report, software test report, deployment report, operations report, experiment summary, or a WPS, Word, or docx template to be filled from topic, requirements, code, data, screenshots, tutorial pages, or results.
 ---
 
 ## When this skill applies
 
 - The user asks to write or complete an experiment report from zero.
+- The user asks for a course design report, internship report, software test report, deployment report, or operations report that follows a fixed school-style structure.
 - The user has a blank WPS, Word, or docx template and wants it filled.
 - The user provides an experiment title, requirements, screenshots, code, data, outputs, or conclusions and wants a polished report.
 - The user provides a tutorial article or CSDN page as the main procedural reference.
@@ -32,17 +33,18 @@ description: Write Chinese university lab reports from scratch or fit report con
    - Use location keys such as `P2` or `T1R1C2` only when explicit overwrite is needed.
 8. If the user also provides screenshots or experiment photos and wants them embedded into the final docx, prefer `scripts/generate-docx-image-map.ps1` on the filled copy and then run `scripts/insert-docx-images.ps1`.
 9. If the user wants a cleaner final docx layout, run `scripts/format-docx-report-style.ps1` after template filling and optional image insertion.
-10. Prefer content-first completion over fragile GUI wandering.
-11. If screenshots are provided, treat them as factual evidence and layout assets.
-12. If a tutorial page is provided, treat it as procedural reference and rewrite it into report-style Chinese instead of copying it.
-13. When a local workflow should fetch tutorial references before generation, prefer `scripts/prepare-report-prompt.ps1` with `-ReferenceUrls` or `-ReferenceTextPaths`.
-14. When the user provides local file paths in a direct chat workflow, inspect those files first if tool access is available; if a path cannot actually be opened, explicitly say which path was inaccessible instead of pretending it was read.
-15. When the user asks for a final local `docx` result and the required paths are already present, prefer finishing the end-to-end local workflow over stopping at a body-only draft.
-16. On Windows PowerShell, do not chain shell commands with `&&`; use separate executions or `;` so the command remains valid in legacy PowerShell hosts.
-17. When intermediate JSON or text files contain Chinese paths, captions, or section names, prefer writing them through PowerShell with explicit UTF-8 encoding or through the bundled scripts; do not rely on generic editor-style writes that may corrupt non-ASCII content.
-18. When direct chat already has a template path, screenshots, identity metadata, and either a finished report body or tutorial references, prefer the one-shot local wrapper `scripts/build-report-from-feishu.ps1` over ad-hoc multi-step shell orchestration.
-19. If direct chat includes uploaded image attachments and the user also provides local image paths, use the uploaded images to understand the visible content and use the local image paths as the actual files for deterministic `docx` embedding.
-20. If direct chat includes uploaded image attachments but no manual local image paths, check whether the runtime injected attachment note lines such as `[media attached ...]` into the prompt. If those lines contain usable image file paths, extract them and pass them into `-ImagePaths` for the local wrapper instead of stopping at body-only output.
+10. If the user wants a template-border / original-frame version, create it from the normal final docx with `scripts/convert-docx-template-frame.ps1`; if they want both versions, keep the normal docx as the borderless copy and also produce the template-frame copy.
+11. Prefer content-first completion over fragile GUI wandering.
+12. If screenshots are provided, treat them as factual evidence and layout assets.
+13. If a tutorial page is provided, treat it as procedural reference and rewrite it into report-style Chinese instead of copying it.
+14. When a local workflow should fetch tutorial references before generation, prefer `scripts/prepare-report-prompt.ps1` with `-ReferenceUrls` or `-ReferenceTextPaths`.
+15. When the user provides local file paths in a direct chat workflow, inspect those files first if tool access is available; if a path cannot actually be opened, explicitly say which path was inaccessible instead of pretending it was read.
+16. When the user asks for a final local `docx` result and the required paths are already present, prefer finishing the end-to-end local workflow over stopping at a body-only draft.
+17. On Windows PowerShell, do not chain shell commands with `&&`; use separate executions or `;` so the command remains valid in legacy PowerShell hosts.
+18. When intermediate JSON or text files contain Chinese paths, captions, or section names, prefer writing them through PowerShell with explicit UTF-8 encoding or through the bundled scripts; do not rely on generic editor-style writes that may corrupt non-ASCII content.
+19. When direct chat already has a template path, screenshots, identity metadata, and either a finished report body or tutorial references, prefer the one-shot local wrapper `scripts/build-report-from-feishu.ps1` over ad-hoc multi-step shell orchestration.
+20. If direct chat includes uploaded image attachments and the user also provides local image paths, use the uploaded images to understand the visible content and use the local image paths as the actual files for deterministic `docx` embedding.
+21. If direct chat includes uploaded image attachments but no manual local image paths, check whether the runtime injected attachment note lines such as `[media attached ...]` into the prompt. If those lines contain usable image file paths, extract them and pass them into `-ImagePaths` for the local wrapper instead of stopping at body-only output.
 
 ## Writing rules
 
@@ -69,6 +71,10 @@ description: Write Chinese university lab reports from scratch or fit report con
 - Template mode can include block values such as `{"section-body": ["paragraph one", "paragraph two"]}` when the template body has multi-paragraph sections.
 - Image mode: when screenshots should be embedded into a docx, prefer image specs or an image insertion map that can be passed to `scripts/generate-docx-image-map.ps1` or `scripts/insert-docx-images.ps1`. Stable section anchors such as `实验步骤` or `实验结果` are preferred over fragile paragraph numbers when the filled docx may add or move paragraphs.
 - Completion mode: if the user explicitly asks to complete the template, first finish the content, then attempt template filling only if tooling is actually available.
+- Border modes:
+  - Borderless mode is the normal final docx from `build-report.ps1`.
+  - Template-frame mode means the title remains outside, while the metadata rows and all report body blocks are kept in one continuous table using the source template's table-frame style (`single`, `sz=4`).
+  - If the user asks for both, keep both files and name them clearly, for example `...docx` and `...-模板一体表格边框版.docx`.
 
 ## Optional helpers
 
@@ -76,9 +82,12 @@ description: Write Chinese university lab reports from scratch or fit report con
 - For local docx templates that should be machine-filled, run `scripts/generate-docx-field-map.ps1` after the report body is ready, then run `scripts/apply-docx-field-map.ps1`.
 - For local screenshots or experiment photos that should be embedded into the filled docx, prefer `scripts/generate-docx-image-map.ps1` first and then run `scripts/insert-docx-images.ps1` on the already-filled copy.
 - For a polished final docx copy, optionally run `scripts/format-docx-report-style.ps1` after filling fields and inserting images.
+- For a template-frame bordered copy, run `scripts/convert-docx-template-frame.ps1 -DocxPath <normal.docx> -OutPath <bordered.docx> -Overwrite`, pass `-CreateTemplateFrameDocx` to `scripts/build-report.ps1`, or pass `-CreateTemplateFrameDocx` / `-TemplateFrameDocxPath` to the URL or Feishu wrappers to produce the extra copy automatically.
+- For a new report profile, start with `scripts/new-report-profile.ps1`, then edit the generated JSON for profile-specific aliases, captions, and prompt guidance before running profile validation.
 - For chat-driven local execution, prefer `scripts/build-report-from-feishu.ps1` so the wrapper can keep the final deliverable in the output root and move intermediate files into an `artifacts/` subdirectory.
 - The image pipeline can resolve OpenClaw-staged relative attachment paths such as `media/inbound/example.png`, so when those paths appear in prompt-injected media notes you can reuse them directly in `-ImagePaths`.
 - When the template has fixed section headings plus blank paragraphs, prefer block mappings over flattening long body content into a single field.
+- When adding or editing a report profile under `profiles/`, run `scripts/validate-report-profiles.ps1` before relying on it in generation, field-map, image-map, or validation workflows.
 - For public tutorial pages, prefer `scripts/fetch-web-article.ps1`; keep `scripts/fetch-csdn-article.ps1` as the compatibility wrapper for CSDN-specific workflows.
 - When a tutorial page should flow directly into report generation, prefer `scripts/prepare-report-prompt.ps1` so the extracted reference text is appended to the final request deterministically.
 - The helpers are optional. If they are unavailable, still finish the report from the information already provided.

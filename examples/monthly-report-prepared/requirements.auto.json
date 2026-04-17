@@ -1,0 +1,64 @@
+{
+  "courseName": "OpenClaw 实验报告技能仓库",
+  "experimentName": "2026 年 4 月升级月报",
+  "minChars": 1800,
+  "sections": [
+    {
+      "name": "本月目标",
+      "aliases": ["本月目标", "月度目标", "目标与里程碑"],
+      "minChars": 90
+    },
+    {
+      "name": "协作环境",
+      "aliases": ["协作环境", "项目背景与协作环境", "开发与协作环境"],
+      "minChars": 110
+    },
+    {
+      "name": "本月任务与输入",
+      "aliases": ["本月任务与输入", "需求来源与优先级", "输入事项"],
+      "minChars": 130
+    },
+    {
+      "name": "本月完成事项",
+      "aliases": ["本月完成事项", "已完成工作", "推进过程与执行"],
+      "minChars": 220
+    },
+    {
+      "name": "阶段成果与数据",
+      "aliases": ["阶段成果与数据", "当前产出与数据", "交付物与指标"],
+      "minChars": 180
+    },
+    {
+      "name": "问题与改进",
+      "aliases": ["问题与改进", "风险与改进", "问题与优化"],
+      "minChars": 130
+    },
+    {
+      "name": "下月计划",
+      "aliases": ["下月计划", "下阶段安排", "后续计划"],
+      "minChars": 130
+    }
+  ],
+  "requiredKeywords": [
+    "OpenClaw 实验报告技能仓库",
+    "2026 年 4 月升级月报"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "TBD",
+    "待补充",
+    "自行填写",
+    "会后补充"
+  ],
+  "paginationRiskThresholds": {
+    "longSectionChars": 1600,
+    "denseSectionChars": 950,
+    "denseSectionParagraphs": 3,
+    "figureClusterRefs": 5
+  },
+  "paginationRiskRemediations": {
+    "pagination-risk-long-section": "Split the monthly rollup into week-by-week, milestone-by-milestone, or deliverable-based subsections before building, or raise paginationRiskThresholds.longSectionChars if long monthly summaries are expected.",
+    "pagination-risk-dense-section-block": "Break dense monthly status text into separate paragraphs for objective, action, evidence, and impact, or tune denseSectionChars and denseSectionParagraphs if compact executive summaries are expected.",
+    "pagination-risk-figure-cluster": "Move some screenshots into '阶段成果与数据' or spread them across adjacent sections, or raise paginationRiskThresholds.figureClusterRefs if the monthly report normally groups many evidence screenshots together."
+  }
+}

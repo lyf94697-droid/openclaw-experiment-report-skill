@@ -3,6 +3,10 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$DocxPath,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [int]$ExpectedImageCount = -1,
 
   [int]$ExpectedCaptionCount = -1,
@@ -18,6 +22,8 @@ $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
 
 function Get-ZipEntryText {
   param(
@@ -100,6 +106,15 @@ function Add-Finding {
     })
 }
 
+function ConvertTo-SectionPattern {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Text
+  )
+
+  return [regex]::Escape($Text)
+}
+
 function ConvertTo-IntegerFromDigitString {
   param(
     [Parameter(Mandatory = $true)]
@@ -168,6 +183,12 @@ function New-LayoutCheckMessage {
 }
 
 $resolvedDocxPath = (Resolve-Path -LiteralPath $DocxPath).Path
+if ([string]::IsNullOrWhiteSpace($ReportProfilePath)) {
+  $resolvedReportProfilePath = $null
+} else {
+  $resolvedReportProfilePath = (Resolve-Path -LiteralPath $ReportProfilePath).Path
+}
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $resolvedReportProfilePath -RepoRoot (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([System.IO.Path]::GetExtension($resolvedDocxPath).ToLowerInvariant() -ne ".docx") {
   throw "Only .docx files are supported: $resolvedDocxPath"
 }
@@ -245,15 +266,13 @@ try {
     Add-Finding -Findings $warnings -Code "image-relationship-drawing-mismatch" -Message ("Image relationship count is {0}, but document drawing count is {1}." -f $imageRelationshipCount, $imageDrawingCount)
   }
 
-  $sectionGroups = @(
-    [pscustomobject]@{ label = "purpose"; patterns = @("\u5b9e\u9a8c\u76ee\u7684") },
-    [pscustomobject]@{ label = "environment"; patterns = @("\u5b9e\u9a8c\u73af\u5883", "\u5b9e\u9a8c\u8bbe\u5907", "\u5b9e\u9a8c\u5e73\u53f0") },
-    [pscustomobject]@{ label = "theory-or-task"; patterns = @("\u5b9e\u9a8c\u539f\u7406", "\u4efb\u52a1\u8981\u6c42", "\u5b9e\u9a8c\u5185\u5bb9", "\u5b9e\u9a8c\u8981\u6c42") },
-    [pscustomobject]@{ label = "steps"; patterns = @("\u5b9e\u9a8c\u6b65\u9aa4", "\u5b9e\u9a8c\u8fc7\u7a0b") },
-    [pscustomobject]@{ label = "results"; patterns = @("\u5b9e\u9a8c\u7ed3\u679c", "\u5b9e\u9a8c\u73b0\u8c61", "\u7ed3\u679c\u8bb0\u5f55") },
-    [pscustomobject]@{ label = "analysis"; patterns = @("\u95ee\u9898\u5206\u6790", "\u7ed3\u679c\u5206\u6790", "\u5b9e\u9a8c\u5206\u6790") },
-    [pscustomobject]@{ label = "summary"; patterns = @("\u5b9e\u9a8c\u603b\u7ed3", "\u5b9e\u9a8c\u5c0f\u7ed3", "\u603b\u7ed3\u4e0e\u601d\u8003") }
-  )
+  $sectionGroups = foreach ($sectionField in (Get-ReportProfileSectionFields -Profile $reportProfile)) {
+    [pscustomobject]@{
+      label = [string]$sectionField.key
+      heading = [string]$sectionField.heading
+      patterns = @($sectionField.aliases | ForEach-Object { ConvertTo-SectionPattern -Text ([string]$_) })
+    }
+  }
 
   $sectionMatches = New-Object System.Collections.Generic.List[object]
   $missingSections = New-Object System.Collections.Generic.List[string]
@@ -268,12 +287,13 @@ try {
 
     [void]$sectionMatches.Add([pscustomobject]@{
         label = $group.label
+        heading = $group.heading
         matched = (-not [string]::IsNullOrWhiteSpace($matchedAlias))
         matchedAlias = $matchedAlias
       })
 
     if ([string]::IsNullOrWhiteSpace($matchedAlias)) {
-      [void]$missingSections.Add([string]$group.label)
+      [void]$missingSections.Add([string]$group.heading)
     }
   }
 
@@ -323,6 +343,8 @@ try {
 
   $result = [pscustomobject]@{
     docxPath = $resolvedDocxPath
+    reportProfileName = [string]$reportProfile.name
+    reportProfilePath = [string]$reportProfile.resolvedProfilePath
     passed = $checkPassed
     message = $layoutMessage
     summary = [pscustomobject]@{

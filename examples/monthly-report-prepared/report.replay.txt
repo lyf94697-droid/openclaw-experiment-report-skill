@@ -1,0 +1,39 @@
+OpenClaw 实验报告技能仓库
+月报主题：2026 年 4 月升级月报
+
+一、本月目标
+2026 年 4 月的核心目标，是把仓库从“能够生成实验报告”的单点能力，继续推进到“能够稳定支撑相邻文档家族、能够解释失败原因、能够通过固定输入反复回放”的工程化状态。本月在路线选择上没有继续堆新的分支脚本，而是坚持 profile 驱动这一条主线，把周报、会议纪要、月报等相邻文档继续纳入同一条 build、validation、trace 和 smoke 流水线。
+
+围绕这个目标，本月设定了三个明确里程碑。第一是把 `monthly-report` 从临时 preset 推进成内置 profile，并补齐 metadata、章节约束、默认样式和风险阈值；第二是让分页风险提示不只是“报风险”，还要带出适合不同文档家族的修复建议；第三是把 prepared-summary 回放做成仓库内可复用的样例，而不是只存在于一次性生成目录里，确保后续 regression 可以在本地和 CI 中稳定复现。
+
+二、协作环境
+本月的主要工作环境仍然是 GitHub、OpenClaw、PowerShell 和本地 Windows 开发机的组合。代码修改、README 和 ROADMAP 维护、PR 提交与 review 跟踪都围绕 GitHub 展开，脚本执行和 smoke 回归集中在 PowerShell 流程里，涉及生成正文、包装 wrapper、输出 summary 与 pipeline trace 的链路则继续通过 OpenClaw 技能仓库现有脚本完成。
+
+协作方式上，本月继续保持“先把可复用输入和机器可读输出固化，再讨论更大的能力扩张”这一原则。也就是说，新增能力必须能落到 profile JSON、summary JSON、pipeline trace 或 smoke fixture 这种可检查的产物上，而不是停留在口头说明。这个协作环境的直接收益，是每次改动都能落到具体脚本、具体字段和具体回归断言上，后续接手时上下文成本更低。
+
+三、本月任务与输入
+本月任务主要来自三类输入。第一类输入是仓库的长期方向约束，即继续保持“一条可靠的文档流水线”，通过 profile 元数据切换行为，而不是把仓库扩张成泛办公工具。第二类输入来自 ROADMAP 中尚未完成的最小升级点，例如更真实的 end-to-end fixture、分页风险提示的 profile 分化、以及更容易复用的 prompt 和 summary 示例。第三类输入来自实际使用路径暴露出来的摩擦点，比如 prepared-summary 一旦被提交进仓库，summary 内的路径字段如果还是绝对路径，就会失去可移植性。
+
+这些输入最终被拆成了可执行任务。围绕 monthly-report，需要检查 display name、metadata 标签、章节标题、默认样式、分页风险阈值和 remediation 是否完整透传到自动生成 requirements、validation JSON、build summary 与 wrapper trace；围绕 examples，需要让 prepared-summary 真正变成一个可直接 replay 的仓库内样例；围绕 smoke，需要确保新增能力不是只在本机手工可用，而是能通过固定夹具快速覆盖。
+
+四、本月完成事项
+本月首先完成的是 monthly-report 的 profile 化收口工作。该 profile 已经作为 built-in profile 进入 `profiles/`，同时补齐了项目名称、月报主题、提交人、审核人、月份周期、工作环境等元数据标签，以及本月目标、协作环境、本月任务与输入、本月完成事项、阶段成果与数据、问题与改进、下月计划等章节要求。与此同步，`examples/profile-presets/` 下保留了 monthly-report 的 preset 快照，用于继续验证 path-based 分叉和示例生成场景。
+
+在风险解释层，本月完成了 profile 级 `paginationRiskThresholds` 和 `paginationRiskRemediations` 的打通。现在分页风险除了能报告长章节、密集段落和截图簇集这几类 warning，还会把 profile 自己定义的修复建议继续带到自动生成的 requirements、validation 结果、`build-report.ps1` 的 summary、`build-report-from-url.ps1` / `build-report-from-feishu.ps1` 的 wrapper summary，以及 `pipeline-trace.json` / `pipeline-trace.md`。这意味着月报、周报、课程设计报告不再被同一套笼统提示覆盖，修复建议已经能跟随文档家族区分。
+
+围绕 regression，本月还补强了多条 smoke 路径。已有 smoke 继续覆盖 built-in profile 加载、自动 prompt/metadata/requirements 生成、draft validation、template-frame docx、pagination-risk warning 透传、wrapper summary 字段以及 roadmap triage 结果。本次回合又把 prepared-summary 的仓库内回放能力从课程设计样例扩展到月报样例，使 prompt、metadata、requirements、referenceTextPaths、reportProfilePath 这些路径可以固定在仓库下，后续回放不需要依赖一次性输出目录。
+
+五、阶段成果与数据
+从交付结果看，仓库当前已经稳定具备八个 built-in profile，分别覆盖实验报告、课程设计报告、专业实习报告、软件测试报告、部署运维报告、周报、会议纪要和月报。和月报相关的自动化输出已经贯通到 prompt、metadata、requirements、summary、validation、wrapper trace 和 smoke 夹具，说明这一类相邻文档不再只是“理论上可以支持”，而是已经进入主流水线的回归覆盖范围。
+
+本月可验证的工程产出主要体现在三方面。其一，`scripts/analyze-roadmap-next-step.ps1` 与 GitHub 定时工作流已经可以每天从 ROADMAP 中挑出一个最小、可被 smoke 覆盖的升级点，降低继续演进时的选择成本。其二，prepared-summary 回放链路已经能够区分 `live` 与 `replay`，并在 summary 与 pipeline trace 中写出输入来源、validation 状态和关键产物路径。其三，repo 内示例不再只是 profile preset，已经开始出现能够直接 replay 的 prepared bundle，这为后续补更多 realistic fixture 打下了基础。
+
+六、问题与改进
+虽然本月已经把月报 profile 和 prepared-summary 回放推进了一步，但仓库还有几个需要继续处理的问题。第一，真实模板适配的覆盖面仍然不够广，特别是 Word/WPS 对分页和图片布局更敏感的模板，现有 smoke 仍以轻量模板夹具为主，和真实交付模板之间还有距离。第二，prepared-summary 虽然已经能固化 prompt、metadata 和 requirements，但 example 的数量还不多，课程设计、月报之外的 profile 还缺少更多能直接 replay 的仓库内夹具。
+
+此外，roadmap triage 虽然能帮助持续推进最小升级点，但它目前主要依赖文本启发式，对“已经部分完成但还值得继续深化”的事项识别还不够细。后续改进时，需要继续把更多完成证据落到 README、ROADMAP、CHANGELOG 和 smoke 断言中，让 triage 的结论更接近仓库真实状态，而不是停留在模糊匹配层面。
+
+七、下月计划
+下月的第一优先级，是继续把 realistic fixture 做厚，尤其是围绕 monthly-report、meeting-minutes 和 deployment-report 增加更多 prepared-summary 或真实模板夹具，让不同 profile 不只是能生成 prompt，还能更稳定地穿透到最终 `docx`。第二优先级，是继续加强模板兼容性诊断，把“为什么某个模板没有命中自动填充规则”变成更短、更可执行的 diagnostics，而不是让用户自己翻 field-map JSON 推断原因。
+
+第三优先级，是沿着“最小升级点 + smoke 覆盖”的节奏继续推进仓库演进。具体做法包括：补更多 profile 级 examples、把更多 wrapper 输出串进 pipeline trace、提高回放夹具的可移植性，并继续通过 GitHub PR 保持每次升级都有对应的文档说明、验证记录和可回归样例。这样做的目标不是追求功能数量，而是让仓库在面对不同学校模板、不同报告类型和不同回放路径时，表现得更稳定、更可解释、更容易维护。

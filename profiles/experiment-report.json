@@ -1,0 +1,139 @@
+{
+  "name": "experiment-report",
+  "displayName": "实验报告",
+  "defaultStyleProfile": "auto",
+  "defaultExperimentProperty": "③验证性实验",
+  "metadataFields": [
+    { "key": "Name", "label": "姓名" },
+    { "key": "StudentId", "label": "学号" },
+    { "key": "ClassName", "label": "班级" },
+    { "key": "TeacherName", "label": "指导教师" },
+    { "key": "CourseName", "label": "课程名称" },
+    { "key": "ExperimentName", "label": "实验名称" },
+    { "key": "ExperimentProperty", "label": "实验性质" },
+    { "key": "ExperimentDate", "label": "实验时间" },
+    { "key": "ExperimentLocation", "label": "实验地点" }
+  ],
+  "extraLabels": [
+    { "key": "Date", "label": "日期" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "实验目的",
+      "aliases": ["实验目的"],
+      "minChars": { "standard": 30, "full": 60 }
+    },
+    {
+      "key": "Environment",
+      "heading": "实验环境",
+      "aliases": ["实验环境", "实验设备与环境"],
+      "minChars": { "standard": 30, "full": 60 }
+    },
+    {
+      "key": "Theory",
+      "heading": "实验原理或任务要求",
+      "aliases": ["实验原理或任务要求", "实验原理", "任务要求"],
+      "minChars": { "standard": 30, "full": 80 }
+    },
+    {
+      "key": "Steps",
+      "heading": "实验步骤",
+      "aliases": ["实验步骤", "实验过程"],
+      "minChars": { "standard": 60, "full": 140 }
+    },
+    {
+      "key": "Results",
+      "heading": "实验结果",
+      "aliases": ["实验结果", "实验现象与结果记录"],
+      "minChars": { "standard": 50, "full": 120 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题分析",
+      "aliases": ["问题分析", "结果分析"],
+      "minChars": { "standard": 30, "full": 80 }
+    },
+    {
+      "key": "Summary",
+      "heading": "实验总结",
+      "aliases": ["实验总结", "总结与思考", "实验小结"],
+      "minChars": { "standard": 30, "full": 80 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "实验内容"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "environment", "analysis", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "实验环境截图",
+      "steps": "实验步骤截图",
+      "result": "实验结果截图",
+      "analysis": "问题分析截图",
+      "summary": "实验总结截图",
+      "default": "实验过程截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "ping", "caption": "ping 连通性测试结果" },
+      { "pattern": "arp", "caption": "arp 邻居缓存查看结果" },
+      { "pattern": "ipconfig", "caption": "ipconfig 网络参数结果" },
+      { "pattern": "config|setup|install|步骤|command|cmd|命令", "caption": "实验步骤截图" },
+      { "pattern": "拓扑|environment|vmware|server|环境|network", "caption": "实验环境截图" },
+      { "pattern": "analysis|error|problem|异常", "caption": "问题分析截图" }
+    ]
+  },
+  "paginationRiskThresholds": {
+    "longSectionChars": 900,
+    "denseSectionChars": 550,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 3
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["实验目的", "实验内容"],
+      "blocks": [
+        { "heading": "一. 实验目的", "sectionIds": ["purpose"] },
+        { "heading": "二. 实验内容", "sectionIds": ["environment", "theory"] }
+      ]
+    },
+    {
+      "matchAll": ["实验步骤", "实验小结"],
+      "blocks": [
+        { "heading": "三. 实验步骤", "sectionIds": ["steps"] },
+        { "heading": "四. 实验结果", "sectionIds": ["result"] },
+        { "heading": "五. 问题分析", "sectionIds": ["analysis"] },
+        { "heading": "六.实验小结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 700,
+      "promptGuidance": [
+        "Prefer a complete submit-ready report instead of a terse outline.",
+        "Keep each required section concrete and useful, especially the steps and results sections."
+      ]
+    },
+    "full": {
+      "minChars": 1100,
+      "promptGuidance": [
+        "Prefer a submit-ready report with substantial section content instead of a terse outline.",
+        "Unless the reference material is very sparse, aim for roughly 1200 to 1800 Chinese characters.",
+        "The purpose, environment, theory, analysis, and summary sections should each contain multiple complete sentences rather than a single short statement.",
+        "The steps and results sections should be the most detailed parts. Explain the setup order, key operations, command or configuration intent, observed outcomes, and why those outcomes support completion of the experiment.",
+        "If the webpages do not provide screenshots or exact measured values, keep the language concrete and validation-oriented instead of filling space with generic filler."
+      ]
+    }
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评",
+    "抓包结果"
+  ]
+}

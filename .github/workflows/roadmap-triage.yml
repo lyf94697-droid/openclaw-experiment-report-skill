@@ -1,0 +1,38 @@
+name: Roadmap Daily Triage
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  roadmap-triage:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Analyze roadmap candidates
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\analyze-roadmap-next-step.ps1 `
+            -OutputDir .\tests-output\roadmap-triage `
+            -Format text
+
+      - name: Add triage report to job summary
+        shell: powershell
+        run: |
+          Get-Content .\tests-output\roadmap-triage\roadmap-triage.md -Raw |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+      - name: Upload roadmap triage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: roadmap-triage
+          path: |
+            tests-output/roadmap-triage/roadmap-triage.md
+            tests-output/roadmap-triage/roadmap-triage.json
