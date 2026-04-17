@@ -22,6 +22,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "report-profiles.ps1")
+$script:ValidationRemediationOverrides = @{}
 
 function ConvertTo-PlainHashtable {
   param(
@@ -136,7 +137,7 @@ function Get-RequirementsRoot {
       }
     }
 
-    return @{
+    $requirements = @{
       courseName = ""
       experimentName = ""
       minChars = [int]$detailProfile.minChars
@@ -146,6 +147,12 @@ function Get-RequirementsRoot {
       reportProfileName = [string]$profile.name
       reportProfilePath = [string]$profile.resolvedProfilePath
     }
+    $paginationRiskRemediations = Get-ReportProfilePaginationRiskRemediations -Profile $profile
+    if (@($paginationRiskRemediations.PSObject.Properties).Count -gt 0) {
+      $requirements["paginationRiskRemediations"] = $paginationRiskRemediations
+    }
+
+    return $requirements
   } elseif ([string]::IsNullOrWhiteSpace($ConfigPath) -eq [string]::IsNullOrWhiteSpace($ConfigJson)) {
     throw "Provide zero or one of -RequirementsPath and -RequirementsJson."
   }
@@ -185,6 +192,33 @@ function Resolve-PaginationRiskThresholds {
   return [pscustomobject]$thresholds
 }
 
+function Resolve-PaginationRiskRemediations {
+  param(
+    [AllowNull()]
+    [object]$Value
+  )
+
+  $knownCodes = @(
+    "pagination-risk-long-section",
+    "pagination-risk-dense-section-block",
+    "pagination-risk-figure-cluster"
+  )
+  $remediations = @{}
+
+  if ($null -eq $Value) {
+    return $remediations
+  }
+
+  $configuredRemediations = ConvertTo-PlainHashtable -InputObject $Value
+  foreach ($code in $knownCodes) {
+    if ($configuredRemediations.ContainsKey($code) -and -not [string]::IsNullOrWhiteSpace([string]$configuredRemediations[$code])) {
+      $remediations[$code] = [string]$configuredRemediations[$code]
+    }
+  }
+
+  return $remediations
+}
+
 function Test-TextContains {
   param(
     [Parameter(Mandatory = $true)]
@@ -213,8 +247,15 @@ function Get-HeadingPattern {
 function Get-ValidationRemediation {
   param(
     [Parameter(Mandatory = $true)]
-    [string]$Code
+    [string]$Code,
+
+    [AllowNull()]
+    [hashtable]$ConfiguredRemediations = $script:ValidationRemediationOverrides
   )
+
+  if ($null -ne $ConfiguredRemediations -and $ConfiguredRemediations.ContainsKey($Code) -and -not [string]::IsNullOrWhiteSpace([string]$ConfiguredRemediations[$Code])) {
+    return [string]$ConfiguredRemediations[$Code]
+  }
 
   switch ($Code) {
     "missing-profile-required-heading" { return "Add the missing profile section heading and body, or add an alias to the active report profile if the report uses a valid alternate heading." }
@@ -456,6 +497,11 @@ if ($requirementsRoot.ContainsKey("paginationRiskThresholds")) {
   $paginationRiskThresholdSource = $requirementsRoot["paginationRiskThresholds"]
 }
 $paginationRiskThresholds = Resolve-PaginationRiskThresholds -Value $paginationRiskThresholdSource
+$paginationRiskRemediationSource = $null
+if ($requirementsRoot.ContainsKey("paginationRiskRemediations")) {
+  $paginationRiskRemediationSource = $requirementsRoot["paginationRiskRemediations"]
+}
+$script:ValidationRemediationOverrides = Resolve-PaginationRiskRemediations -Value $paginationRiskRemediationSource
 
 $resolvedValidationProfileName = if ($requirementsRoot.ContainsKey("reportProfileName") -and -not [string]::IsNullOrWhiteSpace([string]$requirementsRoot["reportProfileName"])) {
   [string]$requirementsRoot["reportProfileName"]
@@ -734,6 +780,7 @@ $result = [pscustomobject]@{
     findingCountsByCode = $findingCountsByCode
     findingCountsByCategory = $findingCountsByCategory
     paginationRiskThresholds = $paginationRiskThresholds
+    paginationRiskRemediations = $(if ($script:ValidationRemediationOverrides.Count -gt 0) { [pscustomobject]$script:ValidationRemediationOverrides } else { $null })
     errorCodes = @($findings | Where-Object { $_.severity -eq "error" } | ForEach-Object { [string]$_.code } | Select-Object -Unique)
     warningCodes = @($findings | Where-Object { $_.severity -eq "warning" } | ForEach-Object { [string]$_.code } | Select-Object -Unique)
   }

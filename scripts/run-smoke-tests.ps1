@@ -30,7 +30,16 @@ function Assert-ValidationPaginationRiskSummary {
     [object]$Summary,
 
     [Parameter(Mandatory = $true)]
-    [string]$MessagePrefix
+    [string]$MessagePrefix,
+
+    [AllowNull()]
+    [string]$ExpectedLongRemediationPattern,
+
+    [AllowNull()]
+    [string]$ExpectedDenseRemediationPattern,
+
+    [AllowNull()]
+    [string]$ExpectedFigureRemediationPattern
   )
 
   $warningCodes = @($Summary.validationWarningCodes | ForEach-Object { [string]$_ })
@@ -53,6 +62,21 @@ function Assert-ValidationPaginationRiskSummary {
   Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$longWarningSummary.remediation)) -Message "$MessagePrefix should expose long-section remediation guidance."
   Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$denseWarningSummary.remediation)) -Message "$MessagePrefix should expose dense-section remediation guidance."
   Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$figureWarningSummary.remediation)) -Message "$MessagePrefix should expose figure-cluster remediation guidance."
+  if ((-not [string]::IsNullOrWhiteSpace($ExpectedLongRemediationPattern)) -or (-not [string]::IsNullOrWhiteSpace($ExpectedDenseRemediationPattern)) -or (-not [string]::IsNullOrWhiteSpace($ExpectedFigureRemediationPattern))) {
+    Assert-True -Condition ($Summary.PSObject.Properties.Name -contains 'validationPaginationRiskRemediations') -Message "$MessagePrefix should expose validationPaginationRiskRemediations."
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedLongRemediationPattern)) {
+    Assert-True -Condition ([string]$Summary.validationPaginationRiskRemediations.'pagination-risk-long-section' -match $ExpectedLongRemediationPattern) -Message "$MessagePrefix should expose the custom long-section remediation override."
+    Assert-True -Condition ([string]$longWarningSummary.remediation -match $ExpectedLongRemediationPattern) -Message "$MessagePrefix should carry the custom long-section remediation into validationWarningSummary."
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedDenseRemediationPattern)) {
+    Assert-True -Condition ([string]$Summary.validationPaginationRiskRemediations.'pagination-risk-dense-section-block' -match $ExpectedDenseRemediationPattern) -Message "$MessagePrefix should expose the custom dense-section remediation override."
+    Assert-True -Condition ([string]$denseWarningSummary.remediation -match $ExpectedDenseRemediationPattern) -Message "$MessagePrefix should carry the custom dense-section remediation into validationWarningSummary."
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedFigureRemediationPattern)) {
+    Assert-True -Condition ([string]$Summary.validationPaginationRiskRemediations.'pagination-risk-figure-cluster' -match $ExpectedFigureRemediationPattern) -Message "$MessagePrefix should expose the custom figure-cluster remediation override."
+    Assert-True -Condition ([string]$figureWarningSummary.remediation -match $ExpectedFigureRemediationPattern) -Message "$MessagePrefix should carry the custom figure-cluster remediation into validationWarningSummary."
+  }
 }
 
 function Normalize-OutlineForComparison {
@@ -941,6 +965,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $monthlyReportProfile -SectionId 'result' -BaseName 'monthly-metrics') -eq '阶段成果与数据截图') -Message 'Monthly-report profile image caption defaults are missing the result caption.'
   $monthlyPaginationThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $monthlyReportProfile
   Assert-True -Condition ([int]$monthlyPaginationThresholds.longSectionChars -eq 1600) -Message 'Monthly-report profile pagination-risk thresholds are missing.'
+  $monthlyPaginationRemediations = Get-ReportProfilePaginationRiskRemediations -Profile $monthlyReportProfile
+  Assert-True -Condition ([string]$monthlyPaginationRemediations.'pagination-risk-long-section' -match 'week-by-week') -Message 'Monthly-report profile pagination-risk remediations are missing the long-section override.'
+  Assert-True -Condition ([string]$monthlyPaginationRemediations.'pagination-risk-dense-section-block' -match 'objective, action, evidence, and impact') -Message 'Monthly-report profile pagination-risk remediations are missing the dense-section override.'
+  Assert-True -Condition ([string]$monthlyPaginationRemediations.'pagination-risk-figure-cluster' -match '阶段成果与数据') -Message 'Monthly-report profile pagination-risk remediations are missing the figure-cluster override.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -1027,6 +1055,8 @@ URL: https://example.com/network-lab
   $monthlyRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '2026 年 4 月项目月报' -Profile $monthlyReportProfile -ExtraKeywords @('月度进展', '校园导览小程序') -DetailLevel 'full') | ConvertFrom-Json
   Assert-True -Condition ([int]$monthlyRequirements.minChars -eq 1800) -Message 'Auto requirements helper did not use the monthly-report full minChars.'
   Assert-True -Condition (@($monthlyRequirements.sections | Where-Object { $_.name -eq '本月完成事项' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the monthly-report completion section heading.'
+  Assert-True -Condition ([string]$monthlyRequirements.paginationRiskRemediations.'pagination-risk-long-section' -match 'week-by-week') -Message 'Auto requirements helper did not carry the monthly-report long-section remediation.'
+  Assert-True -Condition ([string]$monthlyRequirements.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '阶段成果与数据') -Message 'Auto requirements helper did not carry the monthly-report figure-cluster remediation.'
   $monthlyMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '2026 年 4 月项目月报' -Profile $monthlyReportProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '项目月报' -ResolvedExperimentDate '2026-04' -ResolvedExperimentLocation 'GitHub + 飞书 + 本地开发环境') | ConvertFrom-Json
   Assert-True -Condition ([string]$monthlyMetadata.提交人 -eq '李四') -Message 'Auto metadata helper did not emit the monthly-report owner label.'
   Assert-True -Condition ([string]$monthlyMetadata.月报主题 -eq '2026 年 4 月项目月报') -Message 'Auto metadata helper did not emit the monthly-report title label.'
@@ -1056,6 +1086,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$exampleMonthlyPreset.defaultStyleProfile -eq 'compact') -Message 'Monthly preset should demonstrate compact as the default style profile.'
   Assert-True -Condition ([string]$exampleMonthlyPreset.sectionFields[3].heading -eq '本月完成事项') -Message 'Monthly preset is missing the expected steps heading.'
   Assert-True -Condition ([int]$exampleMonthlyPreset.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly preset should demonstrate custom pagination-risk thresholds.'
+  Assert-True -Condition ([string]$exampleMonthlyPreset.paginationRiskRemediations.'pagination-risk-long-section' -match 'week-by-week') -Message 'Monthly preset should demonstrate custom pagination-risk remediations.'
   $results.Add('example profile presets OK') | Out-Null
 
   $profilePresetSamplesDir = Join-Path $tempRoot 'profile-preset-samples'
@@ -1084,6 +1115,8 @@ URL: https://example.com/network-lab
   $monthlyPresetRequirements = (Get-Content -LiteralPath ([string]$monthlyPresetSample.requirementsPath) -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition (@($monthlyPresetRequirements.sections | Where-Object { [string]$_.name -eq '本月完成事项' }).Count -eq 1) -Message 'Monthly preset sample requirements are missing the expected completion section.'
   Assert-True -Condition ([int]$monthlyPresetRequirements.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly preset sample requirements did not preserve custom pagination-risk thresholds.'
+  Assert-True -Condition ([string]$monthlyPresetRequirements.paginationRiskRemediations.'pagination-risk-long-section' -match 'week-by-week') -Message 'Monthly preset sample requirements did not preserve the custom long-section remediation.'
+  Assert-True -Condition ([string]$monthlyPresetRequirements.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '阶段成果与数据') -Message 'Monthly preset sample requirements did not preserve the custom figure-cluster remediation.'
   $results.Add('profile preset sample runner OK') | Out-Null
 
   $roadmapTriageOutputDir = Join-Path $tempRoot 'roadmap-triage'
@@ -1264,6 +1297,8 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([int]$monthlyGeneratedRequirements.minChars -eq 1800) -Message 'Monthly report-input generation requirements are missing the expected minChars.'
     Assert-True -Condition (@($monthlyGeneratedRequirements.sections | Where-Object { $_.name -eq '本月完成事项' }).Count -eq 1) -Message 'Monthly report-input generation requirements are missing the completion section.'
     Assert-True -Condition ([int]$monthlyGeneratedRequirements.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly report-input generation requirements are missing pagination-risk thresholds.'
+    Assert-True -Condition ([string]$monthlyGeneratedRequirements.paginationRiskRemediations.'pagination-risk-long-section' -match 'week-by-week') -Message 'Monthly report-input generation requirements are missing the custom long-section remediation.'
+    Assert-True -Condition ([string]$monthlyGeneratedRequirements.paginationRiskRemediations.'pagination-risk-dense-section-block' -match 'objective, action, evidence, and impact') -Message 'Monthly report-input generation requirements are missing the custom dense-section remediation.'
   } finally {
     $env:AGENTS_HOME = $originalInputsAgentsHome
   }
@@ -2097,6 +2132,54 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$monthlyValidation.reportProfileName -eq 'monthly-report') -Message 'Monthly report validation is missing the expected profile name.'
   Assert-True -Condition ([int]$monthlyValidation.summary.sectionCount -ge 7) -Message 'Monthly report validation did not load the expected section rules.'
   Assert-True -Condition ([int]$monthlyValidation.summary.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly report validation did not use the monthly pagination thresholds.'
+
+  $monthlyRiskDenseBlock = ((@('本月围绕校园导览小程序的里程碑拆解、执行动作、交付证据、风险处理和协作记录持续滚动复盘。') * 40) -join '') + '见图1、图2、图3、图4、图5、图6。'
+  $monthlyRiskReportPath = Join-Path $tempRoot 'monthly-report-pagination-risk.md'
+  @(
+    '项目月报',
+    '',
+    '项目名称：校园导览小程序',
+    '月报主题：2026 年 4 月分页风险检查',
+    '提交人：李四',
+    '工号/学号：20261234',
+    '小组/班级：软工 2302',
+    '审核人：王老师',
+    '报告类型：项目月报',
+    '月份周期：2026-04',
+    '工作环境：GitHub + 飞书 + 本地开发环境',
+    '',
+    '一、本月目标',
+    '本月目标聚焦首页结构调整、搜索体验收敛、详情页字段补全和地图接入预研，确保项目既可演示也可持续迭代。',
+    '',
+    '二、协作环境',
+    '协作环境覆盖 GitHub、飞书任务看板、接口文档和本地开发工具，保证需求、实现与验证证据处于同一条追踪链路。',
+    '',
+    '三、本月任务与输入',
+    '本月任务输入来自课程要求、老师阶段反馈、地点基础数据和上月遗留问题清单，并按必须完成、建议完成和延后观察三类优先级推进。',
+    '',
+    '四、本月完成事项',
+    '本月已完成首页卡片、地点筛选、详情页信息补全、搜索交互修正和答辩演示流程整理，开发推进路径基本稳定。与此同时，团队还把任务拆分、页面回归、问题归档和阶段演示材料串成同一条执行链路，保证月度完成事项既有动作描述也有证据沉淀。',
+    '',
+    '五、阶段成果与数据',
+    $monthlyRiskDenseBlock,
+    '',
+    '六、问题与改进',
+    '当前主要问题仍集中在地图联调尚未完成、地点数据规模偏小和搜索排序规则还需要继续收敛。下一步需要把风险按技术、数据和演示三类拆开处理，避免所有问题继续堆叠在同一轮月报里。',
+    '',
+    '七、下月计划',
+    '下月计划优先完成地图接入验证，再补齐地点坐标、收藏状态与演示彩排材料。同时会把搜索排序、路线提示和答辩讲解脚本拆成可单独验收的小目标，降低后续迭代中的联动风险。'
+  ) | Set-Content -LiteralPath $monthlyRiskReportPath -Encoding UTF8
+  $monthlyRiskValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $monthlyRiskReportPath -ReportProfileName 'monthly-report' -Format json | Out-String) | ConvertFrom-Json
+  $monthlyRiskWarningCodes = @($monthlyRiskValidation.summary.warningCodes | ForEach-Object { [string]$_ })
+  $monthlyRiskLongFinding = @($monthlyRiskValidation.findings | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  Assert-True -Condition ([bool]$monthlyRiskValidation.passed) -Message 'Monthly pagination-risk fixture should pass with warnings only.'
+  Assert-True -Condition ([int]$monthlyRiskValidation.summary.paginationRiskCount -ge 3) -Message 'Monthly pagination-risk fixture should surface monthly profile warnings.'
+  Assert-True -Condition ($monthlyRiskWarningCodes -contains 'pagination-risk-long-section') -Message 'Monthly pagination-risk fixture should report pagination-risk-long-section.'
+  Assert-True -Condition ($monthlyRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Monthly pagination-risk fixture should report pagination-risk-dense-section-block.'
+  Assert-True -Condition ($monthlyRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Monthly pagination-risk fixture should report pagination-risk-figure-cluster.'
+  Assert-True -Condition ([string]$monthlyRiskValidation.summary.paginationRiskRemediations.'pagination-risk-long-section' -match 'week-by-week') -Message 'Monthly validation summary should expose the custom long-section remediation.'
+  Assert-True -Condition ([string]$monthlyRiskValidation.summary.paginationRiskRemediations.'pagination-risk-figure-cluster' -match '阶段成果与数据') -Message 'Monthly validation summary should expose the custom figure-cluster remediation.'
+  Assert-True -Condition ([string]$monthlyRiskLongFinding.remediation -match 'week-by-week') -Message 'Monthly validation finding should use the custom long-section remediation.'
   $results.Add('monthly-report profile validation OK') | Out-Null
 
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
@@ -3237,6 +3320,9 @@ URL: https://example.com/network-lab
     '本次实验完成了局域网搭建和常用 DOS 命令验证，能够从地址配置、连通测试和缓存记录三个角度说明实验结果。',
     '通过把命令输出与配置步骤逐项对应，进一步理解了局域网通信中地址规划、协议验证和故障定位之间的关系。'
   ) | Set-Content -LiteralPath $paginationRiskReportPath -Encoding UTF8
+  $customLongPaginationRemediation = 'split the walkthrough into smaller subsections'
+  $customDensePaginationRemediation = 'separate command output, interpretation, and conclusion'
+  $customFigurePaginationRemediation = 'move a few screenshots into neighboring sections'
   $paginationRiskRequirements = [ordered]@{
     reportProfileName = 'experiment-report'
     courseName = '计算机网络'
@@ -3252,6 +3338,11 @@ URL: https://example.com/network-lab
       [ordered]@{ name = '实验总结'; aliases = @('实验总结', '总结与思考'); minChars = 30 }
     )
     forbiddenPatterns = @('TODO', '待补充', '自行填写')
+    paginationRiskRemediations = [ordered]@{
+      'pagination-risk-long-section' = 'Split the walkthrough into smaller subsections before docx generation, or raise paginationRiskThresholds.longSectionChars if this lab intentionally keeps one long narrative block.'
+      'pagination-risk-dense-section-block' = 'Separate command output, interpretation, and conclusion into distinct paragraphs or list items before layout, or tune denseSectionChars and denseSectionParagraphs for this report family.'
+      'pagination-risk-figure-cluster' = 'Move a few screenshots into neighboring sections or group them intentionally before layout, or raise paginationRiskThresholds.figureClusterRefs if screenshot-heavy evidence is expected.'
+    }
   }
   $paginationRiskRequirementsJson = $paginationRiskRequirements | ConvertTo-Json -Depth 8
 
@@ -3266,7 +3357,7 @@ URL: https://example.com/network-lab
     -StyleFinalDocx `
     -StyleProfilePath $buildStyleProfilePath | Out-Null
   $buildReportWarningSummary = (Get-Content -LiteralPath (Join-Path $buildReportWarningOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
-  Assert-ValidationPaginationRiskSummary -Summary $buildReportWarningSummary -MessagePrefix 'build-report warning summary'
+  Assert-ValidationPaginationRiskSummary -Summary $buildReportWarningSummary -MessagePrefix 'build-report warning summary' -ExpectedLongRemediationPattern $customLongPaginationRemediation -ExpectedDenseRemediationPattern $customDensePaginationRemediation -ExpectedFigureRemediationPattern $customFigurePaginationRemediation
   Assert-True -Condition ([string]$buildReportWarningSummary.requirementsInputMode -eq 'inline') -Message 'build-report warning summary should record requirementsInputMode=inline.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportWarningSummary.validationPath)) -Message 'build-report warning summary should include a readable validation path.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportWarningSummary.finalDocxPath)) -Message 'build-report warning summary final docx path should exist.'
@@ -3404,7 +3495,7 @@ URL: https://example.com/network-lab
   $urlWarningSummaryPath = Join-Path $urlWarningOutputDir 'url-build-summary.json'
   Assert-True -Condition (Test-Path -LiteralPath $urlWarningSummaryPath) -Message 'URL warning wrapper did not create the wrapper summary.'
   $urlWarningSummary = (Get-Content -LiteralPath $urlWarningSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
-  Assert-ValidationPaginationRiskSummary -Summary $urlWarningSummary -MessagePrefix 'URL warning wrapper summary'
+  Assert-ValidationPaginationRiskSummary -Summary $urlWarningSummary -MessagePrefix 'URL warning wrapper summary' -ExpectedLongRemediationPattern $customLongPaginationRemediation -ExpectedDenseRemediationPattern $customDensePaginationRemediation -ExpectedFigureRemediationPattern $customFigurePaginationRemediation
   Assert-True -Condition ([string]$urlWarningSummary.generationMode -eq 'replay') -Message 'URL warning wrapper should use replay generation mode.'
   Assert-True -Condition ([string]$urlWarningSummary.buildRequirementsInputMode -eq 'inline') -Message 'URL warning wrapper should expose buildRequirementsInputMode=inline.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$urlWarningSummary.pipelineTracePath)) -Message 'URL warning wrapper should create a pipeline trace JSON.'
@@ -3412,6 +3503,7 @@ URL: https://example.com/network-lab
   $urlWarningTraceCodes = @($urlWarningTrace.build.validationWarningCodes | ForEach-Object { [string]$_ })
   Assert-True -Condition ([bool]$urlWarningTrace.build.validationPassed) -Message 'URL warning pipeline trace should expose validationPassed=true.'
   Assert-True -Condition ([int]$urlWarningTrace.build.validationPaginationRiskCount -ge 3) -Message 'URL warning pipeline trace should expose pagination risks.'
+  Assert-True -Condition ([string]$urlWarningTrace.build.validationPaginationRiskRemediations.'pagination-risk-long-section' -match $customLongPaginationRemediation) -Message 'URL warning pipeline trace should expose the custom long-section remediation.'
   Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-long-section') -Message 'URL warning pipeline trace should expose pagination-risk-long-section.'
   Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-dense-section-block') -Message 'URL warning pipeline trace should expose pagination-risk-dense-section-block.'
   $urlTraceLongWarningSummary = @($urlWarningTrace.build.validationWarningSummary | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
@@ -3510,7 +3602,7 @@ URL: https://example.com/network-lab
   $feishuWarningSummaryPath = Join-Path $feishuWarningOutputDir 'feishu-build-summary.json'
   Assert-True -Condition (Test-Path -LiteralPath $feishuWarningSummaryPath) -Message 'Feishu warning wrapper did not create the wrapper summary.'
   $feishuWarningSummary = (Get-Content -LiteralPath $feishuWarningSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
-  Assert-ValidationPaginationRiskSummary -Summary $feishuWarningSummary -MessagePrefix 'Feishu warning wrapper summary'
+  Assert-ValidationPaginationRiskSummary -Summary $feishuWarningSummary -MessagePrefix 'Feishu warning wrapper summary' -ExpectedLongRemediationPattern $customLongPaginationRemediation -ExpectedDenseRemediationPattern $customDensePaginationRemediation -ExpectedFigureRemediationPattern $customFigurePaginationRemediation
   Assert-True -Condition ([string]$feishuWarningSummary.mode -eq 'local-report') -Message 'Feishu warning wrapper should use local-report mode.'
   Assert-True -Condition ([string]$feishuWarningSummary.buildRequirementsInputMode -eq 'inline') -Message 'Feishu warning wrapper should expose buildRequirementsInputMode=inline.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$feishuWarningSummary.pipelineTracePath)) -Message 'Feishu warning wrapper should create a pipeline trace JSON.'
@@ -3518,6 +3610,7 @@ URL: https://example.com/network-lab
   $feishuWarningTraceCodes = @($feishuWarningTrace.build.validationWarningCodes | ForEach-Object { [string]$_ })
   Assert-True -Condition ([bool]$feishuWarningTrace.build.validationPassed) -Message 'Feishu warning pipeline trace should expose validationPassed=true.'
   Assert-True -Condition ([int]$feishuWarningTrace.build.validationPaginationRiskCount -ge 3) -Message 'Feishu warning pipeline trace should expose pagination risks.'
+  Assert-True -Condition ([string]$feishuWarningTrace.build.validationPaginationRiskRemediations.'pagination-risk-long-section' -match $customLongPaginationRemediation) -Message 'Feishu warning pipeline trace should expose the custom long-section remediation.'
   Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-long-section') -Message 'Feishu warning pipeline trace should expose pagination-risk-long-section.'
   Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-dense-section-block') -Message 'Feishu warning pipeline trace should expose pagination-risk-dense-section-block.'
   Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-figure-cluster') -Message 'Feishu warning pipeline trace should expose pagination-risk-figure-cluster.'

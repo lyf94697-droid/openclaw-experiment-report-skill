@@ -87,6 +87,11 @@
     "denseSectionParagraphs": 3,
     "figureClusterRefs": 5
   },
+  "paginationRiskRemediations": {
+    "pagination-risk-long-section": "Split the monthly rollup into week-by-week, milestone-by-milestone, or deliverable-based subsections before building, or raise paginationRiskThresholds.longSectionChars if long monthly summaries are expected.",
+    "pagination-risk-dense-section-block": "Break dense monthly status text into separate paragraphs for objective, action, evidence, and impact, or tune denseSectionChars and denseSectionParagraphs if compact executive summaries are expected.",
+    "pagination-risk-figure-cluster": "Move some screenshots into '阶段成果与数据' or spread them across adjacent sections, or raise paginationRiskThresholds.figureClusterRefs if the monthly report normally groups many evidence screenshots together."
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["本月目标", "本月任务与输入"],

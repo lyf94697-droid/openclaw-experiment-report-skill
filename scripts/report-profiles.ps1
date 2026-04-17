@@ -467,6 +467,29 @@ function Get-ReportProfilePaginationRiskThresholds {
   return [pscustomobject]$thresholds
 }
 
+function Get-ReportProfilePaginationRiskRemediations {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  $knownCodes = @(
+    "pagination-risk-long-section",
+    "pagination-risk-dense-section-block",
+    "pagination-risk-figure-cluster"
+  )
+  $configuredRemediations = ConvertTo-ReportProfilePlainHashtable -InputObject (Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "paginationRiskRemediations")
+  $remediations = [ordered]@{}
+
+  foreach ($code in $knownCodes) {
+    if ($configuredRemediations.ContainsKey($code) -and -not [string]::IsNullOrWhiteSpace([string]$configuredRemediations[$code])) {
+      $remediations[$code] = [string]$configuredRemediations[$code]
+    }
+  }
+
+  return [pscustomobject]$remediations
+}
+
 function Get-ReportProfileImagePlacementDefaults {
   param(
     [Parameter(Mandatory = $true)]
@@ -739,7 +762,7 @@ function New-ReportProfileAutoRequirementsJson {
     }
   }
 
-  $requirements = [pscustomobject]@{
+  $requirements = [ordered]@{
     courseName = $ResolvedCourseName
     experimentName = $ResolvedExperimentName
     minChars = [int]$detailProfile.minChars
@@ -748,8 +771,12 @@ function New-ReportProfileAutoRequirementsJson {
     forbiddenPatterns = @($Profile.forbiddenPatterns)
     paginationRiskThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $Profile
   }
+  $paginationRiskRemediations = Get-ReportProfilePaginationRiskRemediations -Profile $Profile
+  if (@($paginationRiskRemediations.PSObject.Properties).Count -gt 0) {
+    $requirements["paginationRiskRemediations"] = $paginationRiskRemediations
+  }
 
-  return ($requirements | ConvertTo-Json -Depth 6)
+  return ([pscustomobject]$requirements | ConvertTo-Json -Depth 6)
 }
 
 function New-ReportProfileAutoMetadataJson {

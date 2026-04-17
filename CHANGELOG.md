@@ -22,6 +22,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added a Markdown index output to `scripts/run-profile-preset-samples.ps1` for faster preview of generated preset sample bundles.
 - Added a scheduled roadmap triage workflow and `scripts/analyze-roadmap-next-step.ps1` to surface small smoke-coverable next-step candidates from `ROADMAP.md`.
 - Added schema-backed `paginationRiskThresholds` so report profiles can tune long-section, dense-section, and figure-cluster pagination warnings.
+- Added optional `paginationRiskRemediations` so report profiles can override pagination-warning repair guidance per document family.
 - Added `scripts/report-defaults.ps1` so generated runs can remember the last course name and experiment name.
 - Added `CONTRIBUTING.md` with repository workflow, testing expectations, and contribution scope.
 - Added `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, and `ROADMAP.md` for GitHub-facing repository completeness.
@@ -46,6 +47,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Expanded smoke coverage so `monthly-report` is exercised as a built-in profile through loader assertions, generated input bundles, draft validation, install packaging, and roadmap-triage expectations.
 - Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
+- Propagated profile-specific pagination-risk remediations through generated requirements, validation summaries, build summaries, and wrapper traces.
 - Added smoke coverage for template-frame docx generation and wrapper summary propagation.
 
 ### Fixed

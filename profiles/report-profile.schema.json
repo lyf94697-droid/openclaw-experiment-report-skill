@@ -144,6 +144,9 @@
     "paginationRiskThresholds": {
       "$ref": "#/$defs/paginationRiskThresholds"
     },
+    "paginationRiskRemediations": {
+      "$ref": "#/$defs/paginationRiskRemediations"
+    },
     "forbiddenPatterns": {
       "type": "array",
       "items": {
@@ -247,6 +250,24 @@
         "figureClusterRefs": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "paginationRiskRemediations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pagination-risk-long-section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pagination-risk-dense-section-block": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pagination-risk-figure-cluster": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

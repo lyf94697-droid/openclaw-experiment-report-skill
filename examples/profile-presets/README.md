@@ -38,7 +38,7 @@ Recommended workflow:
 
 3. If the preset works for your document family, either keep using it through `-ReportProfilePath`, switch to the matching built-in `-ReportProfileName`, or fork a copy and continue tuning aliases, captions, and prompt guidance.
 
-Each preset can also tune `paginationRiskThresholds` so validation warnings match the document family's normal section length and screenshot density.
+Each preset can also tune `paginationRiskThresholds` so validation warnings match the document family's normal section length and screenshot density, and can optionally add `paginationRiskRemediations` so the machine-readable repair guidance matches that document family as well.
 
 You can also generate sample input bundles for every preset in this directory:
 

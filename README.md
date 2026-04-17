@@ -75,7 +75,7 @@
 - `weekly-report` 覆盖工作目标、协作环境、本周任务与输入、本周完成事项、阶段成果、风险与改进、下周计划
 - `meeting-minutes` 覆盖会议目标、参会信息与背景、议题与输入、讨论过程与决议、当前结论、风险与争议、后续安排
 - `monthly-report` 覆盖本月目标、协作环境、本月任务与输入、本月完成事项、阶段成果与数据、问题与改进、下月计划
-- profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、分页风险阈值、图注规则、图片落位优先级和复合模板填充规则
+- profile 现在不只是章节名列表，还承载 metadata 标签、默认样式、prompt 文案、章节最小长度、分页风险阈值、分页风险修复建议、图注规则、图片落位优先级和复合模板填充规则
 - 模板适配能力也被抽象出来，可以用 `check-report-profile-template-fit.ps1` 诊断新模板缺字段、缺章节、缺 alias 或是否需要新增复合填充规则
 - 插图流程已经支持按 profile 识别章节、生成图片落位预案、写入图注、连续图片 2 列分组布局，以及最终 layout check
 - 构建过程现在会写出 `summary.json`、`pipeline-trace.json`、`pipeline-trace.md`、`image-placement-plan.md` 和 `layout-check.json`，方便复盘每次运行到底用了什么输入、生成了什么产物
@@ -242,6 +242,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 新增 report profile 时，可以先用 `scripts/new-report-profile.ps1` 生成 schema-valid 草稿，再按具体文档类型调整标题、alias、图注和 prompt 文案
 - 如果某类文档天然章节更长或图片更多，可以在 profile 里调高 `paginationRiskThresholds`，避免把正常结构误报成分页风险；反过来也可以调低，用于更早捕捉 WPS/Word 模板风险
+- 如果某类文档不仅阈值不同，分页风险的修复方式也不同，可以在 profile 里追加 `paginationRiskRemediations`；这些建议会继续透传到自动生成的 requirements、validation JSON、`build-report` summary 和 wrapper summary
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
 - 如果你想沿用 path-based 方式试跑或继续做 profile 分叉，可以先看 `examples/profile-presets/`：目前保留 `weekly-report.json`、`meeting-minutes.json` 和 `monthly-report.json` 三份示例快照；对应的 built-in profile 也都已经在 `profiles/` 下可直接使用，这些快照更适合验证“这条 pipeline 能不能复用”或继续做定制分叉
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`

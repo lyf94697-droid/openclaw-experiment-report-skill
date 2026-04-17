@@ -545,6 +545,46 @@ function Test-PaginationRiskThresholds {
   }
 }
 
+function Test-PaginationRiskRemediations {
+  param(
+    [AllowEmptyCollection()]
+    [System.Collections.Generic.List[object]]$Findings,
+
+    [AllowNull()]
+    [object]$Remediations,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  if ($null -eq $Remediations) {
+    return
+  }
+
+  if ($Remediations -is [string] -or $Remediations -is [System.ValueType] -or (($Remediations -is [System.Collections.IEnumerable]) -and ($Remediations -isnot [System.Collections.IDictionary]))) {
+    Add-ProfileFinding -Findings $Findings -Severity error -Code "pagination-risk-remediations-invalid" -Path $Path -Message "paginationRiskRemediations must be an object when present."
+    return
+  }
+
+  $knownKeys = @("pagination-risk-long-section", "pagination-risk-dense-section-block", "pagination-risk-figure-cluster")
+  foreach ($property in $Remediations.PSObject.Properties) {
+    if ($knownKeys -notcontains [string]$property.Name) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "pagination-risk-remediation-unknown" -Path "$Path.$($property.Name)" -Message "paginationRiskRemediations contains an unknown property."
+    }
+  }
+
+  foreach ($key in $knownKeys) {
+    $rawValue = Get-OptionalPropertyValue -InputObject $Remediations -Name $key
+    if ($null -eq $rawValue) {
+      continue
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$rawValue)) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "pagination-risk-remediation-empty" -Path "$Path.$key" -Message "paginationRiskRemediations.$key must not be empty."
+    }
+  }
+}
+
 function Test-FieldMapCompositeRules {
   param(
     [AllowEmptyCollection()]
@@ -657,6 +697,7 @@ function Test-ReportProfile {
 
   Test-ImagePlacementDefaults -Findings $Findings -ImagePlacementDefaults (Get-OptionalPropertyValue -InputObject $Profile -Name "imagePlacementDefaults") -KnownSectionIds $knownSectionIds -Path "$Path.imagePlacementDefaults"
   Test-PaginationRiskThresholds -Findings $Findings -Thresholds (Get-OptionalPropertyValue -InputObject $Profile -Name "paginationRiskThresholds") -Path "$Path.paginationRiskThresholds"
+  Test-PaginationRiskRemediations -Findings $Findings -Remediations (Get-OptionalPropertyValue -InputObject $Profile -Name "paginationRiskRemediations") -Path "$Path.paginationRiskRemediations"
   Test-FieldMapCompositeRules -Findings $Findings -Rules (Get-OptionalPropertyValue -InputObject $Profile -Name "fieldMapCompositeRules") -KnownSectionIds $knownSectionIds -Path "$Path.fieldMapCompositeRules"
   Test-DetailProfiles -Findings $Findings -DetailProfiles (Get-OptionalPropertyValue -InputObject $Profile -Name "detailProfiles") -Path "$Path.detailProfiles"
 
