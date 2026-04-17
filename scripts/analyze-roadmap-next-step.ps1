@@ -174,7 +174,7 @@ function Get-ProfileExpansionCandidates {
   )
 
   $candidates = New-Object System.Collections.Generic.List[object]
-  $orderedProfiles = @("weekly-report", "meeting-minutes")
+  $orderedProfiles = @("meeting-minutes", "monthly-report")
   foreach ($profileName in $orderedProfiles) {
     $builtInPath = Join-Path $RepoRoot ("profiles\{0}.json" -f $profileName)
     $presetPath = Join-Path $RepoRoot ("examples\profile-presets\{0}.json" -f $profileName)

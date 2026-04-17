@@ -1,11 +1,11 @@
 # Custom Profile Presets
 
-This directory contains example report-profile presets for adjacent document types that still benefit from `-ReportProfilePath`, including snapshots that mirror a built-in profile.
+This directory contains example report-profile presets kept as path-based sample snapshots and customization starting points.
 
 Current examples:
 
-- `weekly-report.json` (kept as a path-based example snapshot; a built-in profile also exists under `profiles/`)
-- `meeting-minutes.json`
+- `weekly-report.json` (a built-in profile also exists under `profiles/`)
+- `meeting-minutes.json` (a built-in profile also exists under `profiles/`)
 
 Recommended workflow:
 
@@ -34,7 +34,7 @@ Recommended workflow:
      -OutputDir ".\tests-output\meeting-minutes-sample"
    ```
 
-3. If the preset works for your document family, either keep using it through `-ReportProfilePath` or move a copy into `profiles/` and continue tuning aliases, captions, and prompt guidance until it is ready for built-in promotion.
+3. If the preset works for your document family, either keep using it through `-ReportProfilePath`, switch to the matching built-in `-ReportProfileName`, or fork a copy and continue tuning aliases, captions, and prompt guidance.
 
 Each preset can also tune `paginationRiskThresholds` so validation warnings match the document family's normal section length and screenshot density.
 
@@ -54,4 +54,4 @@ That command writes one subdirectory per preset, each containing:
 
 It also writes a top-level `profile-preset-samples.md` index so you can quickly preview all generated sample bundles without opening each JSON file.
 
-These presets are intentionally examples. `meeting-minutes` still represents an external adjacent document type, while `weekly-report` stays here as a reusable path-based sample even though a built-in profile now exists.
+These presets are intentionally examples. Both `weekly-report` and `meeting-minutes` now exist as built-in profiles, and the copies here remain useful when you want a path-based sample or a quick customization starting point.

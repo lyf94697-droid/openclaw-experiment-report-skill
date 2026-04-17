@@ -169,7 +169,9 @@ Good fit when the structure is profile-driven rather than free-form:
 
 ### 6. Meeting Minutes With Template Filling
 
-Good fit later, not sooner:
+Status: built-in `meeting-minutes` profile is in place.
+
+Good fit because the profile model can now carry structured discussion, confirmed decisions, risks, and follow-up actions:
 
 - less image-heavy
 - more table- and action-item-oriented
@@ -188,7 +190,7 @@ The expansion order should stay disciplined:
 7. `meeting-minutes`
 8. `monthly-report`
 
-The first six are now built-in. The next adjacent candidate in this order is `meeting-minutes`, followed by `monthly-report` if a reusable preset proves out.
+The first seven are now built-in. The next adjacent candidate in this order is `monthly-report`.
 
 ## Supporting Platform Work
 
@@ -224,6 +226,7 @@ Alongside new profiles, the repository should keep investing in a few shared cap
 Implemented baseline:
 
 - `profiles/weekly-report.json`
+- `profiles/meeting-minutes.json`
 - `examples/profile-presets/weekly-report.json`
 - `examples/profile-presets/meeting-minutes.json`
 - `scripts/run-profile-preset-samples.ps1`
@@ -231,7 +234,7 @@ Implemented baseline:
 - `.github/workflows/roadmap-triage.yml`
 - schema-backed `paginationRiskThresholds` in report profiles and preset examples
 
-`meeting-minutes` still stays outside `profiles/` on purpose so adjacent document types can be prototyped through `-ReportProfilePath` before they are promoted to built-in profiles. `weekly-report` has crossed that threshold and now lives in `profiles/`, while the preset copy remains as a reusable example snapshot and sample-runner input.
+`weekly-report` and `meeting-minutes` have crossed the threshold into `profiles/`, while the preset copies remain as reusable example snapshots and sample-runner inputs. The next adjacent candidate is `monthly-report`, which still needs either a reusable preset or a direct built-in proposal.
 
 ## Non-Goals For Now
 

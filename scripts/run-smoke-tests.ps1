@@ -680,6 +680,7 @@ try {
       (Join-Path $repoRoot 'profiles\software-test-report.json'),
       (Join-Path $repoRoot 'profiles\deployment-report.json'),
       (Join-Path $repoRoot 'profiles\weekly-report.json'),
+      (Join-Path $repoRoot 'profiles\meeting-minutes.json'),
       (Join-Path $repoRoot 'profiles\report-profile.schema.json'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\analyze-roadmap-next-step.ps1'),
@@ -920,6 +921,15 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $weeklyReportProfile -SectionId 'result' -BaseName 'demo-result') -eq '阶段成果截图') -Message 'Weekly-report profile image caption defaults are missing the result caption.'
   $weeklyPaginationThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $weeklyReportProfile
   Assert-True -Condition ([int]$weeklyPaginationThresholds.longSectionChars -eq 1200) -Message 'Weekly-report profile pagination-risk thresholds are missing.'
+  $meetingMinutesProfile = Get-ReportProfile -ProfileName 'meeting-minutes' -RepoRoot $repoRoot
+  Assert-True -Condition ([string]$meetingMinutesProfile.name -eq 'meeting-minutes') -Message 'Meeting-minutes profile loader returned an unexpected profile name.'
+  Assert-True -Condition ([string]$meetingMinutesProfile.displayName -eq '会议纪要') -Message 'Meeting-minutes profile loader returned an unexpected display name.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $meetingMinutesProfile) -eq 'default') -Message 'Meeting-minutes profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $meetingMinutesProfile) -contains '会议主题') -Message 'Meeting-minutes profile metadata prefixes are missing 会议主题.'
+  Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $meetingMinutesProfile) -contains '讨论过程与决议') -Message 'Meeting-minutes profile required headings are missing 讨论过程与决议.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $meetingMinutesProfile -SectionId 'result' -BaseName 'decision-confirmed') -eq '结论确认截图') -Message 'Meeting-minutes profile image caption defaults are missing the result caption.'
+  $meetingMinutesPaginationThresholds = Get-ReportProfilePaginationRiskThresholds -Profile $meetingMinutesProfile
+  Assert-True -Condition ([int]$meetingMinutesPaginationThresholds.longSectionChars -eq 1000) -Message 'Meeting-minutes profile pagination-risk thresholds are missing.'
   $experimentPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '计算机网络' -ResolvedExperimentName '交换机 VLAN 配置实验' -Profile $reportProfile -DetailLevel 'standard'
   Assert-True -Condition ($experimentPromptText -match '实验报告 body') -Message 'Auto prompt helper did not use the experiment-report display name.'
   Assert-True -Condition ($experimentPromptText -match '课程名称: 计算机网络') -Message 'Auto prompt helper did not emit the experiment-report course-name label.'
@@ -987,13 +997,24 @@ URL: https://example.com/network-lab
   $weeklyMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代周报' -Profile $weeklyReportProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '项目周报' -ResolvedExperimentDate '第 6 周' -ResolvedExperimentLocation 'GitHub + 飞书 + 本地开发环境') | ConvertFrom-Json
   Assert-True -Condition ([string]$weeklyMetadata.提交人 -eq '李四') -Message 'Auto metadata helper did not emit the weekly-report owner label.'
   Assert-True -Condition ([string]$weeklyMetadata.周报主题 -eq '第 6 周迭代周报') -Message 'Auto metadata helper did not emit the weekly-report title label.'
+  $meetingPromptText = New-ReportProfileAutoPromptText -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代评审会' -Profile $meetingMinutesProfile -DetailLevel 'full'
+  Assert-True -Condition ($meetingPromptText -match '会议纪要 body') -Message 'Auto prompt helper did not use the meeting-minutes display name.'
+  Assert-True -Condition ($meetingPromptText -match '项目名称: 校园导览小程序') -Message 'Auto prompt helper did not emit the meeting-minutes project label.'
+  Assert-True -Condition ($meetingPromptText -match '会议主题: 第 6 周迭代评审会') -Message 'Auto prompt helper did not emit the meeting-minutes title label.'
+  Assert-True -Condition ($meetingPromptText -match '讨论过程与决议') -Message 'Auto prompt helper did not include meeting-minutes required headings.'
+  $meetingRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代评审会' -Profile $meetingMinutesProfile -ExtraKeywords @('迭代评审', '校园导览小程序') -DetailLevel 'full') | ConvertFrom-Json
+  Assert-True -Condition ([int]$meetingRequirements.minChars -eq 1300) -Message 'Auto requirements helper did not use the meeting-minutes full minChars.'
+  Assert-True -Condition (@($meetingRequirements.sections | Where-Object { $_.name -eq '讨论过程与决议' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the meeting-minutes discussion section heading.'
+  $meetingMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '校园导览小程序' -ResolvedExperimentName '第 6 周迭代评审会' -Profile $meetingMinutesProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '评审会议纪要' -ResolvedExperimentDate '2026-04-13' -ResolvedExperimentLocation 'GitHub + 飞书会议') | ConvertFrom-Json
+  Assert-True -Condition ([string]$meetingMetadata.记录人 -eq '李四') -Message 'Auto metadata helper did not emit the meeting-minutes recorder label.'
+  Assert-True -Condition ([string]$meetingMetadata.会议主题 -eq '第 6 周迭代评审会') -Message 'Auto metadata helper did not emit the meeting-minutes title label.'
   $results.Add('report profile loader OK') | Out-Null
 
   $reportProfileSchema = (Get-Content -LiteralPath (Join-Path $repoRoot 'profiles\report-profile.schema.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$reportProfileSchema.title -eq 'OpenClaw report profile') -Message 'Report profile schema did not parse.'
   $profileValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$profileValidation.passed) -Message 'Report profile validation failed.'
-  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 6) -Message 'Report profile validation did not cover built-in profiles.'
+  Assert-True -Condition ([int]$profileValidation.summary.profileCount -ge 7) -Message 'Report profile validation did not cover built-in profiles.'
   Assert-True -Condition ([int]$profileValidation.summary.errorCount -eq 0) -Message 'Report profile validation reported unexpected errors.'
   $results.Add('report profile schema validation OK') | Out-Null
 
@@ -1008,6 +1029,7 @@ URL: https://example.com/network-lab
   $exampleMeetingPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\meeting-minutes.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$exampleMeetingPreset.defaultStyleProfile -eq 'default') -Message 'Meeting-minutes preset should demonstrate default as the default style profile.'
   Assert-True -Condition ([string]$exampleMeetingPreset.sectionFields[3].heading -eq '讨论过程与决议') -Message 'Meeting-minutes preset is missing the expected steps heading.'
+  Assert-True -Condition ([int]$exampleMeetingPreset.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Meeting-minutes preset should demonstrate custom pagination-risk thresholds.'
   $results.Add('example profile presets OK') | Out-Null
 
   $profilePresetSamplesDir = Join-Path $tempRoot 'profile-preset-samples'
@@ -1041,6 +1063,9 @@ URL: https://example.com/network-lab
   $roadmapTriageMarkdown = Get-Content -LiteralPath ([string]$roadmapTriage.markdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($roadmapTriageMarkdown -match 'Roadmap Daily Triage') -Message 'Roadmap triage markdown is missing the expected title.'
   Assert-True -Condition ($roadmapTriageMarkdown -match 'Smoke-Coverable') -Message 'Roadmap triage markdown is missing the smoke-coverable section.'
+  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'weekly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending weekly-report after promotion.'
+  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'meeting-minutes is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending meeting-minutes after promotion.'
+  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'monthly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 1) -Message 'Roadmap triage should advance to the next unbuilt profile candidate.'
   $roadmapTriageWorkflow = Get-Content -LiteralPath (Join-Path $repoRoot '.github\workflows\roadmap-triage.yml') -Raw -Encoding UTF8
   Assert-True -Condition ($roadmapTriageWorkflow -match 'schedule:') -Message 'Roadmap triage workflow is missing a schedule trigger.'
   Assert-True -Condition ($roadmapTriageWorkflow -match 'workflow_dispatch:') -Message 'Roadmap triage workflow is missing a manual trigger.'
@@ -1143,6 +1168,38 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([int]$weeklyGeneratedRequirements.minChars -eq 1400) -Message 'Weekly report-input generation requirements are missing the expected minChars.'
     Assert-True -Condition (@($weeklyGeneratedRequirements.sections | Where-Object { $_.name -eq '本周完成事项' }).Count -eq 1) -Message 'Weekly report-input generation requirements are missing the completion section.'
     Assert-True -Condition ([int]$weeklyGeneratedRequirements.paginationRiskThresholds.longSectionChars -eq 1200) -Message 'Weekly report-input generation requirements are missing pagination-risk thresholds.'
+
+    $meetingInputsOutputDir = Join-Path $tempRoot 'meeting-minutes-inputs-output'
+    & (Join-Path $repoRoot 'scripts\generate-report-inputs.ps1') `
+      -CourseName '校园导览小程序' `
+      -ExperimentName '第 6 周迭代评审会' `
+      -StudentName '李四' `
+      -StudentId '20261234' `
+      -ClassName '软工 2302' `
+      -TeacherName '王老师' `
+      -ExperimentProperty '评审会议纪要' `
+      -ExperimentDate '2026-04-13' `
+      -ExperimentLocation 'GitHub + 飞书会议' `
+      -ReportProfileName 'meeting-minutes' `
+      -RequiredKeywords @('迭代评审', '行动项') `
+      -OutputDir $meetingInputsOutputDir `
+      -DetailLevel full | Out-Null
+    $meetingInputsSummaryPath = Join-Path $meetingInputsOutputDir 'report-inputs-summary.json'
+    Assert-True -Condition (Test-Path -LiteralPath $meetingInputsSummaryPath) -Message 'Meeting-minutes report-input generation did not create the summary JSON.'
+    $meetingInputsSummary = (Get-Content -LiteralPath $meetingInputsSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$meetingInputsSummary.reportProfileName -eq 'meeting-minutes') -Message 'Meeting-minutes report-input generation summary is missing the expected profile name.'
+    Assert-True -Condition ([string]$meetingInputsSummary.reportProfileDisplayName -eq '会议纪要') -Message 'Meeting-minutes report-input generation summary is missing the expected display name.'
+    Assert-True -Condition ((Split-Path -Leaf ([string]$meetingInputsSummary.defaultsPath)) -eq 'meeting-minutes.defaults.json') -Message 'Meeting-minutes report-input generation should persist defaults under the profile-specific defaults file.'
+    $meetingGeneratedPrompt = Get-Content -LiteralPath (Join-Path $meetingInputsOutputDir 'prompt.txt') -Raw -Encoding UTF8
+    Assert-True -Condition ($meetingGeneratedPrompt -match '会议纪要 body') -Message 'Meeting-minutes report-input generation did not emit the expected prompt body.'
+    Assert-True -Condition ($meetingGeneratedPrompt -match '会议主题: 第 6 周迭代评审会') -Message 'Meeting-minutes report-input generation did not emit the expected title label.'
+    $meetingGeneratedMetadata = (Get-Content -LiteralPath (Join-Path $meetingInputsOutputDir 'metadata.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([string]$meetingGeneratedMetadata.记录人 -eq '李四') -Message 'Meeting-minutes report-input generation metadata is missing the recorder label.'
+    Assert-True -Condition ([string]$meetingGeneratedMetadata.会议主题 -eq '第 6 周迭代评审会') -Message 'Meeting-minutes report-input generation metadata is missing the title label.'
+    $meetingGeneratedRequirements = (Get-Content -LiteralPath (Join-Path $meetingInputsOutputDir 'requirements.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+    Assert-True -Condition ([int]$meetingGeneratedRequirements.minChars -eq 1300) -Message 'Meeting-minutes report-input generation requirements are missing the expected minChars.'
+    Assert-True -Condition (@($meetingGeneratedRequirements.sections | Where-Object { $_.name -eq '讨论过程与决议' }).Count -eq 1) -Message 'Meeting-minutes report-input generation requirements are missing the discussion section.'
+    Assert-True -Condition ([int]$meetingGeneratedRequirements.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Meeting-minutes report-input generation requirements are missing pagination-risk thresholds.'
   } finally {
     $env:AGENTS_HOME = $originalInputsAgentsHome
   }
@@ -1876,6 +1933,56 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$weeklyValidation.summary.sectionCount -ge 7) -Message 'Weekly report validation did not load the expected section rules.'
   Assert-True -Condition ([int]$weeklyValidation.summary.paginationRiskThresholds.longSectionChars -eq 1200) -Message 'Weekly report validation did not use the weekly pagination thresholds.'
   $results.Add('weekly-report profile validation OK') | Out-Null
+
+  $meetingMinutesPath = Join-Path $tempRoot 'meeting-minutes.md'
+  @'
+会议纪要
+
+项目名称：校园导览小程序
+会议主题：第 6 周迭代评审会
+记录人：李四
+工号/学号：20261234
+参会小组：软工 2302
+主持人：王老师
+纪要类型：评审会议纪要
+会议日期：2026-04-13
+会议地点：GitHub + 飞书会议
+
+一、会议目标
+本次会议目标是对校园导览小程序第 6 周迭代的阶段成果进行集中评审，确认哪些功能已经达到可演示标准，哪些问题需要在下周继续推进。
+会议同时要求把功能完成情况、风险判断和后续责任人说清楚，避免纪要只停留在泛泛而谈的过程记录上。
+
+二、参会信息与背景
+本次评审会由课程指导老师和项目小组核心成员共同参加，会议前已经提前共享了最新页面截图、演示脚本、任务看板和已知问题清单。
+参会背景是当前版本已经具备首页分类、地点搜索和详情展示的基本能力，但地图接入、排序优化和演示稳定性还需要进一步确认取舍。
+
+三、议题与输入
+本次会议输入包括本周开发提交记录、关键页面截图、已完成任务列表、未关闭问题单以及老师对答辩展示顺序提出的修改建议。
+会议议题主要围绕四个方面展开，分别是当前版本能否满足演示要求、路线提示是否需要继续开发、地图组件接入成本是否可控，以及下周任务应该如何重新排序。
+
+四、讨论过程与决议
+会议先回顾了本周已完成的页面与接口联调结果，确认首页分类、关键词搜索和详情页信息展示已经达到可演示水平。随后针对路线提示和地图接入进行讨论，大家一致认为当前静态文本方案虽然能说明设计思路，但若完全不接地图组件，最终展示说服力仍然不足。
+在资源评估部分，小组成员说明地图组件接入主要难点在于地点坐标整理和详情页跳转联动，而不是基础显示能力本身。主持人最终决定下周优先完成地图接入验证和一条完整路线展示链路，同时压缩非关键视觉细节，确保最终版本先满足完整演示。
+
+五、当前结论
+会议确认当前版本可以作为阶段性可演示成果继续推进，不需要推翻现有页面结构和数据组织方案。首页分类、地点列表、详情页和搜索流程将保持现有实现，只针对交互细节和演示顺序做小范围优化。
+同时会议明确了下一轮迭代的核心结论，即路线展示与地图联动是当前最值得投入的能力，收藏功能和复杂排序策略暂时不作为下周必须完成项。
+
+六、风险与争议
+当前主要风险在于地图组件接入后可能暴露出地点坐标不完整、详情页跳转逻辑混乱和页面加载变慢等问题。如果这些问题集中出现，下周计划就需要重新压缩范围。
+会议中的主要争议点是是否继续保留静态路线文字作为备用方案。一部分成员认为备用方案能降低演示风险，另一部分成员认为双方案并行会分散开发精力，最后决定先保留静态说明，但不再投入额外美化工作。
+
+七、后续安排
+后续安排是先由前端负责人在下周前两天完成地图组件接入验证，并输出一份包含截图和性能观察的记录；后端同步整理地点坐标和分类字段，保证前端联调时有稳定数据来源。
+记录人会在本次会议后更新飞书任务看板，把地图验证、演示彩排、问题回归和答辩讲解稿拆成明确任务，并在下一次周会前汇总完成情况和残留阻塞项。
+'@ | Set-Content -LiteralPath $meetingMinutesPath -Encoding UTF8
+
+  $meetingValidation = (& (Join-Path $repoRoot 'scripts\validate-report-draft.ps1') -Path $meetingMinutesPath -ReportProfileName 'meeting-minutes' -Format json | Out-String) | ConvertFrom-Json
+  Assert-True -Condition ([bool]$meetingValidation.passed) -Message 'Meeting minutes validation should pass for the meeting-minutes profile.'
+  Assert-True -Condition ([string]$meetingValidation.reportProfileName -eq 'meeting-minutes') -Message 'Meeting minutes validation is missing the expected profile name.'
+  Assert-True -Condition ([int]$meetingValidation.summary.sectionCount -ge 7) -Message 'Meeting minutes validation did not load the expected section rules.'
+  Assert-True -Condition ([int]$meetingValidation.summary.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Meeting minutes validation did not use the meeting pagination thresholds.'
+  $results.Add('meeting-minutes profile validation OK') | Out-Null
 
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
@@ -3407,6 +3514,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\software-test-report.json')) -Message 'Install script did not copy the software-test-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\deployment-report.json')) -Message 'Install script did not copy the deployment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\weekly-report.json')) -Message 'Install script did not copy the weekly-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\report-profile.schema.json')) -Message 'Install script did not copy the report profile schema.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
