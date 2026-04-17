@@ -37,6 +37,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Improved direct-chat image handling so OpenClaw-staged relative attachment paths such as `media/inbound/example.png` can resolve into the final docx image pipeline.
 - Propagated structural validation and pagination-risk summaries through URL and Feishu wrapper outputs.
 - Propagated profile pagination-risk thresholds through generated requirements, validation JSON, build summaries, and wrapper traces.
+- Added remediation guidance to validation findings and warning summaries so machine-readable outputs include the next repair action.
 - Expanded smoke coverage for structural validation and pagination-risk codes across experiment and internship report profiles.
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
 - Added smoke coverage for template-frame docx generation and wrapper summary propagation.

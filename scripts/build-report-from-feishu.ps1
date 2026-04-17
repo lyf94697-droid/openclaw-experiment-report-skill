@@ -575,6 +575,7 @@ $pipelineTrace = [pscustomobject]@{
     validationPaginationRiskThresholds = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationPaginationRiskThresholds") { $innerSummary.validationPaginationRiskThresholds } else { $null })
     validationStructuralIssueCount = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $innerSummary.validationStructuralIssueCount } else { $null })
     validationWarningCodes = $innerValidationWarningCodes
+    validationWarningSummary = $innerValidationWarningSummary
   }
   artifacts = [pscustomobject]@{
     reportPath = $resolvedCopiedReportPath

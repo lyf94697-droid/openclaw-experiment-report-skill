@@ -47,6 +47,12 @@ function Assert-ValidationPaginationRiskSummary {
   Assert-True -Condition ($warningSummaryCodes -contains 'pagination-risk-long-section') -Message "$MessagePrefix should include pagination-risk-long-section in validationWarningSummary."
   Assert-True -Condition ($warningSummaryCodes -contains 'pagination-risk-dense-section-block') -Message "$MessagePrefix should include pagination-risk-dense-section-block in validationWarningSummary."
   Assert-True -Condition ($warningSummaryCodes -contains 'pagination-risk-figure-cluster') -Message "$MessagePrefix should include pagination-risk-figure-cluster in validationWarningSummary."
+  $longWarningSummary = @($Summary.validationWarningSummary | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  $denseWarningSummary = @($Summary.validationWarningSummary | Where-Object { [string]$_.code -eq 'pagination-risk-dense-section-block' })[0]
+  $figureWarningSummary = @($Summary.validationWarningSummary | Where-Object { [string]$_.code -eq 'pagination-risk-figure-cluster' })[0]
+  Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$longWarningSummary.remediation)) -Message "$MessagePrefix should expose long-section remediation guidance."
+  Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$denseWarningSummary.remediation)) -Message "$MessagePrefix should expose dense-section remediation guidance."
+  Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$figureWarningSummary.remediation)) -Message "$MessagePrefix should expose figure-cluster remediation guidance."
 }
 
 function Normalize-OutlineForComparison {
@@ -1309,6 +1315,12 @@ arp -a
   Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-long-section') -Message 'Experiment structural-risk fixture should report pagination-risk-long-section.'
   Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-dense-section-block') -Message 'Experiment structural-risk fixture should report pagination-risk-dense-section-block.'
   Assert-True -Condition ($experimentStructureRiskWarningCodes -contains 'pagination-risk-figure-cluster') -Message 'Experiment structural-risk fixture should report pagination-risk-figure-cluster.'
+  $duplicateHeadingFinding = @($experimentStructureRiskValidation.findings | Where-Object { [string]$_.code -eq 'duplicate-section-heading' })[0]
+  $placeholderFinding = @($experimentStructureRiskValidation.findings | Where-Object { [string]$_.code -eq 'placeholder-only-section' })[0]
+  $longPaginationFinding = @($experimentStructureRiskValidation.findings | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  Assert-True -Condition ([string]$duplicateHeadingFinding.remediation -match 'canonical heading') -Message 'Experiment structural-risk fixture should include duplicate-heading remediation guidance.'
+  Assert-True -Condition ([string]$placeholderFinding.remediation -match 'Replace placeholders') -Message 'Experiment structural-risk fixture should include placeholder remediation guidance.'
+  Assert-True -Condition ([string]$longPaginationFinding.remediation -match 'paginationRiskThresholds\.longSectionChars') -Message 'Experiment structural-risk fixture should include pagination threshold remediation guidance.'
   $results.Add('experiment structural validation OK') | Out-Null
 
   $experimentPaginationRiskReportPath = Join-Path $tempRoot 'experiment-pagination-risk-report.md'
@@ -3077,6 +3089,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$urlWarningTrace.build.validationPaginationRiskCount -ge 3) -Message 'URL warning pipeline trace should expose pagination risks.'
   Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-long-section') -Message 'URL warning pipeline trace should expose pagination-risk-long-section.'
   Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-dense-section-block') -Message 'URL warning pipeline trace should expose pagination-risk-dense-section-block.'
+  $urlTraceLongWarningSummary = @($urlWarningTrace.build.validationWarningSummary | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$urlTraceLongWarningSummary.remediation)) -Message 'URL warning pipeline trace should expose remediation guidance.'
   Assert-True -Condition ($urlWarningTraceCodes -contains 'pagination-risk-figure-cluster') -Message 'URL warning pipeline trace should expose pagination-risk-figure-cluster.'
   $urlWarningTraceMarkdown = Get-Content -LiteralPath ([string]$urlWarningSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($urlWarningTraceMarkdown -match 'Validation passed: True') -Message 'URL warning pipeline markdown should include validation status.'
@@ -3182,6 +3196,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-long-section') -Message 'Feishu warning pipeline trace should expose pagination-risk-long-section.'
   Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-dense-section-block') -Message 'Feishu warning pipeline trace should expose pagination-risk-dense-section-block.'
   Assert-True -Condition ($feishuWarningTraceCodes -contains 'pagination-risk-figure-cluster') -Message 'Feishu warning pipeline trace should expose pagination-risk-figure-cluster.'
+  $feishuTraceLongWarningSummary = @($feishuWarningTrace.build.validationWarningSummary | Where-Object { [string]$_.code -eq 'pagination-risk-long-section' })[0]
+  Assert-True -Condition (-not [string]::IsNullOrWhiteSpace([string]$feishuTraceLongWarningSummary.remediation)) -Message 'Feishu warning pipeline trace should expose remediation guidance.'
   $feishuWarningTraceMarkdown = Get-Content -LiteralPath ([string]$feishuWarningSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($feishuWarningTraceMarkdown -match 'Validation passed: True') -Message 'Feishu warning pipeline markdown should include validation status.'
   Assert-True -Condition ($feishuWarningTraceMarkdown -match ("Pagination risks: {0}" -f [int]$feishuWarningSummary.validationPaginationRiskCount)) -Message 'Feishu warning pipeline markdown should include pagination risk count.'

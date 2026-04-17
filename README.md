@@ -103,7 +103,7 @@
 | `validationPaginationRiskThresholds` | 当前使用的分页风险阈值，来自 active report profile 或外部 requirements |
 | `validationStructuralIssueCount` | `category = structure` 的结构问题数量 |
 | `validationErrorCodes` / `validationWarningCodes` | 去重后的机器可读 code 列表 |
-| `validationWarningSummary` | warning 的轻量摘要，包含 `severity`、`code`、`category`、`message` |
+| `validationWarningSummary` | warning 的轻量摘要，包含 `severity`、`code`、`category`、`message`、`remediation` |
 | `validationFindingCountsByCode` / `validationFindingCountsByCategory` | 按 code 和 category 聚合的计数表 |
 | `templateFrameDocxPath` | 可选模板边框版 `docx` 路径；普通最终稿仍保留在 `finalDocxPath` |
 
@@ -128,6 +128,8 @@
 | `pagination-risk-figure-cluster` | warning | 单个章节引用较多图片，图片和图注可能造成分页压力 |
 
 这些分页风险阈值可以在 profile 的 `paginationRiskThresholds` 里调整。字段包括 `longSectionChars`、`denseSectionChars`、`denseSectionParagraphs` 和 `figureClusterRefs`；`validate-report-draft.ps1` 的 `summary.paginationRiskThresholds` 会写出本次实际使用的值。
+
+每条 validation finding 现在还会带 `remediation` 字段。它是给自动化和人工排查看的下一步建议，例如补齐缺失章节、合并重复标题、替换占位符、拆分过长段落，或在 profile 中调整分页阈值。
 
 ## 快速开始
 

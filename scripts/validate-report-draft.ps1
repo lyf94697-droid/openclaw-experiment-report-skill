@@ -210,6 +210,34 @@ function Get-HeadingPattern {
   return '^(?:\u7B2C?[0-9\u4E00\u4E8C\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D\u5341]+(?:\u7AE0|\u8282)?[.\)\u3001]?\s*)?(?:' + ($escapedAliases -join '|') + ')\s*(?:[:\uFF1A])?$'
 }
 
+function Get-ValidationRemediation {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Code
+  )
+
+  switch ($Code) {
+    "missing-profile-required-heading" { return "Add the missing profile section heading and body, or add an alias to the active report profile if the report uses a valid alternate heading." }
+    "missing-required-section" { return "Add the missing required section heading and body, or remove the section from the requirements if it is not required for this run." }
+    "duplicate-section-heading" { return "Keep one canonical heading and merge or rename repeated sections so downstream template filling has a single target." }
+    "section-order-anomaly" { return "Reorder the sections to match the active profile or requirements order, or update the profile sectionFields order if the template expects this sequence." }
+    "empty-section" { return "Write concrete body content under the section, or remove that section from the active profile or requirements if it is not required." }
+    "placeholder-only-section" { return "Replace placeholders such as TODO, placeholder text, or blank underline blocks with final report content before building the docx." }
+    "short-section" { return "Expand the section with concrete steps, evidence, results, or analysis until it meets minChars, or tune the profile threshold if the section is intentionally brief." }
+    "pagination-risk-long-section" { return "Split the long section into shorter paragraphs or subsections, or raise paginationRiskThresholds.longSectionChars in the active profile if this length is expected." }
+    "pagination-risk-dense-section-block" { return "Break the dense text block into more paragraphs or list items, or tune denseSectionChars and denseSectionParagraphs in the active profile." }
+    "pagination-risk-figure-cluster" { return "Move some figure references to adjacent sections, group screenshots deliberately, or raise paginationRiskThresholds.figureClusterRefs if this density is normal." }
+    "missing-course-name" { return "Add the required course name near the top of the report, or fix courseName in the requirements if the expected value is wrong." }
+    "missing-experiment-name" { return "Add the required experiment or project name near the top of the report, or fix experimentName in the requirements if the expected value is wrong." }
+    "missing-keyword" { return "Add the required keyword in the relevant section, or remove it from requiredKeywords if it is not required for this document." }
+    "missing-required-phrase" { return "Add the required phrase in the relevant section, or remove it from requiredPhrases if it is no longer required." }
+    "forbidden-pattern" { return "Remove placeholder or generated boilerplate wording before submission." }
+    "short-report" { return "Expand the report with concrete procedure, result, and analysis content, or tune the detail profile minChars if this document type is intentionally shorter." }
+    "missing-figure-refs" { return "Add figure references and captions for the required screenshots, or lower minFigureRefs if screenshots are not required for this run." }
+    default { return $null }
+  }
+}
+
 function Add-Finding {
   param(
     [Parameter(Mandatory = $true)]
@@ -228,7 +256,10 @@ function Add-Finding {
     [string]$Category,
 
     [AllowNull()]
-    [object]$Context
+    [object]$Context,
+
+    [AllowNull()]
+    [string]$Remediation
   )
 
   $contextObject = $null
@@ -239,11 +270,18 @@ function Add-Finding {
     }
   }
 
+  $resolvedRemediation = if ([string]::IsNullOrWhiteSpace($Remediation)) {
+    Get-ValidationRemediation -Code $Code
+  } else {
+    $Remediation
+  }
+
   $Target.Add([pscustomobject]@{
       severity = $Severity
       code = $Code
       category = $Category
       message = $Message
+      remediation = $resolvedRemediation
       context = $contextObject
     }) | Out-Null
 }
@@ -734,6 +772,9 @@ if ($Format -eq "json") {
     foreach ($finding in $findings) {
       $categoryPrefix = if (-not [string]::IsNullOrWhiteSpace([string]$finding.category)) { "{0}/" -f [string]$finding.category } else { "" }
       [void]$linesOut.Add("- [$($finding.severity)] $categoryPrefix$($finding.code): $($finding.message)")
+      if ($finding.PSObject.Properties.Name -contains "remediation" -and -not [string]::IsNullOrWhiteSpace([string]$finding.remediation)) {
+        [void]$linesOut.Add("  Remediation: $($finding.remediation)")
+      }
     }
   }
 

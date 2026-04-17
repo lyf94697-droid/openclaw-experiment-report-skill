@@ -366,6 +366,7 @@ if ($null -ne $validationResult -and $validationResult.PSObject.Properties.Name 
           code = [string]$_.code
           category = $(if ($_.PSObject.Properties.Name -contains "category") { [string]$_.category } else { $null })
           message = [string]$_.message
+          remediation = $(if ($_.PSObject.Properties.Name -contains "remediation") { [string]$_.remediation } else { $null })
         }
       }
   )
