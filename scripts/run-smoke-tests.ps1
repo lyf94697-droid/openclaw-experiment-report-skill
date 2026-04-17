@@ -670,6 +670,7 @@ try {
       (Join-Path $repoRoot 'examples\profile-presets\README.md'),
       (Join-Path $repoRoot 'examples\profile-presets\weekly-report.json'),
       (Join-Path $repoRoot 'examples\profile-presets\meeting-minutes.json'),
+      (Join-Path $repoRoot 'examples\profile-presets\monthly-report.json'),
       (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\sample-report.txt'),
@@ -1020,7 +1021,7 @@ URL: https://example.com/network-lab
 
   $exampleProfilePresetValidation = (& (Join-Path $repoRoot 'scripts\validate-report-profiles.ps1') -ProfileDir (Join-Path $repoRoot 'examples\profile-presets') -Format json | Out-String) | ConvertFrom-Json
   Assert-True -Condition ([bool]$exampleProfilePresetValidation.passed) -Message 'Example profile presets failed validation.'
-  Assert-True -Condition ([int]$exampleProfilePresetValidation.summary.profileCount -eq 2) -Message 'Example profile preset validation should cover the curated preset pair.'
+  Assert-True -Condition ([int]$exampleProfilePresetValidation.summary.profileCount -eq 3) -Message 'Example profile preset validation should cover the curated preset trio.'
   Assert-True -Condition ([int]$exampleProfilePresetValidation.summary.errorCount -eq 0) -Message 'Example profile preset validation reported unexpected errors.'
   $exampleWeeklyPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\weekly-report.json') -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$exampleWeeklyPreset.defaultStyleProfile -eq 'compact') -Message 'Weekly preset should demonstrate compact as the default style profile.'
@@ -1030,17 +1031,22 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$exampleMeetingPreset.defaultStyleProfile -eq 'default') -Message 'Meeting-minutes preset should demonstrate default as the default style profile.'
   Assert-True -Condition ([string]$exampleMeetingPreset.sectionFields[3].heading -eq '讨论过程与决议') -Message 'Meeting-minutes preset is missing the expected steps heading.'
   Assert-True -Condition ([int]$exampleMeetingPreset.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Meeting-minutes preset should demonstrate custom pagination-risk thresholds.'
+  $exampleMonthlyPreset = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\profile-presets\monthly-report.json') -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$exampleMonthlyPreset.defaultStyleProfile -eq 'compact') -Message 'Monthly preset should demonstrate compact as the default style profile.'
+  Assert-True -Condition ([string]$exampleMonthlyPreset.sectionFields[3].heading -eq '本月完成事项') -Message 'Monthly preset is missing the expected steps heading.'
+  Assert-True -Condition ([int]$exampleMonthlyPreset.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly preset should demonstrate custom pagination-risk thresholds.'
   $results.Add('example profile presets OK') | Out-Null
 
   $profilePresetSamplesDir = Join-Path $tempRoot 'profile-preset-samples'
   $profilePresetSamples = (& (Join-Path $repoRoot 'scripts\run-profile-preset-samples.ps1') -OutputDir $profilePresetSamplesDir -Format json | Out-String) | ConvertFrom-Json
-  Assert-True -Condition ([int]$profilePresetSamples.generatedCount -eq 2) -Message 'Profile preset sample runner should generate both curated preset samples.'
+  Assert-True -Condition ([int]$profilePresetSamples.generatedCount -eq 3) -Message 'Profile preset sample runner should generate all curated preset samples.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$profilePresetSamples.summaryPath)) -Message 'Profile preset sample runner did not write its summary JSON.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$profilePresetSamples.markdownPath)) -Message 'Profile preset sample runner did not write its markdown index.'
   $profilePresetSamplesMarkdown = Get-Content -LiteralPath ([string]$profilePresetSamples.markdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($profilePresetSamplesMarkdown -match 'Profile Preset Samples') -Message 'Profile preset sample markdown is missing the expected title.'
   Assert-True -Condition ($profilePresetSamplesMarkdown -match 'weekly-report') -Message 'Profile preset sample markdown is missing weekly-report.'
   Assert-True -Condition ($profilePresetSamplesMarkdown -match 'meeting-minutes') -Message 'Profile preset sample markdown is missing meeting-minutes.'
+  Assert-True -Condition ($profilePresetSamplesMarkdown -match 'monthly-report') -Message 'Profile preset sample markdown is missing monthly-report.'
   $weeklyPresetSample = @($profilePresetSamples.generated | Where-Object { [string]$_.reportProfileName -eq 'weekly-report' })[0]
   Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.promptPath)) -Message 'Weekly preset sample runner did not create prompt.txt.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPresetSample.metadataPath)) -Message 'Weekly preset sample runner did not create metadata.auto.json.'
@@ -1052,6 +1058,11 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPresetSample.promptPath)) -Message 'Meeting-minutes preset sample runner did not create prompt.txt.'
   $meetingPresetPrompt = Get-Content -LiteralPath ([string]$meetingPresetSample.promptPath) -Raw -Encoding UTF8
   Assert-True -Condition ($meetingPresetPrompt -match '会议纪要 body') -Message 'Meeting-minutes preset sample prompt is missing the profile display name.'
+  $monthlyPresetSample = @($profilePresetSamples.generated | Where-Object { [string]$_.reportProfileName -eq 'monthly-report' })[0]
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$monthlyPresetSample.promptPath)) -Message 'Monthly preset sample runner did not create prompt.txt.'
+  $monthlyPresetRequirements = (Get-Content -LiteralPath ([string]$monthlyPresetSample.requirementsPath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (@($monthlyPresetRequirements.sections | Where-Object { [string]$_.name -eq '本月完成事项' }).Count -eq 1) -Message 'Monthly preset sample requirements are missing the expected completion section.'
+  Assert-True -Condition ([int]$monthlyPresetRequirements.paginationRiskThresholds.longSectionChars -eq 1600) -Message 'Monthly preset sample requirements did not preserve custom pagination-risk thresholds.'
   $results.Add('profile preset sample runner OK') | Out-Null
 
   $roadmapTriageOutputDir = Join-Path $tempRoot 'roadmap-triage'
@@ -1066,6 +1077,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'weekly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending weekly-report after promotion.'
   Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'meeting-minutes is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 0) -Message 'Roadmap triage should not keep recommending meeting-minutes after promotion.'
   Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'monthly-report is listed in the recommended expansion order but is not a built-in profile.' }).Count -eq 1) -Message 'Roadmap triage should advance to the next unbuilt profile candidate.'
+  Assert-True -Condition (@($roadmapTriage.candidates | Where-Object { [string]$_.roadmapItem -eq 'monthly-report is listed in the recommended expansion order but is not a built-in profile.' -and [string]$_.suggestedNextStep -match 'Run the preset through sample generation' }).Count -eq 1) -Message 'Roadmap triage should recognize the monthly-report preset and suggest sample-driven promotion.'
   $roadmapTriageWorkflow = Get-Content -LiteralPath (Join-Path $repoRoot '.github\workflows\roadmap-triage.yml') -Raw -Encoding UTF8
   Assert-True -Condition ($roadmapTriageWorkflow -match 'schedule:') -Message 'Roadmap triage workflow is missing a schedule trigger.'
   Assert-True -Condition ($roadmapTriageWorkflow -match 'workflow_dispatch:') -Message 'Roadmap triage workflow is missing a manual trigger.'
@@ -3521,6 +3533,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\README.md')) -Message 'Install script did not copy the profile preset README.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'

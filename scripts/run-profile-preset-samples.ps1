@@ -89,6 +89,20 @@ function Get-SampleValuesForProfile {
         requiredKeywords = @("milestone", "decision", "action-item")
       }
     }
+    "monthly-report" {
+      return [pscustomobject]@{
+        courseName = "campus-guide-miniapp"
+        experimentName = "2026-04-monthly-progress-report"
+        studentName = "sample-user"
+        studentId = "20261234"
+        className = "software-engineering-2302"
+        teacherName = "sample-reviewer"
+        experimentProperty = "project-monthly-report"
+        experimentDate = "2026-04"
+        experimentLocation = "GitHub + Feishu + local development"
+        requiredKeywords = @("monthly-progress", "delivery-metrics", "next-month-plan")
+      }
+    }
     default {
       $displayName = [string]$Profile.name
       return [pscustomobject]@{

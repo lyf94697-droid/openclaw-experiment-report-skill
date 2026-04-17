@@ -158,7 +158,7 @@ Good fit because they still benefit from:
 
 ### 5. Weekly And Monthly Reports
 
-Status: built-in `weekly-report` profile is in place; `monthly-report` remains future work.
+Status: built-in `weekly-report` profile is in place; a reusable `monthly-report` preset is in place, while built-in promotion remains future work.
 
 Good fit when the structure is profile-driven rather than free-form:
 
@@ -190,7 +190,7 @@ The expansion order should stay disciplined:
 7. `meeting-minutes`
 8. `monthly-report`
 
-The first seven are now built-in. The next adjacent candidate in this order is `monthly-report`.
+The first seven are now built-in. The next adjacent candidate in this order is promoting `monthly-report` from preset to built-in.
 
 ## Supporting Platform Work
 
@@ -229,12 +229,13 @@ Implemented baseline:
 - `profiles/meeting-minutes.json`
 - `examples/profile-presets/weekly-report.json`
 - `examples/profile-presets/meeting-minutes.json`
+- `examples/profile-presets/monthly-report.json`
 - `scripts/run-profile-preset-samples.ps1`
 - `scripts/analyze-roadmap-next-step.ps1`
 - `.github/workflows/roadmap-triage.yml`
 - schema-backed `paginationRiskThresholds` in report profiles and preset examples
 
-`weekly-report` and `meeting-minutes` have crossed the threshold into `profiles/`, while the preset copies remain as reusable example snapshots and sample-runner inputs. The next adjacent candidate is `monthly-report`, which still needs either a reusable preset or a direct built-in proposal.
+`weekly-report` and `meeting-minutes` have crossed the threshold into `profiles/`, while the preset copies remain as reusable example snapshots and sample-runner inputs. `monthly-report` now has a reusable preset and sample-runner path, so the next adjacent candidate is promoting it into `profiles/` once that shape proves out.
 
 ## Non-Goals For Now
 

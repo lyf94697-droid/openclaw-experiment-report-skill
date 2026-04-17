@@ -242,7 +242,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 新增 report profile 时，可以先用 `scripts/new-report-profile.ps1` 生成 schema-valid 草稿，再按具体文档类型调整标题、alias、图注和 prompt 文案
 - 如果某类文档天然章节更长或图片更多，可以在 profile 里调高 `paginationRiskThresholds`，避免把正常结构误报成分页风险；反过来也可以调低，用于更早捕捉 WPS/Word 模板风险
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
-- 如果你想沿用 path-based 方式试跑或继续做 profile 分叉，可以先看 `examples/profile-presets/`：目前保留 `weekly-report.json` 和 `meeting-minutes.json` 两份示例快照，适合先验证“这条 pipeline 能不能复用”
+- 如果你想沿用 path-based 方式试跑或继续做 profile 分叉，可以先看 `examples/profile-presets/`：目前保留 `weekly-report.json`、`meeting-minutes.json` 和 `monthly-report.json` 三份示例快照，适合先验证“这条 pipeline 能不能复用”
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
@@ -270,6 +270,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
   -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
   -DetailLevel full `
   -OutputDir ".\tests-output\weekly-report-sample"
+```
+
+如果你想先试跑还没提升为 built-in 的 `monthly-report` preset：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
+  -ReportProfilePath ".\examples\profile-presets\monthly-report.json" `
+  -CourseName "校园导览小程序" `
+  -ExperimentName "2026 年 4 月项目月报" `
+  -StudentName "李四" `
+  -StudentId "20261234" `
+  -ClassName "软工 2302" `
+  -TeacherName "王老师" `
+  -ExperimentProperty "项目月报" `
+  -ExperimentDate "2026-04" `
+  -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
+  -DetailLevel full `
+  -OutputDir ".\tests-output\monthly-report-sample"
 ```
 
 如果你想同时生成全部示例 preset 的样例输入包：
