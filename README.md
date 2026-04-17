@@ -179,7 +179,87 @@ openclaw skills list
 
 其中 `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 在需要自动生成正文时默认使用 `-DetailLevel full`，也就是默认要求输出更完整、不是提纲式的正文。
 
-### 3. 一条常见用法
+### 3. 现在最值得直接用的 5 个场景
+
+| 你手上有什么 | 建议入口 | 主要产物 |
+| --- | --- | --- |
+| 教程链接、实验题目、学校模板、截图 | `build-report-from-url.ps1` | 生成正文、填模板、插图、最终 `docx` |
+| 已经写好的正文、metadata、requirements、模板 | `build-report.ps1` | 确定性本地构建，不重新生成正文 |
+| 一份新学校模板，不确定能不能自动填 | `check-report-profile-template-fit.ps1` | 模板适配诊断、缺字段/缺章节提示 |
+| 很多截图，不确定应该放到哪一节 | `generate-docx-image-map.ps1 -PlanOnly` | 图片落位预案和图注建议 |
+| 周报、月报、会议纪要、部署报告这类结构化文档 | `generate-report-inputs.ps1` 或对应 wrapper + `-ReportProfileName` | profile 化 prompt、metadata、requirements 和可 replay 输入包 |
+
+如果你只有教程链接和模板，直接从 URL 走到成品：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
+  -ReportProfileName "experiment-report" `
+  -ReferenceUrls "https://example.com/tutorial" `
+  -CourseName "计算机网络" `
+  -ExperimentName "局域网搭建实验" `
+  -TemplatePath "E:\reports\template.docx" `
+  -StudentName "张三" `
+  -StudentId "20260001" `
+  -ClassName "计科 2201" `
+  -OutputDir "E:\reports\final-output"
+```
+
+如果你已经有正文，只想把它套进模板并做排版：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
+  -TemplatePath "E:\reports\template.docx" `
+  -ReportPath "E:\reports\body.txt" `
+  -MetadataPath "E:\reports\metadata.json" `
+  -RequirementsPath "E:\reports\requirements.json" `
+  -OutputDir "E:\reports\final-output" `
+  -StyleFinalDocx `
+  -StyleProfile auto
+```
+
+如果你拿到一个新模板，先检查能不能自动填：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-report-profile-template-fit.ps1 `
+  -TemplatePath "E:\reports\template.docx" `
+  -ReportPath "E:\reports\body.txt" `
+  -MetadataPath "E:\reports\metadata.json" `
+  -ReportProfileName "experiment-report" `
+  -Format markdown `
+  -OutFile "E:\reports\template-fit.md"
+```
+
+如果你只想先看截图会怎么分配，不立刻生成 `docx`：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-docx-image-map.ps1 `
+  -ReportPath "E:\reports\body.txt" `
+  -ImagePaths "E:\reports\step-1.png","E:\reports\result-1.png" `
+  -ReportProfileName "experiment-report" `
+  -PlanOnly `
+  -Format markdown `
+  -OutFile "E:\reports\image-plan.md"
+```
+
+如果你要做月报、周报或会议纪要，先生成可检查的输入包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-report-inputs.ps1 `
+  -ReportProfileName "monthly-report" `
+  -CourseName "校园导览小程序" `
+  -ExperimentName "2026 年 4 月项目月报" `
+  -StudentName "李四" `
+  -StudentId "20261234" `
+  -ClassName "软工 2302" `
+  -TeacherName "王老师" `
+  -ExperimentDate "2026-04" `
+  -ExperimentLocation "GitHub + 飞书 + 本地开发环境" `
+  -OutputDir ".\tests-output\monthly-report-inputs"
+```
+
+这些命令的共同点是：先把正文、metadata、requirements、图片计划、validation、layout check 和最终 `docx` 尽量写成可复查的文件，而不是只给一段不可追踪的聊天输出。
+
+### 4. 一条常见用法
 
 如果你想走聊天友好的本地封装入口，可以直接用：
 
@@ -316,7 +396,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 
 这条命令会直接复用示例目录里的 prompt、metadata、requirements 和参考文本；如果后面你想把 replay 切回 live generation，只需要去掉 `-PreGeneratedReportPath`。
 
-### 4. 飞书或直聊场景补充
+### 5. 飞书或直聊场景补充
 
 如果你走 Feishu 或其他直接聊天场景，有几条经验是稳定有效的：
 
@@ -329,7 +409,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 - 对于未标注章节的多张截图，脚本会按上传顺序优先把前半归入实验步骤、后半归入实验结果，再对同章节连续图片应用 2 列布局
 - 如果聊天运行时根本没有暴露真实附件路径，就应该明确说不能直接插图，而不是假装已经写进 `docx`
 
-### 5. 本地验证
+### 6. 本地验证
 
 在提交修改或排查问题前，建议先跑一遍烟测：
 

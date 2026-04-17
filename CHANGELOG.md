@@ -35,6 +35,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 
 - Expanded `README.md` with a quick-start build flow, demo links, and contributor-oriented repository structure notes.
 - Expanded `README.md` with repository health notes and a future profile-driven document roadmap.
+- Expanded `README.md` with a practical five-scenario usage guide that maps common inputs to the right local script and output artifacts.
 - Clarified the GitHub-facing documentation for the expansion from experiment reports into course-design and internship report profiles.
 - Documented validation/risk output files, summary fields, and machine-readable structural/pagination risk codes.
 - Expanded smoke tests to cover the new local build entry point and required repository files.
