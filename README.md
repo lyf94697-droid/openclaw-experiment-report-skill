@@ -404,6 +404,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\export-report-template-exampl
 
 默认会输出到 `examples/report-templates/`；如果你想导到别的目录，可以额外传 `-OutputDir`。
 
+如果你想看更接近真实高校报告的合成样本，而不是只有空白模板，可以生成真实感 fixture 包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\export-realistic-report-fixtures.ps1 -Overwrite
+```
+
+默认会输出到 `examples/realistic-report-fixtures/`。这批文件是匿名合成的，不包含真实学生信息或原始学校模板，覆盖单表格填满实验报告、多表综合实验报告和完整课程设计报告三种结构，适合用来回归测试表格框架、摘要关键词、评分表、图表标题和截图密集正文。
+
 例如，直接回放仓库内置的月报 prepared-summary 示例：
 
 ```powershell

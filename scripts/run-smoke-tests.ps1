@@ -4729,6 +4729,40 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignTemplateOutline -match '四、方案设计与实现') -Message 'Checked-in course-design template example should contain the implementation heading.'
   $results.Add('report template examples OK') | Out-Null
 
+  $realisticFixtureDir = Join-Path $repoRoot 'examples\realistic-report-fixtures'
+  $realisticFixtureReadmePath = Join-Path $realisticFixtureDir 'README.md'
+  $realisticFixtureSummaryPath = Join-Path $realisticFixtureDir 'realistic-report-fixtures-summary.json'
+  $realisticFixtureFiles = @(
+    'single-table-experiment-filled.docx',
+    'integrated-experiment-multi-table.docx',
+    'course-design-full-example.docx'
+  )
+  foreach ($fixturePath in @($realisticFixtureReadmePath, $realisticFixtureSummaryPath) + @($realisticFixtureFiles | ForEach-Object { Join-Path $realisticFixtureDir $_ })) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Realistic report fixture is missing: {0}" -f $fixturePath)
+  }
+  $realisticFixtureOutputDir = Join-Path $tempRoot 'realistic-report-fixtures-regenerated'
+  $realisticFixtureGeneration = & (Join-Path $repoRoot 'scripts\export-realistic-report-fixtures.ps1') -OutputDir $realisticFixtureOutputDir -Overwrite
+  Assert-True -Condition ([int]$realisticFixtureGeneration.generatedCount -eq 3) -Message 'Realistic fixture exporter should generate the three synthetic real-world report fixtures.'
+  foreach ($fixtureFile in $realisticFixtureFiles) {
+    $checkedInFixturePath = Join-Path $realisticFixtureDir $fixtureFile
+    $generatedFixturePath = Join-Path $realisticFixtureOutputDir $fixtureFile
+    Assert-True -Condition (Test-Path -LiteralPath $generatedFixturePath -PathType Leaf) -Message ("Realistic fixture exporter did not generate: {0}" -f $fixtureFile)
+    $checkedInFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $checkedInFixturePath -Format markdown | Out-String
+    $generatedFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $generatedFixturePath -Format markdown | Out-String
+    Assert-True -Condition ((Normalize-OutlineForComparison -Text $checkedInFixtureOutline) -eq (Normalize-OutlineForComparison -Text $generatedFixtureOutline)) -Message ("Checked-in realistic fixture drifted from regenerated output: {0}" -f $fixtureFile)
+  }
+  $singleTableFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $realisticFixtureDir 'single-table-experiment-filled.docx') -Format markdown | Out-String
+  Assert-True -Condition ($singleTableFixtureOutline -match 'Table count: 1') -Message 'Single-table realistic fixture should keep the framed one-table report shape.'
+  Assert-True -Condition ($singleTableFixtureOutline -match '一、实验目的') -Message 'Single-table realistic fixture should include filled report sections inside the body cell.'
+  $integratedFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $realisticFixtureDir 'integrated-experiment-multi-table.docx') -Format markdown | Out-String
+  Assert-True -Condition ($integratedFixtureOutline -match 'Table count: 4') -Message 'Integrated experiment fixture should contain the multi-table report shape.'
+  Assert-True -Condition ($integratedFixtureOutline -match '二．实验报告') -Message 'Integrated experiment fixture should include the report-body block.'
+  $courseDesignFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $realisticFixtureDir 'course-design-full-example.docx') -Format markdown | Out-String
+  Assert-True -Condition ($courseDesignFixtureOutline -match '摘要：') -Message 'Course-design fixture should include an abstract block.'
+  Assert-True -Condition ($courseDesignFixtureOutline -match '关键词：') -Message 'Course-design fixture should include keywords.'
+  Assert-True -Condition ($courseDesignFixtureOutline -match '表3-1') -Message 'Course-design fixture should include realistic table captions.'
+  $results.Add('realistic report fixtures OK') | Out-Null
+
   $referenceImportOutputDir = Join-Path $tempRoot 'real-template-reference-import'
   $referenceImportSummary = & (Join-Path $repoRoot 'scripts\import-report-template-references.ps1') `
     -Path (Join-Path $templateExamplesDir 'experiment-report-template.docx') `
@@ -4768,6 +4802,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-image-map.ps1')) -Message 'Install script did not copy image-map generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-report-inputs.ps1')) -Message 'Install script did not copy report-input generation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\export-report-template-examples.ps1')) -Message 'Install script did not copy the template-example exporter script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\export-realistic-report-fixtures.ps1')) -Message 'Install script did not copy the realistic fixture exporter script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\import-report-template-references.ps1')) -Message 'Install script did not copy the real-template reference importer script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\new-report-profile.ps1')) -Message 'Install script did not copy profile scaffold generator script.'
@@ -4798,6 +4833,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\experiment-report-template.docx')) -Message 'Install script did not copy the experiment template example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\course-design-report-template.docx')) -Message 'Install script did not copy the course-design template example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\weekly-report-template.docx')) -Message 'Install script did not copy the weekly template example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\realistic-report-fixtures\single-table-experiment-filled.docx')) -Message 'Install script did not copy the single-table realistic fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\realistic-report-fixtures\course-design-full-example.docx')) -Message 'Install script did not copy the course-design realistic fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'docs\real-template-patterns.md')) -Message 'Install script did not copy the real-template pattern documentation.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the deployment prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report.replay.txt')) -Message 'Install script did not copy the deployment replay report fixture.'

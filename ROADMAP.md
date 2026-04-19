@@ -246,12 +246,14 @@ Implemented baseline:
 - `scripts/export-report-template-examples.ps1` plus `examples/report-templates/` as a checked-in template pack generated from the built-in profiles
 - `scripts/import-report-template-references.ps1` for local-only importing, conversion, and outline extraction of real school templates without committing private or copyrighted references
 - `docs/real-template-patterns.md` as an anonymized design note for observed real experiment-report and course-design template structures
+- `scripts/export-realistic-report-fixtures.ps1` plus `examples/realistic-report-fixtures/` as a synthetic, checked-in fixture pack for single-table experiment reports, multi-table integrated experiment reports, and full course-design reports
 - smoke coverage for replaying a checked-in deployment-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in software-test-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in weekly-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in monthly prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in meeting-minutes prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for regenerating the checked-in report-template example pack and comparing its extracted outlines against the committed `docx` files
+- smoke coverage for regenerating the synthetic realistic-report fixture pack and comparing extracted outlines against the committed `docx` files
 
 `weekly-report`, `meeting-minutes`, and `monthly-report` have crossed the threshold into `profiles/`, while the preset copies remain as reusable example snapshots and sample-runner inputs.
 

@@ -1,0 +1,24 @@
+﻿{
+  "generatedCount": 3,
+  "outputDir": "E:\\游戏\\openclaw-experiment-report-skill\\examples\\realistic-report-fixtures",
+  "fixtures": [
+    {
+      "fileName": "single-table-experiment-filled.docx",
+      "pattern": "single-table framed experiment report",
+      "purpose": "Filled one-table lab report with metadata, body sections, figures, and teacher-comment row.",
+      "outputPath": "E:\\游戏\\openclaw-experiment-report-skill\\examples\\realistic-report-fixtures\\single-table-experiment-filled.docx"
+    },
+    {
+      "fileName": "integrated-experiment-multi-table.docx",
+      "pattern": "multi-table integrated experiment report",
+      "purpose": "Cover plus four report tables for design plan, method/data/reference, results, analysis, summary, and score.",
+      "outputPath": "E:\\游戏\\openclaw-experiment-report-skill\\examples\\realistic-report-fixtures\\integrated-experiment-multi-table.docx"
+    },
+    {
+      "fileName": "course-design-full-example.docx",
+      "pattern": "full course-design report example",
+      "purpose": "Cover, grading table, abstract, keywords, module tables, database tables, diagrams, tests, and references.",
+      "outputPath": "E:\\游戏\\openclaw-experiment-report-skill\\examples\\realistic-report-fixtures\\course-design-full-example.docx"
+    }
+  ]
+}

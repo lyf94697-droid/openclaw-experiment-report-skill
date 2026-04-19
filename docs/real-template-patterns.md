@@ -4,6 +4,8 @@ This note summarizes anonymized structure patterns observed from local universit
 
 Use this document as design guidance for profiles, field maps, image placement, and future template fixtures.
 
+Synthetic checked-in fixtures live in `examples/realistic-report-fixtures/` and can be regenerated with `scripts/export-realistic-report-fixtures.ps1`. They are derived from these patterns but use anonymized, made-up content.
+
 ## Local Import Workflow
 
 Run the importer against local references when adapting a new school template:
@@ -157,7 +159,7 @@ Implementation implication:
 Most useful next upgrades:
 
 - add explicit composite-body rules for the single-table experiment-report frame
-- add multi-table integrated-experiment fixtures with anonymized synthetic content
+- expand the synthetic multi-table integrated-experiment fixtures with more edge cases such as multiple student rows, score rubrics, and longer teacher-comment blocks
 - expand `course-design-report` with abstract, keywords, grading table, figure/table caption rules, and deeper numbered subsections
 - add template-fit diagnostics for cover-only fields, grading tables, and large body cells
 - keep real user references local, then commit only anonymized structure summaries and synthetic fixtures

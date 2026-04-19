@@ -38,6 +38,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added `scripts/export-report-template-examples.ps1` and `examples/report-templates/` so the repository now ships a checked-in template pack for all built-in report profiles.
 - Added `scripts/import-report-template-references.ps1` for local-only importing, WPS/Word conversion, and outline extraction of real report templates and examples.
 - Added `docs/real-template-patterns.md` with anonymized real-world experiment-report and course-design template patterns for future profile and fixture upgrades.
+- Added `scripts/export-realistic-report-fixtures.ps1` and `examples/realistic-report-fixtures/` with synthetic real-world-style `docx` fixtures for filled single-table experiment reports, integrated experiment reports, and full course-design reports.
 
 ### Changed
 
@@ -68,6 +69,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Expanded smoke coverage so a checked-in `meeting-minutes` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 - Expanded smoke coverage so the checked-in report-template example pack is regenerated and compared against the committed `docx` outlines.
 - Documented a local workflow for analyzing real school templates without committing private or copyrighted source files.
+- Expanded smoke coverage so the checked-in realistic report fixture pack is regenerated and compared against extracted `docx` outlines.
 
 ### Fixed
 
