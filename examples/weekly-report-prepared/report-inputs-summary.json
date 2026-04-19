@@ -1,0 +1,25 @@
+{
+  "outputDir": ".",
+  "reportProfileName": "weekly-report",
+  "reportProfilePath": "../../profiles/weekly-report.json",
+  "reportProfileDisplayName": "周报",
+  "courseName": "OpenClaw 实验报告技能仓库",
+  "experimentName": "2026 年 4 月第 3 周维护周报",
+  "requestedCourseName": "OpenClaw 实验报告技能仓库",
+  "requestedExperimentName": "2026 年 4 月第 3 周维护周报",
+  "inferredExperimentName": "",
+  "defaultsPath": "defaults.snapshot.json",
+  "usedStoredCourseName": false,
+  "usedStoredExperimentName": false,
+  "usedInferredExperimentName": false,
+  "detailLevel": "full",
+  "promptPath": "prompt.txt",
+  "metadataPath": "metadata.auto.json",
+  "requirementsPath": "requirements.auto.json",
+  "requestedReferenceUrls": [],
+  "referenceUrls": [],
+  "referenceTextPaths": [
+    "references/project-context.txt"
+  ],
+  "fetchedReferenceTextPaths": []
+}

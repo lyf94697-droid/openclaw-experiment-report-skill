@@ -1,0 +1,48 @@
+项目周报
+
+项目名称：OpenClaw 实验报告技能仓库
+周报主题：2026 年 4 月第 3 周维护周报
+提交人：仓库维护者
+工号/学号：maintainer-202604
+小组/班级：自动化维护组
+审核人：GitHub Reviewer
+报告类型：项目周报
+周次：2026-W16
+工作环境：GitHub + PowerShell + 本地开发环境
+
+一、工作目标
+本周的核心目标，是继续把仓库的“profile 已存在”推进成“仓库内有可直接回放的 prepared fixture”，从而缩小真实回归能力与文档说明之间的差距。具体到本周，团队要求下一项升级必须满足四个条件：第一，能够直接提交到仓库并长期保留；第二，能被 `scripts/run-smoke-tests.ps1` 覆盖；第三，能通过 `build-report-from-url.ps1` 的 replay 模式复用；第四，不引入新的旁路脚本，而是尽量沿用现有 monthly 与 meeting 的 prepared-summary 流程。
+
+围绕这个目标，本周没有扩展新的 profile，也没有追加更重的 UI 或模板分析功能，而是集中做一件更扎实的小事：补齐 `weekly-report` 的 checked-in prepared replay bundle。这样做的意义在于，周报是典型的执行型文档，结构上既不像月报那样偏阶段汇总，也不像会议纪要那样偏决议和争议，正适合用来验证 prepared replay 是否真的能跨不同项目文档家族保持稳定。
+
+二、协作环境
+本周的工作环境仍然是 GitHub、PowerShell、本地 Windows 开发机和 OpenClaw 现有脚本流水线的组合。代码修改、README 与 ROADMAP 维护、提交历史跟踪以及分支推送都在 GitHub 上完成；脚本执行和 smoke 回归继续通过 PowerShell 统一入口触发；而 profile 解析、prepared-summary 路径解析、validation 汇总、wrapper summary 与 pipeline trace 的产物，则全部沿用仓库现有脚本链路生成。
+
+协作方式上，本周仍然坚持“先把可验证产物沉淀下来，再谈更抽象的扩展”的原则。也就是说，凡是声称增加了周报 replay 能力的改动，都必须体现为仓库内真实存在的 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、`defaults.snapshot.json`、参考文本和 `report.replay.txt`，并且要能在 smoke 中被重新解析和回放。这样的协作环境虽然节奏偏保守，但能明显降低后续接手时的不确定性。
+
+三、本周任务与输入
+本周任务主要来自三类输入。第一类输入是 ROADMAP 中仍未完全关闭的 “more realistic end-to-end fixtures” 项，它已经通过月报和会议纪要证明了价值，本周最自然的延伸就是周报。第二类输入来自仓库当前的 built-in profile 基线，即 `weekly-report` 已经在 `profiles/weekly-report.json` 中具备元数据标签、章节要求、默认样式、默认图注和分页阈值，因此不存在再造一套文档结构的必要，只需要让 prepared replay 这条链路接上。
+
+第三类输入来自现有 smoke 结构。团队回看 `scripts/run-smoke-tests.ps1` 后发现，monthly 与 meeting 都已经拥有 checked-in prepared fixture 和对应 replay 断言，而 weekly 还停留在 loader、generated inputs、draft validation 与 install packaging 这几个层面。基于这个判断，本周任务被拆成四项：新增 `examples/weekly-report-prepared/` 目录；补一个最小 `New-WeeklyReportTemplateDocx` 模板夹具；在 smoke 里验证 resolved paths、generation mode、image input mode 和 pipeline trace；同步更新 README、CHANGELOG 与 ROADMAP，让使用者能在仓库说明里看到这套样例。
+
+四、本周完成事项
+本周首先完成的是 weekly prepared replay bundle 的骨架固化工作。团队基于 `generate-report-inputs.ps1` 生成了一份周报 seed，然后把绝对路径版本整理成仓库可提交的相对路径版本，最终在 `examples/weekly-report-prepared/` 下提交了 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、`defaults.snapshot.json`、`references/project-context.txt` 和 `report.replay.txt`。这样一来，周报和月报、会议纪要一样，也具备了 checked-in prepared-summary 的最小可复用形态。
+
+第二项完成事项是补齐 weekly 专用的模板夹具与 smoke 回放路径。本周在 `scripts/run-smoke-tests.ps1` 中新增了 `New-WeeklyReportTemplateDocx`，使周报 prepared bundle 可以在不依赖真实外部模板的前提下完成从 replay 输入到最终 docx 的整条链路回放。对应 smoke 还会检查 `reportProfileName`、`reportProfileDisplayName`、resolved `promptPath` / `metadataPath` / `requirementsPath` / `defaultsPath` / `referenceTextPaths`、`generationMode=replay`、`buildImageInputMode=none`、`validationPassed`、pipeline trace 和清洗后的正文标题命中情况，保证这条能力不是“存在文件”而是真正能被回归验证。
+
+第三项完成事项是把安装覆盖和仓库说明同步跟上。安装 smoke 现在会继续确认 `examples/weekly-report-prepared/` 里的 summary 和 replay report 能被 `install-skill.ps1` 一并复制到目标目录。与此同时，README 中补充了“仓库现在附带三份可直接 replay 的 prepared-summary 输入包”的说明，并增加了 weekly replay 的命令示例；CHANGELOG 和 ROADMAP 也同步记下 weekly fixture 与 smoke 覆盖，确保这次升级不只停留在测试脚本里，而是进入仓库的对外说明基线。
+
+五、阶段成果
+从阶段结果看，本周最直接的成果，是周报这一类执行型文档现在也具备了 repo-level prepared replay 基线。仓库内已经可以同时找到 `weekly-report`、`meeting-minutes` 和 `monthly-report` 三套相邻文档的 built-in profile、preset example 和 checked-in replay fixture，这使“项目文档家族扩张”不再只是 profile 数量增加，而是开始形成可以直接对照、直接回放的完整样例集。
+
+从可验证产物角度看，本周成果主要体现为三点。其一，`examples/weekly-report-prepared/` 让 prepared-summary 的相对路径解析再次覆盖到一个结构不同的文档族；其二，smoke 中新增的 weekly replay 断言把这条能力纳入常规回归，而不是仅靠手工试跑；其三，安装与文档说明同步更新后，后续维护者或使用者可以直接发现并复用这套周报样例，而不需要翻提交历史或临时输出目录找线索。
+
+六、风险与改进
+虽然 weekly prepared bundle 已经补上，但本周也暴露出一个仍需持续注意的问题：仓库目前在 prepared replay 方面已经覆盖了周报、会议纪要和月报三类项目型文档，可是更偏工程交付的 `software-test-report` 和 `deployment-report` 还没有对应的 checked-in replay fixture。考虑到这两类文档在分页风险、截图密度和 remediation 上已经有了 profile-specific 定制，它们其实是下一批很值得继续补的 realistic fixture 候选。
+
+另一个改进点是，当前 prepared bundle 仍然主要验证“输入路径是否稳定、回放链路是否贯通”，对真实 Word/WPS 模板敏感性、图片布局差异和 template-fit 诊断的覆盖还不算深。本周选择了更保守的最小升级路径，这是合理的，但后续如果要继续提高仓库的工程可信度，就需要在现有 fixture 的基础上逐步引入更接近真实交付环境的模板和截图输入，而不是一直停留在轻量模板夹具层面。
+
+七、下周计划
+下周的第一优先级，是继续沿着 “最小升级点 + smoke 覆盖” 的方式，把 prepared replay fixture 扩展到更工程化的文档类型，优先候选仍然是 `software-test-report` 和 `deployment-report`。这两类文档已经具备 profile-specific pagination remediation，如果再补上 checked-in replay bundle，就能把“结构不同”和“分页策略不同”同时纳入更真实的回归样例。
+
+第二优先级，是在不打断当前 profile-driven 主线的前提下，继续加强 prepared fixture 的可解释性。例如，可以考虑让 README 里的 replay 示例按照文档家族分类组织，或者在 ROADMAP 中更明确地区分“已有 prepared bundle 的 profile”和“还缺 repo-level replay fixture 的 profile”。这样做不会增加很多实现复杂度，但能让后续每次继续升级时，选择成本和理解成本都更低。

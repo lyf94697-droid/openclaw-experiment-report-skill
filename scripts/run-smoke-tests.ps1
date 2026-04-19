@@ -366,6 +366,103 @@ function New-MonthlyReportTemplateDocx {
   }
 }
 
+function New-WeeklyReportTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>项目周报</w:t></w:r></w:p>
+    <w:p><w:r><w:t>项目名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>周报主题：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>提交人</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>工号/学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>小组/班级</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>审核人</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>周次：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>工作环境：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>报告类型：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>一、工作目标</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>协作环境</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>二、本周任务与输入</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>三、本周完成事项</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>四、阶段成果</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>五、风险与改进</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>六、下周计划</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-MeetingMinutesTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -2494,6 +2591,10 @@ URL: https://example.com/network-lab
   New-MeetingMinutesTemplateDocx -Path $meetingMinutesTemplateDocx
   Assert-True -Condition (Test-Path -LiteralPath $meetingMinutesTemplateDocx) -Message 'Failed to create the meeting-minutes template fixture.'
 
+  $weeklyReportTemplateDocx = Join-Path $tempRoot 'weekly-report-template.docx'
+  New-WeeklyReportTemplateDocx -Path $weeklyReportTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $weeklyReportTemplateDocx) -Message 'Failed to create the weekly-report template fixture.'
+
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
 软件工程课程设计报告
@@ -3936,6 +4037,81 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($meetingPreparedCleanedReport -match '讨论过程与决议') -Message 'Meeting-minutes prepared-summary URL wrapper cleaned report is missing the expected discussion heading.'
   $results.Add('build-report-from-url meeting-minutes prepared summary OK') | Out-Null
 
+  $weeklyPreparedSummaryDir = Join-Path $repoRoot 'examples\weekly-report-prepared'
+  $weeklyPreparedSummaryPath = Join-Path $weeklyPreparedSummaryDir 'report-inputs-summary.json'
+  $weeklyPreparedPromptPath = Join-Path $weeklyPreparedSummaryDir 'prompt.txt'
+  $weeklyPreparedMetadataPath = Join-Path $weeklyPreparedSummaryDir 'metadata.auto.json'
+  $weeklyPreparedRequirementsPath = Join-Path $weeklyPreparedSummaryDir 'requirements.auto.json'
+  $weeklyPreparedDefaultsPath = Join-Path $weeklyPreparedSummaryDir 'defaults.snapshot.json'
+  $weeklyPreparedReferencePath = Join-Path $weeklyPreparedSummaryDir 'references\project-context.txt'
+  $weeklyPreparedReplayReportPath = Join-Path $weeklyPreparedSummaryDir 'report.replay.txt'
+  foreach ($fixturePath in @(
+      $weeklyPreparedSummaryPath,
+      $weeklyPreparedPromptPath,
+      $weeklyPreparedMetadataPath,
+      $weeklyPreparedRequirementsPath,
+      $weeklyPreparedDefaultsPath,
+      $weeklyPreparedReferencePath,
+      $weeklyPreparedReplayReportPath
+    )) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Weekly prepared-summary fixture is missing: {0}" -f $fixturePath)
+  }
+
+  $weeklyPreparedBuildOutputDir = Join-Path $tempRoot 'weekly-prepared-summary-url-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $weeklyReportTemplateDocx `
+    -PreparedInputsSummaryPath $weeklyPreparedSummaryPath `
+    -OutputDir $weeklyPreparedBuildOutputDir `
+    -StyleProfile auto `
+    -PreGeneratedReportPath $weeklyPreparedReplayReportPath `
+    -SkipSessionReset | Out-Null
+  $weeklyPreparedBuildSummaryPath = Join-Path $weeklyPreparedBuildOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $weeklyPreparedBuildSummaryPath) -Message 'Weekly prepared-summary URL wrapper did not create the wrapper summary.'
+  $weeklyPreparedBuildSummary = (Get-Content -LiteralPath $weeklyPreparedBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.reportProfileName -eq 'weekly-report') -Message 'Weekly prepared-summary URL wrapper should inherit the weekly-report profile.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.reportProfileDisplayName -eq '周报') -Message 'Weekly prepared-summary URL wrapper should inherit the weekly-report display name.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.reportProfilePath -eq (Join-Path $repoRoot 'profiles\weekly-report.json')) -Message 'Weekly prepared-summary URL wrapper should resolve the relative reportProfilePath.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.detailLevel -eq 'full') -Message 'Weekly prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.generationMode -eq 'replay') -Message 'Weekly prepared-summary URL wrapper should mark the report generation mode as replay.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.reportInputsSummaryPath -eq $weeklyPreparedSummaryPath) -Message 'Weekly prepared-summary URL wrapper should keep the original input summary path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.promptPath -eq $weeklyPreparedPromptPath) -Message 'Weekly prepared-summary URL wrapper should resolve the relative prompt path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.metadataPath -eq $weeklyPreparedMetadataPath) -Message 'Weekly prepared-summary URL wrapper should resolve the relative metadata path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.requirementsPath -eq $weeklyPreparedRequirementsPath) -Message 'Weekly prepared-summary URL wrapper should resolve the relative requirements path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.defaultsPath -eq $weeklyPreparedDefaultsPath) -Message 'Weekly prepared-summary URL wrapper should resolve the relative defaults path.'
+  Assert-True -Condition (@($weeklyPreparedBuildSummary.referenceTextPaths).Count -eq 1) -Message 'Weekly prepared-summary URL wrapper should keep one resolved reference text path.'
+  Assert-True -Condition ([string]@($weeklyPreparedBuildSummary.referenceTextPaths)[0] -eq $weeklyPreparedReferencePath) -Message 'Weekly prepared-summary URL wrapper should resolve the relative reference text path.'
+  Assert-True -Condition (@($weeklyPreparedBuildSummary.fetchedReferenceTextPaths).Count -eq 0) -Message 'Weekly prepared-summary URL wrapper should keep fetchedReferenceTextPaths empty for local fixtures.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.requestedCourseName -eq 'OpenClaw 实验报告技能仓库') -Message 'Weekly prepared-summary URL wrapper lost the requested project name.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.requestedExperimentName -eq '2026 年 4 月第 3 周维护周报') -Message 'Weekly prepared-summary URL wrapper lost the requested weekly title.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.preGeneratedReportPath -eq $weeklyPreparedReplayReportPath) -Message 'Weekly prepared-summary URL wrapper summary is missing the replay report path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.buildReportInputMode -eq 'path') -Message 'Weekly prepared-summary URL wrapper should expose buildReportInputMode=path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Weekly prepared-summary URL wrapper should expose buildMetadataInputMode=path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Weekly prepared-summary URL wrapper should expose buildRequirementsInputMode=path.'
+  Assert-True -Condition ([string]$weeklyPreparedBuildSummary.buildImageInputMode -eq 'none') -Message 'Weekly prepared-summary URL wrapper should expose buildImageInputMode=none.'
+  Assert-True -Condition ([bool]$weeklyPreparedBuildSummary.validationPassed) -Message 'Weekly prepared-summary URL wrapper should expose validationPassed=true.'
+  Assert-True -Condition ([int]$weeklyPreparedBuildSummary.validationWarningCount -eq 0) -Message 'Weekly prepared-summary URL wrapper should expose zero validation warnings.'
+  Assert-True -Condition ([int]$weeklyPreparedBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Weekly prepared-summary URL wrapper should expose zero pagination risks.'
+  Assert-True -Condition ([int]$weeklyPreparedBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Weekly prepared-summary URL wrapper should expose zero structural issues.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPreparedBuildSummary.pipelineTracePath)) -Message 'Weekly prepared-summary URL wrapper should create a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPreparedBuildSummary.pipelineTraceMarkdownPath)) -Message 'Weekly prepared-summary URL wrapper should create a pipeline-trace markdown file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPreparedBuildSummary.rawReportPath)) -Message 'Weekly prepared-summary URL wrapper did not write the raw report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPreparedBuildSummary.cleanedReportPath)) -Message 'Weekly prepared-summary URL wrapper did not write the cleaned report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$weeklyPreparedBuildSummary.finalDocxPath)) -Message 'Weekly prepared-summary URL wrapper final docx path does not exist.'
+  $weeklyPreparedTrace = (Get-Content -LiteralPath ([string]$weeklyPreparedBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$weeklyPreparedTrace.wrapper.generationMode -eq 'replay') -Message 'Weekly prepared-summary URL pipeline trace should keep generationMode=replay.'
+  Assert-True -Condition ([string]$weeklyPreparedTrace.artifacts.promptPath -eq $weeklyPreparedPromptPath) -Message 'Weekly prepared-summary URL pipeline trace should expose the resolved prompt path.'
+  Assert-True -Condition ([string]$weeklyPreparedTrace.build.reportInputMode -eq 'path') -Message 'Weekly prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
+  Assert-True -Condition ([string]$weeklyPreparedTrace.build.imageInputMode -eq 'none') -Message 'Weekly prepared-summary URL pipeline trace should keep build.imageInputMode=none.'
+  Assert-True -Condition ([bool]$weeklyPreparedTrace.build.validationPassed) -Message 'Weekly prepared-summary URL pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$weeklyPreparedTrace.build.validationPaginationRiskCount -eq 0) -Message 'Weekly prepared-summary URL pipeline trace should expose zero pagination risks.'
+  $weeklyPreparedTraceMarkdown = Get-Content -LiteralPath ([string]$weeklyPreparedBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($weeklyPreparedTraceMarkdown -match 'Generation mode: replay') -Message 'Weekly prepared-summary URL pipeline markdown should include the replay generation mode.'
+  Assert-True -Condition ($weeklyPreparedTraceMarkdown -match 'Image input mode: none') -Message 'Weekly prepared-summary URL pipeline markdown should include the build image input mode.'
+  Assert-True -Condition ($weeklyPreparedTraceMarkdown -match 'Validation passed: True') -Message 'Weekly prepared-summary URL pipeline markdown should include validation status.'
+  $weeklyPreparedCleanedReport = Get-Content -LiteralPath ([string]$weeklyPreparedBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($weeklyPreparedCleanedReport -match '阶段成果') -Message 'Weekly prepared-summary URL wrapper cleaned report is missing the expected results heading.'
+  $results.Add('build-report-from-url weekly prepared summary OK') | Out-Null
+
   $urlWarningOutputDir = Join-Path $tempRoot 'url-warning-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
     -TemplatePath $sampleDocx `
@@ -4189,6 +4365,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\weekly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the weekly prepared-summary fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\weekly-report-prepared\report.replay.txt')) -Message 'Install script did not copy the weekly replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the monthly prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report.replay.txt')) -Message 'Install script did not copy the monthly replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\meeting-minutes-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the meeting-minutes prepared-summary fixture.'
