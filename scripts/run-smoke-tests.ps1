@@ -366,6 +366,103 @@ function New-MonthlyReportTemplateDocx {
   }
 }
 
+function New-MeetingMinutesTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>会议纪要</w:t></w:r></w:p>
+    <w:p><w:r><w:t>项目名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>会议主题：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>记录人</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>工号/学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>参会小组</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>主持人</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>会议日期：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>纪要类型：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>会议地点：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>一、会议目标</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>二、参会信息与背景</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>三、议题与输入</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>四、讨论过程与决议</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>五、当前结论</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>六、风险与争议</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>七、后续安排</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-InternshipTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -2393,6 +2490,10 @@ URL: https://example.com/network-lab
   New-MonthlyReportTemplateDocx -Path $monthlyReportTemplateDocx
   Assert-True -Condition (Test-Path -LiteralPath $monthlyReportTemplateDocx) -Message 'Failed to create the monthly-report template fixture.'
 
+  $meetingMinutesTemplateDocx = Join-Path $tempRoot 'meeting-minutes-template.docx'
+  New-MeetingMinutesTemplateDocx -Path $meetingMinutesTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $meetingMinutesTemplateDocx) -Message 'Failed to create the meeting-minutes template fixture.'
+
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
 软件工程课程设计报告
@@ -3760,6 +3861,81 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($monthlyPreparedCleanedReport -match '阶段成果与数据') -Message 'Monthly prepared-summary URL wrapper cleaned report is missing the expected results heading.'
   $results.Add('build-report-from-url monthly prepared summary OK') | Out-Null
 
+  $meetingPreparedSummaryDir = Join-Path $repoRoot 'examples\meeting-minutes-prepared'
+  $meetingPreparedSummaryPath = Join-Path $meetingPreparedSummaryDir 'report-inputs-summary.json'
+  $meetingPreparedPromptPath = Join-Path $meetingPreparedSummaryDir 'prompt.txt'
+  $meetingPreparedMetadataPath = Join-Path $meetingPreparedSummaryDir 'metadata.auto.json'
+  $meetingPreparedRequirementsPath = Join-Path $meetingPreparedSummaryDir 'requirements.auto.json'
+  $meetingPreparedDefaultsPath = Join-Path $meetingPreparedSummaryDir 'defaults.snapshot.json'
+  $meetingPreparedReferencePath = Join-Path $meetingPreparedSummaryDir 'references\project-context.txt'
+  $meetingPreparedReplayReportPath = Join-Path $meetingPreparedSummaryDir 'report.replay.txt'
+  foreach ($fixturePath in @(
+      $meetingPreparedSummaryPath,
+      $meetingPreparedPromptPath,
+      $meetingPreparedMetadataPath,
+      $meetingPreparedRequirementsPath,
+      $meetingPreparedDefaultsPath,
+      $meetingPreparedReferencePath,
+      $meetingPreparedReplayReportPath
+    )) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Meeting-minutes prepared-summary fixture is missing: {0}" -f $fixturePath)
+  }
+
+  $meetingPreparedBuildOutputDir = Join-Path $tempRoot 'meeting-prepared-summary-url-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $meetingMinutesTemplateDocx `
+    -PreparedInputsSummaryPath $meetingPreparedSummaryPath `
+    -OutputDir $meetingPreparedBuildOutputDir `
+    -StyleProfile auto `
+    -PreGeneratedReportPath $meetingPreparedReplayReportPath `
+    -SkipSessionReset | Out-Null
+  $meetingPreparedBuildSummaryPath = Join-Path $meetingPreparedBuildOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $meetingPreparedBuildSummaryPath) -Message 'Meeting-minutes prepared-summary URL wrapper did not create the wrapper summary.'
+  $meetingPreparedBuildSummary = (Get-Content -LiteralPath $meetingPreparedBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.reportProfileName -eq 'meeting-minutes') -Message 'Meeting-minutes prepared-summary URL wrapper should inherit the meeting-minutes profile.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.reportProfileDisplayName -eq '会议纪要') -Message 'Meeting-minutes prepared-summary URL wrapper should inherit the meeting-minutes display name.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.reportProfilePath -eq (Join-Path $repoRoot 'profiles\meeting-minutes.json')) -Message 'Meeting-minutes prepared-summary URL wrapper should resolve the relative reportProfilePath.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.detailLevel -eq 'full') -Message 'Meeting-minutes prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.generationMode -eq 'replay') -Message 'Meeting-minutes prepared-summary URL wrapper should mark the report generation mode as replay.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.reportInputsSummaryPath -eq $meetingPreparedSummaryPath) -Message 'Meeting-minutes prepared-summary URL wrapper should keep the original input summary path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.promptPath -eq $meetingPreparedPromptPath) -Message 'Meeting-minutes prepared-summary URL wrapper should resolve the relative prompt path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.metadataPath -eq $meetingPreparedMetadataPath) -Message 'Meeting-minutes prepared-summary URL wrapper should resolve the relative metadata path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.requirementsPath -eq $meetingPreparedRequirementsPath) -Message 'Meeting-minutes prepared-summary URL wrapper should resolve the relative requirements path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.defaultsPath -eq $meetingPreparedDefaultsPath) -Message 'Meeting-minutes prepared-summary URL wrapper should resolve the relative defaults path.'
+  Assert-True -Condition (@($meetingPreparedBuildSummary.referenceTextPaths).Count -eq 1) -Message 'Meeting-minutes prepared-summary URL wrapper should keep one resolved reference text path.'
+  Assert-True -Condition ([string]@($meetingPreparedBuildSummary.referenceTextPaths)[0] -eq $meetingPreparedReferencePath) -Message 'Meeting-minutes prepared-summary URL wrapper should resolve the relative reference text path.'
+  Assert-True -Condition (@($meetingPreparedBuildSummary.fetchedReferenceTextPaths).Count -eq 0) -Message 'Meeting-minutes prepared-summary URL wrapper should keep fetchedReferenceTextPaths empty for local fixtures.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.requestedCourseName -eq 'OpenClaw 实验报告技能仓库') -Message 'Meeting-minutes prepared-summary URL wrapper lost the requested project name.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.requestedExperimentName -eq '2026 年 4 月路线评审会') -Message 'Meeting-minutes prepared-summary URL wrapper lost the requested meeting topic.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.preGeneratedReportPath -eq $meetingPreparedReplayReportPath) -Message 'Meeting-minutes prepared-summary URL wrapper summary is missing the replay report path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.buildReportInputMode -eq 'path') -Message 'Meeting-minutes prepared-summary URL wrapper should expose buildReportInputMode=path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Meeting-minutes prepared-summary URL wrapper should expose buildMetadataInputMode=path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Meeting-minutes prepared-summary URL wrapper should expose buildRequirementsInputMode=path.'
+  Assert-True -Condition ([string]$meetingPreparedBuildSummary.buildImageInputMode -eq 'none') -Message 'Meeting-minutes prepared-summary URL wrapper should expose buildImageInputMode=none.'
+  Assert-True -Condition ([bool]$meetingPreparedBuildSummary.validationPassed) -Message 'Meeting-minutes prepared-summary URL wrapper should expose validationPassed=true.'
+  Assert-True -Condition ([int]$meetingPreparedBuildSummary.validationWarningCount -eq 0) -Message 'Meeting-minutes prepared-summary URL wrapper should expose zero validation warnings.'
+  Assert-True -Condition ([int]$meetingPreparedBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Meeting-minutes prepared-summary URL wrapper should expose zero pagination risks.'
+  Assert-True -Condition ([int]$meetingPreparedBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Meeting-minutes prepared-summary URL wrapper should expose zero structural issues.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPreparedBuildSummary.pipelineTracePath)) -Message 'Meeting-minutes prepared-summary URL wrapper should create a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPreparedBuildSummary.pipelineTraceMarkdownPath)) -Message 'Meeting-minutes prepared-summary URL wrapper should create a pipeline-trace markdown file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPreparedBuildSummary.rawReportPath)) -Message 'Meeting-minutes prepared-summary URL wrapper did not write the raw report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPreparedBuildSummary.cleanedReportPath)) -Message 'Meeting-minutes prepared-summary URL wrapper did not write the cleaned report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$meetingPreparedBuildSummary.finalDocxPath)) -Message 'Meeting-minutes prepared-summary URL wrapper final docx path does not exist.'
+  $meetingPreparedTrace = (Get-Content -LiteralPath ([string]$meetingPreparedBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$meetingPreparedTrace.wrapper.generationMode -eq 'replay') -Message 'Meeting-minutes prepared-summary URL pipeline trace should keep generationMode=replay.'
+  Assert-True -Condition ([string]$meetingPreparedTrace.artifacts.promptPath -eq $meetingPreparedPromptPath) -Message 'Meeting-minutes prepared-summary URL pipeline trace should expose the resolved prompt path.'
+  Assert-True -Condition ([string]$meetingPreparedTrace.build.reportInputMode -eq 'path') -Message 'Meeting-minutes prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
+  Assert-True -Condition ([string]$meetingPreparedTrace.build.imageInputMode -eq 'none') -Message 'Meeting-minutes prepared-summary URL pipeline trace should keep build.imageInputMode=none.'
+  Assert-True -Condition ([bool]$meetingPreparedTrace.build.validationPassed) -Message 'Meeting-minutes prepared-summary URL pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$meetingPreparedTrace.build.validationPaginationRiskCount -eq 0) -Message 'Meeting-minutes prepared-summary URL pipeline trace should expose zero pagination risks.'
+  $meetingPreparedTraceMarkdown = Get-Content -LiteralPath ([string]$meetingPreparedBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($meetingPreparedTraceMarkdown -match 'Generation mode: replay') -Message 'Meeting-minutes prepared-summary URL pipeline markdown should include the replay generation mode.'
+  Assert-True -Condition ($meetingPreparedTraceMarkdown -match 'Image input mode: none') -Message 'Meeting-minutes prepared-summary URL pipeline markdown should include the build image input mode.'
+  Assert-True -Condition ($meetingPreparedTraceMarkdown -match 'Validation passed: True') -Message 'Meeting-minutes prepared-summary URL pipeline markdown should include validation status.'
+  $meetingPreparedCleanedReport = Get-Content -LiteralPath ([string]$meetingPreparedBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($meetingPreparedCleanedReport -match '讨论过程与决议') -Message 'Meeting-minutes prepared-summary URL wrapper cleaned report is missing the expected discussion heading.'
+  $results.Add('build-report-from-url meeting-minutes prepared summary OK') | Out-Null
+
   $urlWarningOutputDir = Join-Path $tempRoot 'url-warning-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
     -TemplatePath $sampleDocx `
@@ -4015,6 +4191,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the monthly prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report.replay.txt')) -Message 'Install script did not copy the monthly replay report fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\meeting-minutes-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the meeting-minutes prepared-summary fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\meeting-minutes-prepared\report.replay.txt')) -Message 'Install script did not copy the meeting-minutes replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'

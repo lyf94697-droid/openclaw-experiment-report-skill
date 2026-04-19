@@ -1,0 +1,59 @@
+{
+  "courseName": "OpenClaw 实验报告技能仓库",
+  "experimentName": "2026 年 4 月路线评审会",
+  "minChars": 1300,
+  "sections": [
+    {
+      "name": "会议目标",
+      "aliases": ["会议目标", "会议目的", "召开目标"],
+      "minChars": 60
+    },
+    {
+      "name": "参会信息与背景",
+      "aliases": ["参会信息与背景", "参会信息", "会议背景"],
+      "minChars": 90
+    },
+    {
+      "name": "议题与输入",
+      "aliases": ["议题与输入", "会议议题", "讨论输入"],
+      "minChars": 100
+    },
+    {
+      "name": "讨论过程与决议",
+      "aliases": ["讨论过程与决议", "讨论过程", "会议讨论记录"],
+      "minChars": 180
+    },
+    {
+      "name": "当前结论",
+      "aliases": ["当前结论", "已确认事项", "会议结论"],
+      "minChars": 130
+    },
+    {
+      "name": "风险与争议",
+      "aliases": ["风险与争议", "待确认问题", "分歧与风险"],
+      "minChars": 90
+    },
+    {
+      "name": "后续安排",
+      "aliases": ["后续安排", "行动计划", "待办事项"],
+      "minChars": 90
+    }
+  ],
+  "requiredKeywords": [
+    "OpenClaw 实验报告技能仓库",
+    "2026 年 4 月路线评审会"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "TBD",
+    "待补充",
+    "会后补充",
+    "另行通知"
+  ],
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 700,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 3
+  }
+}

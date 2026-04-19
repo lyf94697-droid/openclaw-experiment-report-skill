@@ -327,7 +327,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 新增或修改 report profile 后，运行 `scripts/validate-report-profiles.ps1`；profile 结构约束集中在 `profiles/report-profile.schema.json`
 - 如果你想沿用 path-based 方式试跑或继续做 profile 分叉，可以先看 `examples/profile-presets/`：目前保留 `weekly-report.json`、`meeting-minutes.json` 和 `monthly-report.json` 三份示例快照；对应的 built-in profile 也都已经在 `profiles/` 下可直接使用，这些快照更适合验证“这条 pipeline 能不能复用”或继续做定制分叉
 - 如果你把 `report-inputs-summary.json` 连同 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、参考文本一起提交到仓库，`build-report-from-url.ps1` / `build-report-from-feishu.ps1` 现在会把 summary 里的相对路径按 summary 文件所在目录解析；checked-in prepared-summary bundle 不再要求保留原来的临时生成目录
-- 仓库里现在附带了一份可直接 replay 的月报输入包：`examples/monthly-report-prepared/`；它包含 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、本地参考文本和一份 `report.replay.txt`
+- 仓库里现在附带了两份可直接 replay 的 prepared-summary 输入包：月报示例 `examples/monthly-report-prepared/` 和会议纪要示例 `examples/meeting-minutes-prepared/`；它们都包含 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、本地参考文本和一份 `report.replay.txt`
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
@@ -396,6 +396,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 ```
 
 这条命令会直接复用示例目录里的 prompt、metadata、requirements 和参考文本；如果后面你想把 replay 切回 live generation，只需要去掉 `-PreGeneratedReportPath`。
+
+如果你要验证会议纪要这一类结构明显不同的文档，也可以直接回放仓库内置的会议纪要 prepared-summary 示例：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
+  -TemplatePath ".\your-meeting-template.docx" `
+  -PreparedInputsSummaryPath ".\examples\meeting-minutes-prepared\report-inputs-summary.json" `
+  -PreGeneratedReportPath ".\examples\meeting-minutes-prepared\report.replay.txt" `
+  -OutputDir ".\tests-output\meeting-minutes-replay" `
+  -StyleProfile auto
+```
+
+这条命令会直接复用会议纪要样例里的 prompt、metadata、requirements、defaults 和本地参考文本，适合检查 prepared-summary replay 是否已经覆盖到月报之外的文档家族。
 
 ### 5. 飞书或直聊场景补充
 

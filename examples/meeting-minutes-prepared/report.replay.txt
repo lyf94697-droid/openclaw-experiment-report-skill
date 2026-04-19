@@ -1,0 +1,48 @@
+会议纪要
+
+项目名称：OpenClaw 实验报告技能仓库
+会议主题：2026 年 4 月路线评审会
+记录人：仓库维护者
+工号/学号：maintainer-202604
+参会小组：自动化维护组
+主持人：GitHub Reviewer
+纪要类型：路线评审会议纪要
+会议日期：2026-04-19
+会议地点：GitHub PR + 飞书会议
+
+一、会议目标
+本次会议目标是对 OpenClaw 实验报告技能仓库最近一轮升级结果做一次收口式路线评审，确认哪些能力已经真正进入可复用、可验证、可交付的主流水线，哪些事项虽然方向明确，但仍缺少足够扎实的回放夹具和 smoke 证据。会议要求所有讨论都围绕仓库当前代码、脚本、README、ROADMAP 和现有 PR 事实展开，而不是只列抽象想法。
+
+会议同时希望把“下一步升级”限制在最小且有实际收益的范围内。也就是说，本次决议必须优先选择那种能够在本仓库直接提交样例、能被 run-smoke-tests.ps1 覆盖、能在 install 之后继续复用，并且不会把维护成本突然抬高的改动。这个约束的目的，是让仓库继续沿着 profile-driven 的路线稳定扩展，而不是因为一时兴起引入太多难以回归的分支逻辑。
+
+二、参会信息与背景
+参会成员主要包括负责仓库脚本与 smoke 流程的维护者、负责 PR 审阅和交付验收的 GitHub Reviewer，以及围绕 roadmap triage 与 replay fixture 设计提供输入的自动化维护组成员。会前已经共享当前分支上的 built-in profile 结果、monthly-report prepared bundle、meeting-minutes profile 配置、install packaging 行为和 smoke 结果，保证参会人对当前基线有一致理解。
+
+会议背景是仓库已经从单一实验报告生成能力，扩展到 experiment-report、course-design-report、internship-report、software-test-report、deployment-report、weekly-report、meeting-minutes、monthly-report 八类 profile，并打通 validation、pagination risk、wrapper summary 和 pipeline trace 这些工程化产物。但从回放覆盖角度看，仓库内目前只有月报 prepared bundle，会议纪要虽然已经有 built-in profile 和 validation smoke，却还没有 checked-in replay fixture，这意味着真实 end-to-end 回归仍然偏向少数文档家族。
+
+三、议题与输入
+本次会议的议题主要来自三类输入。第一类输入是 ROADMAP 中尚未完成的最小升级项，尤其是“more realistic end-to-end fixtures”和“more profile-specific pagination presets”这两项，它们都具备继续推进的价值，但前者更容易直接沉淀为仓库内样例和 smoke 断言。第二类输入来自近期已经完成的月报 prepared bundle 经验，包括相对路径解析、defaults 快照、referenceTextPaths 可移植性以及 replay generationMode 的实际效果，这些经验可以直接迁移到会议纪要文档族。
+
+第三类输入来自已有代码与 smoke 的空白处。大家会前检查了 `profiles/meeting-minutes.json`、`scripts/build-report-from-url.ps1`、`scripts/report-profiles.ps1`、`scripts/run-smoke-tests.ps1` 和 `examples/monthly-report-prepared/`，确认 meeting-minutes 已具备元数据、章节约束、分页阈值和 validation 路径，但缺少一套可直接提交到仓库、并能被安装和回放链路反复使用的 prepared fixture。因此，本次会议不再讨论是否要支持会议纪要，而是集中讨论如何用最小改动把它补齐到与月报近似的工程成熟度。
+
+四、讨论过程与决议
+会议首先回顾了上一轮月报 prepared bundle 的价值。大家一致认为，月报样例带来的最大收益不是多一个示例目录，而是证明了 `report-inputs-summary.json` 里的相对路径、`PreGeneratedReportPath` 的 replay 模式、`pipeline-trace.json` 的关键字段，以及 install 打包后的路径可用性，都可以在 checked-in fixture 上稳定成立。这种“回放证据先落地”的做法，比继续口头讨论下一类文档要更有效。
+
+随后讨论转到 meeting-minutes 文档族。参会人认为会议纪要与月报在结构、元数据标签、章节密度和截图使用方式上都明显不同，正适合用来检验 prepared-summary replay 机制是否真正具备跨文档家族的复用性。与会者特别指出，meeting-minutes 的 `risk` 和 `follow-up` 部分往往更强调结论、争议和行动项，如果 smoke 仍然只能覆盖月报，就很难说明这条回放链路对结构不同的文档也足够稳健。
+
+在具体方案上，会议最终决定选择一条最小实现路径：新增 `examples/meeting-minutes-prepared/`，提交 prompt、metadata、requirements、defaults、reference text 和 replay report；在 smoke 中增加一个最小 `meeting-minutes` 模板 docx helper，让 `build-report-from-url.ps1` 通过 `PreparedInputsSummaryPath` 和 `PreGeneratedReportPath` 完成回放；同时验证 resolved prompt、metadata、requirements、defaults、referenceTextPaths、generationMode、buildImageInputMode、validationPassed、pipeline trace 与 install packaging。会议还要求 README、CHANGELOG 和 ROADMAP 同步更新，避免这类样例只存在于测试脚本里而不被使用者发现。
+
+五、当前结论
+会议确认，下一个最值得推进的升级点不是继续扩展全新文档类型，也不是先做更重的 UI 或自动诊断，而是补齐 `meeting-minutes` 的 checked-in prepared replay bundle，并让它进入 smoke 与安装覆盖。这项改动规模小、回报直接，而且能显著提升仓库对“结构差异较大但仍属同一文档流水线”的说明力。它还能把 roadmap 中的 realistic fixture 事项从概念推进到具体产物，后续维护者也更容易沿着同一模式继续补其他 profile。
+
+会议同时确认，现有月报 prepared bundle 的模式已经足够成熟，可以作为 meeting-minutes 实现的直接参照。仓库不需要为这次升级引入新的脚本分支，也不需要改变 profile schema，只需要在现有结构上补一个新的 repo-level fixture 和对应 smoke 断言。这意味着此次升级对主流程的扰动很低，但对回放覆盖面和文档示例的可解释性提升明显。
+
+六、风险与争议
+本次讨论中的主要风险，是 meeting-minutes prepared fixture 如果写得过于理想化，可能虽然通过 validation，却不能真实反映会议纪要这类文档的结构差异；如果写得过于随意，又会让 smoke 只验证“能跑完”，而没有验证相对路径、章节命中和 replay trace 这些关键点。为此，与会者要求 replay report 必须围绕仓库实际升级工作撰写，并在 smoke 中明确检查 resolved path、generationMode、image input mode 和关键标题命中，避免样例失真。
+
+会议里另一个争议点，是这次是否要顺手继续扩展更多 meeting-minutes 专属 pagination remediation。部分成员认为可以借机继续细化 profile 提示，但多数人认为这会把原本清晰的最小升级点重新拉宽，影响本次回合的落地速度。最终决定先完成 prepared fixture 与 smoke 覆盖，把 realistic fixture 这条链路补齐，后续如果还要细化 remediation，再作为独立的小步提交处理。
+
+七、后续安排
+会后安排分成四项。第一，由仓库维护者新增 `examples/meeting-minutes-prepared/` 目录，并提交可移植的 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、`defaults.snapshot.json`、参考文本和 `report.replay.txt`。第二，由 smoke 维护者在 `scripts/run-smoke-tests.ps1` 中补一个最小 `New-MeetingMinutesTemplateDocx` helper，并增加 prepared replay、pipeline trace 和 install packaging 的断言。
+
+第三，由文档维护者更新 README、CHANGELOG 和 ROADMAP，把 meeting-minutes prepared bundle 明确列入仓库现有样例能力，而不是让它停留在代码细节里。第四，在上述改动完成后，立即运行 `scripts/validate-report-profiles.ps1`、`scripts/run-smoke-tests.ps1` 和 `git diff --check`，确认本次升级确实做到“有产物、有回归、有说明”。如果这些验证都通过，本轮路线评审即可视为完成，并继续把下一个最小升级点交还给 roadmap triage 自动化去筛选。

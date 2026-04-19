@@ -1,0 +1,7 @@
+本次 2026 年 4 月路线评审会的背景，是仓库已经把 experiment-report、course-design-report、internship-report、software-test-report、deployment-report、weekly-report、meeting-minutes、monthly-report 八类 built-in profile 统一纳入同一条 profile-driven 流水线，并且分页风险阈值、remediation、validation summary、wrapper trace 和 template-frame docx 输出都已经可以沿着 build-report / build-report-from-url / build-report-from-feishu 透传。
+
+会议的核心议题不是继续堆新的不相关能力，而是从 ROADMAP 里挑出“最小、实际、能被 smoke 覆盖”的下一步升级点。当天已确认的候选项主要有两个：第一，继续补更多 profile-specific pagination presets；第二，继续把 more realistic end-to-end fixtures 做厚，尤其是让仓库内直接提交的 prepared-summary bundle 不只是月报，还覆盖会议纪要这种结构明显不同的文档家族。
+
+参会人已经提前查看了现有 examples/monthly-report-prepared/、scripts/run-smoke-tests.ps1、profiles/meeting-minutes.json、scripts/build-report-from-url.ps1 和 scripts/report-profiles.ps1，对相对路径解析、validation 透传、replay generationMode 和 install packaging 这些现有能力有统一认识。会上还确认，meeting-minutes 虽然已经有 built-in profile 和 draft validation smoke，但仍缺少 checked-in prepared-summary replay bundle，这会导致回放链路在不同文档家族上的真实覆盖仍然偏薄。
+
+因此，本次会议的预期决议，是把 meeting-minutes prepared fixture 作为下一步最小升级点：在仓库下提交 prompt、metadata、requirements、defaults、reference text 和 replay report；补一个最小的 meeting-minutes 模板夹具；让 build-report-from-url.ps1 能通过 PreparedInputsSummaryPath 和 PreGeneratedReportPath 稳定回放；并在 install smoke、README、CHANGELOG、ROADMAP 中同步体现，让这项升级不仅能跑通，而且能被后续维护者复用和发现。
