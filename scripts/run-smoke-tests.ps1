@@ -560,6 +560,103 @@ function New-SoftwareTestTemplateDocx {
   }
 }
 
+function New-DeploymentTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>部署运维报告</w:t></w:r></w:p>
+    <w:p><w:r><w:t>课程名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>部署项目：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学生姓名</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>班级</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>指导教师</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>部署时间：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>部署类型：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>部署环境：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>一、部署目标</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>二、部署环境</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>三、部署方案与架构</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>四、部署步骤与配置</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>五、验证结果</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>六、问题处理与回滚预案</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>七、部署总结</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-MeetingMinutesTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -2696,6 +2793,10 @@ URL: https://example.com/network-lab
   New-SoftwareTestTemplateDocx -Path $softwareTestTemplateDocx
   Assert-True -Condition (Test-Path -LiteralPath $softwareTestTemplateDocx) -Message 'Failed to create the software-test-report template fixture.'
 
+  $deploymentTemplateDocx = Join-Path $tempRoot 'deployment-template.docx'
+  New-DeploymentTemplateDocx -Path $deploymentTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $deploymentTemplateDocx) -Message 'Failed to create the deployment-report template fixture.'
+
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
 软件工程课程设计报告
@@ -4288,6 +4389,81 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($softwareTestPreparedCleanedReport -match '测试结果') -Message 'Software-test prepared-summary URL wrapper cleaned report is missing the expected results heading.'
   $results.Add('build-report-from-url software-test prepared summary OK') | Out-Null
 
+  $deploymentPreparedSummaryDir = Join-Path $repoRoot 'examples\deployment-report-prepared'
+  $deploymentPreparedSummaryPath = Join-Path $deploymentPreparedSummaryDir 'report-inputs-summary.json'
+  $deploymentPreparedPromptPath = Join-Path $deploymentPreparedSummaryDir 'prompt.txt'
+  $deploymentPreparedMetadataPath = Join-Path $deploymentPreparedSummaryDir 'metadata.auto.json'
+  $deploymentPreparedRequirementsPath = Join-Path $deploymentPreparedSummaryDir 'requirements.auto.json'
+  $deploymentPreparedDefaultsPath = Join-Path $deploymentPreparedSummaryDir 'defaults.snapshot.json'
+  $deploymentPreparedReferencePath = Join-Path $deploymentPreparedSummaryDir 'references\project-context.txt'
+  $deploymentPreparedReplayReportPath = Join-Path $deploymentPreparedSummaryDir 'report.replay.txt'
+  foreach ($fixturePath in @(
+      $deploymentPreparedSummaryPath,
+      $deploymentPreparedPromptPath,
+      $deploymentPreparedMetadataPath,
+      $deploymentPreparedRequirementsPath,
+      $deploymentPreparedDefaultsPath,
+      $deploymentPreparedReferencePath,
+      $deploymentPreparedReplayReportPath
+    )) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Deployment prepared-summary fixture is missing: {0}" -f $fixturePath)
+  }
+
+  $deploymentPreparedBuildOutputDir = Join-Path $tempRoot 'deployment-prepared-summary-url-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $deploymentTemplateDocx `
+    -PreparedInputsSummaryPath $deploymentPreparedSummaryPath `
+    -OutputDir $deploymentPreparedBuildOutputDir `
+    -StyleProfile auto `
+    -PreGeneratedReportPath $deploymentPreparedReplayReportPath `
+    -SkipSessionReset | Out-Null
+  $deploymentPreparedBuildSummaryPath = Join-Path $deploymentPreparedBuildOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $deploymentPreparedBuildSummaryPath) -Message 'Deployment prepared-summary URL wrapper did not create the wrapper summary.'
+  $deploymentPreparedBuildSummary = (Get-Content -LiteralPath $deploymentPreparedBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.reportProfileName -eq 'deployment-report') -Message 'Deployment prepared-summary URL wrapper should inherit the deployment-report profile.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.reportProfileDisplayName -eq '部署运维报告') -Message 'Deployment prepared-summary URL wrapper should inherit the deployment-report display name.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.reportProfilePath -eq (Join-Path $repoRoot 'profiles\deployment-report.json')) -Message 'Deployment prepared-summary URL wrapper should resolve the relative reportProfilePath.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.detailLevel -eq 'full') -Message 'Deployment prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.generationMode -eq 'replay') -Message 'Deployment prepared-summary URL wrapper should mark the report generation mode as replay.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.reportInputsSummaryPath -eq $deploymentPreparedSummaryPath) -Message 'Deployment prepared-summary URL wrapper should keep the original input summary path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.promptPath -eq $deploymentPreparedPromptPath) -Message 'Deployment prepared-summary URL wrapper should resolve the relative prompt path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.metadataPath -eq $deploymentPreparedMetadataPath) -Message 'Deployment prepared-summary URL wrapper should resolve the relative metadata path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.requirementsPath -eq $deploymentPreparedRequirementsPath) -Message 'Deployment prepared-summary URL wrapper should resolve the relative requirements path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.defaultsPath -eq $deploymentPreparedDefaultsPath) -Message 'Deployment prepared-summary URL wrapper should resolve the relative defaults path.'
+  Assert-True -Condition (@($deploymentPreparedBuildSummary.referenceTextPaths).Count -eq 1) -Message 'Deployment prepared-summary URL wrapper should keep one resolved reference text path.'
+  Assert-True -Condition ([string]@($deploymentPreparedBuildSummary.referenceTextPaths)[0] -eq $deploymentPreparedReferencePath) -Message 'Deployment prepared-summary URL wrapper should resolve the relative reference text path.'
+  Assert-True -Condition (@($deploymentPreparedBuildSummary.fetchedReferenceTextPaths).Count -eq 0) -Message 'Deployment prepared-summary URL wrapper should keep fetchedReferenceTextPaths empty for local fixtures.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.requestedCourseName -eq 'OpenClaw 实验报告技能仓库') -Message 'Deployment prepared-summary URL wrapper lost the requested course name.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.requestedExperimentName -eq 'prepared replay 部署回放链路测试') -Message 'Deployment prepared-summary URL wrapper lost the requested deployment title.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.preGeneratedReportPath -eq $deploymentPreparedReplayReportPath) -Message 'Deployment prepared-summary URL wrapper summary is missing the replay report path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildReportInputMode -eq 'path') -Message 'Deployment prepared-summary URL wrapper should expose buildReportInputMode=path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Deployment prepared-summary URL wrapper should expose buildMetadataInputMode=path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Deployment prepared-summary URL wrapper should expose buildRequirementsInputMode=path.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildImageInputMode -eq 'none') -Message 'Deployment prepared-summary URL wrapper should expose buildImageInputMode=none.'
+  Assert-True -Condition ([bool]$deploymentPreparedBuildSummary.validationPassed) -Message 'Deployment prepared-summary URL wrapper should expose validationPassed=true.'
+  Assert-True -Condition ([int]$deploymentPreparedBuildSummary.validationWarningCount -eq 0) -Message 'Deployment prepared-summary URL wrapper should expose zero validation warnings.'
+  Assert-True -Condition ([int]$deploymentPreparedBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Deployment prepared-summary URL wrapper should expose zero pagination risks.'
+  Assert-True -Condition ([int]$deploymentPreparedBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Deployment prepared-summary URL wrapper should expose zero structural issues.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTracePath)) -Message 'Deployment prepared-summary URL wrapper should create a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTraceMarkdownPath)) -Message 'Deployment prepared-summary URL wrapper should create a pipeline-trace markdown file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.rawReportPath)) -Message 'Deployment prepared-summary URL wrapper did not write the raw report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.cleanedReportPath)) -Message 'Deployment prepared-summary URL wrapper did not write the cleaned report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.finalDocxPath)) -Message 'Deployment prepared-summary URL wrapper final docx path does not exist.'
+  $deploymentPreparedTrace = (Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$deploymentPreparedTrace.wrapper.generationMode -eq 'replay') -Message 'Deployment prepared-summary URL pipeline trace should keep generationMode=replay.'
+  Assert-True -Condition ([string]$deploymentPreparedTrace.artifacts.promptPath -eq $deploymentPreparedPromptPath) -Message 'Deployment prepared-summary URL pipeline trace should expose the resolved prompt path.'
+  Assert-True -Condition ([string]$deploymentPreparedTrace.build.reportInputMode -eq 'path') -Message 'Deployment prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
+  Assert-True -Condition ([string]$deploymentPreparedTrace.build.imageInputMode -eq 'none') -Message 'Deployment prepared-summary URL pipeline trace should keep build.imageInputMode=none.'
+  Assert-True -Condition ([bool]$deploymentPreparedTrace.build.validationPassed) -Message 'Deployment prepared-summary URL pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$deploymentPreparedTrace.build.validationPaginationRiskCount -eq 0) -Message 'Deployment prepared-summary URL pipeline trace should expose zero pagination risks.'
+  $deploymentPreparedTraceMarkdown = Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Generation mode: replay') -Message 'Deployment prepared-summary URL pipeline markdown should include the replay generation mode.'
+  Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Image input mode: none') -Message 'Deployment prepared-summary URL pipeline markdown should include the build image input mode.'
+  Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Validation passed: True') -Message 'Deployment prepared-summary URL pipeline markdown should include validation status.'
+  $deploymentPreparedCleanedReport = Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($deploymentPreparedCleanedReport -match '验证结果') -Message 'Deployment prepared-summary URL wrapper cleaned report is missing the expected results heading.'
+  $results.Add('build-report-from-url deployment prepared summary OK') | Out-Null
+
   $urlWarningOutputDir = Join-Path $tempRoot 'url-warning-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
     -TemplatePath $sampleDocx `
@@ -4541,6 +4717,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the deployment prepared-summary fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report.replay.txt')) -Message 'Install script did not copy the deployment replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\software-test-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the software-test prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\software-test-report-prepared\report.replay.txt')) -Message 'Install script did not copy the software-test replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\weekly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the weekly prepared-summary fixture.'

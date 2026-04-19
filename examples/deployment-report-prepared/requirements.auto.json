@@ -1,0 +1,65 @@
+{
+  "courseName": "OpenClaw 实验报告技能仓库",
+  "experimentName": "prepared replay 部署回放链路测试",
+  "minChars": 1600,
+  "sections": [
+    {
+      "name": "部署目标",
+      "aliases": ["部署目标", "部署目的", "任务目标"],
+      "minChars": 70
+    },
+    {
+      "name": "部署环境",
+      "aliases": ["部署环境", "运行环境", "服务器环境", "部署工具与环境"],
+      "minChars": 100
+    },
+    {
+      "name": "部署方案与架构",
+      "aliases": ["部署方案与架构", "部署方案", "系统架构", "架构说明"],
+      "minChars": 110
+    },
+    {
+      "name": "部署步骤与配置",
+      "aliases": ["部署步骤与配置", "部署步骤", "部署过程", "配置过程", "实施过程"],
+      "minChars": 190
+    },
+    {
+      "name": "验证结果",
+      "aliases": ["验证结果", "部署结果", "运行结果", "验收结果"],
+      "minChars": 150
+    },
+    {
+      "name": "问题处理与回滚预案",
+      "aliases": ["问题处理与回滚预案", "问题处理", "故障分析", "回滚预案", "问题与改进"],
+      "minChars": 120
+    },
+    {
+      "name": "部署总结",
+      "aliases": ["部署总结", "总结", "运维总结", "任务总结"],
+      "minChars": 100
+    }
+  ],
+  "requiredKeywords": [
+    "OpenClaw 实验报告技能仓库",
+    "prepared replay 部署回放链路测试"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评"
+  ],
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 650,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
+  "paginationRiskRemediations": {
+    "pagination-risk-long-section": "Split the deployment walkthrough into prerequisites, environment setup, service configuration, startup order, verification, and rollback subsections before building, or raise paginationRiskThresholds.longSectionChars if long runbook-style deployment sections are expected.",
+    "pagination-risk-dense-section-block": "Separate commands, configuration snippets, log observations, and operational explanation into distinct paragraphs or lists so Word/WPS can paginate the deployment process safely.",
+    "pagination-risk-figure-cluster": "Spread deployment screenshots across '部署步骤与配置', '验证结果', and '问题处理与回滚预案', or group them by service/component before layout if a release run normally needs many evidence screenshots."
+  }
+}
