@@ -1,0 +1,7 @@
+本次 prepared replay 回归链路测试的背景，是仓库已经先后为 `monthly-report`、`meeting-minutes` 和 `weekly-report` 三类项目文档补上了 checked-in prepared replay fixture，并通过 `build-report-from-url.ps1` + `PreparedInputsSummaryPath` + `PreGeneratedReportPath` 的组合验证了相对路径解析、validation 汇总、wrapper summary、pipeline trace 和 install packaging 的稳定性。换句话说，仓库在“项目型过程文档”上已经有了相对完整的 repo-level replay 基线。
+
+但从工程交付视角看，当前覆盖面仍然不够均衡。`software-test-report` 和 `deployment-report` 已经拥有 profile-specific 的 paginationRiskRemediations，分别针对测试用例、预期/实际结果、缺陷证据，以及部署命令、验证日志、回滚预案等高密度内容给出不同的分页修复建议。这说明仓库已经承认它们在结构与布局风险上比周报、月报更复杂，可是 repo 内却还没有对应的 checked-in replay fixture，导致这些 profile 的真实回放能力仍然缺少一层最关键的长期样例。
+
+本次测试的任务，就是把 `software-test-report` 也推进成可直接提交到仓库、可被 smoke 覆盖、可被 install 复制、并能在文档中被发现和复用的 prepared replay bundle。为此，需要提交 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、`defaults.snapshot.json`、参考文本和 `report.replay.txt`；同时在 `scripts/run-smoke-tests.ps1` 中增加一个最小 `New-SoftwareTestTemplateDocx` 模板夹具，让这套 replay fixture 不依赖外部模板也能稳定穿过 build、validation 和 final docx 产物链路。
+
+如果这项升级落地，仓库的 realistic end-to-end fixtures 就会第一次覆盖到带有 profile-specific pagination remediation 的工程报告文档族。这样后续继续补 `deployment-report` 时，就可以直接沿用同一模式推进，而仓库对“结构不同、风险不同、但仍使用同一条 profile-driven pipeline”的说明力也会更强。

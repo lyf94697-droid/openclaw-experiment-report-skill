@@ -1,0 +1,16 @@
+Write a formal Chinese university 软件测试报告 body based on the reference webpages.
+
+课程名称: OpenClaw 实验报告技能仓库
+测试项目: prepared replay 回归链路测试
+
+Requirements:
+- The report must begin by explicitly writing the Chinese 课程名称 and 测试项目.
+- The report must include these Chinese headings: 测试目标, 测试环境, 测试范围与依据, 测试用例设计与执行, 测试结果, 缺陷分析与改进, 测试总结.
+- Use the webpages as procedural reference for background, theory, steps, and verification ideas, but do not copy them verbatim.
+- If the webpages are tutorial pages or lab guides, rewrite them into a submit-ready 软件测试报告 in natural Chinese.
+- If the webpages do not provide real screenshots, exact measured values, packet captures, teacher comments, or error logs, do not fabricate them. Write the result section as validation-oriented results instead.
+- Prefer a submit-ready software test report with substantial evidence instead of a terse outline.
+- Unless source material is very sparse, aim for roughly 1600 to 2400 Chinese characters.
+- The test scope, test case execution, result summary, and defect-analysis sections should be the most detailed parts.
+- When describing test cases, explain the tested feature, preconditions, input data, execution steps, observed result, and whether the result matches expectations.
+- Return only the final Chinese 软件测试报告 body.

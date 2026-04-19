@@ -463,6 +463,103 @@ function New-WeeklyReportTemplateDocx {
   }
 }
 
+function New-SoftwareTestTemplateDocx {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $contentTypes = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"@
+
+  $relationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"@
+
+  $documentRelationships = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>
+"@
+
+  $document = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>软件测试报告</w:t></w:r></w:p>
+    <w:p><w:r><w:t>课程名称：__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>测试项目：__________</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学生姓名</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>学号</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>班级</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>指导教师</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>测试时间：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>测试类型：__________</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>测试环境：__________</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>一、测试目标</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>二、测试环境</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>三、测试范围与依据</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>四、测试用例设计与执行</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>五、测试结果</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>六、缺陷分析与改进</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:p><w:r><w:t>七、测试总结</w:t></w:r></w:p>
+    <w:p><w:r><w:t>__________</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+"@
+
+  $zip = [System.IO.Compression.ZipFile]::Open($Path, [System.IO.Compression.ZipArchiveMode]::Create)
+  try {
+    foreach ($entrySpec in @(
+        @{ Name = "[Content_Types].xml"; Text = $contentTypes },
+        @{ Name = "_rels/.rels"; Text = $relationships },
+        @{ Name = "word/_rels/document.xml.rels"; Text = $documentRelationships },
+        @{ Name = "word/document.xml"; Text = $document }
+      )) {
+      $entry = $zip.CreateEntry($entrySpec.Name)
+      $writer = New-Object System.IO.StreamWriter($entry.Open(), (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        $writer.Write($entrySpec.Text)
+      } finally {
+        $writer.Dispose()
+      }
+    }
+  } finally {
+    $zip.Dispose()
+  }
+}
+
 function New-MeetingMinutesTemplateDocx {
   param(
     [Parameter(Mandatory = $true)]
@@ -2595,6 +2692,10 @@ URL: https://example.com/network-lab
   New-WeeklyReportTemplateDocx -Path $weeklyReportTemplateDocx
   Assert-True -Condition (Test-Path -LiteralPath $weeklyReportTemplateDocx) -Message 'Failed to create the weekly-report template fixture.'
 
+  $softwareTestTemplateDocx = Join-Path $tempRoot 'software-test-template.docx'
+  New-SoftwareTestTemplateDocx -Path $softwareTestTemplateDocx
+  Assert-True -Condition (Test-Path -LiteralPath $softwareTestTemplateDocx) -Message 'Failed to create the software-test-report template fixture.'
+
   $courseDesignReportPath = Join-Path $tempRoot 'course-design-report.md'
   @'
 软件工程课程设计报告
@@ -4112,6 +4213,81 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($weeklyPreparedCleanedReport -match '阶段成果') -Message 'Weekly prepared-summary URL wrapper cleaned report is missing the expected results heading.'
   $results.Add('build-report-from-url weekly prepared summary OK') | Out-Null
 
+  $softwareTestPreparedSummaryDir = Join-Path $repoRoot 'examples\software-test-report-prepared'
+  $softwareTestPreparedSummaryPath = Join-Path $softwareTestPreparedSummaryDir 'report-inputs-summary.json'
+  $softwareTestPreparedPromptPath = Join-Path $softwareTestPreparedSummaryDir 'prompt.txt'
+  $softwareTestPreparedMetadataPath = Join-Path $softwareTestPreparedSummaryDir 'metadata.auto.json'
+  $softwareTestPreparedRequirementsPath = Join-Path $softwareTestPreparedSummaryDir 'requirements.auto.json'
+  $softwareTestPreparedDefaultsPath = Join-Path $softwareTestPreparedSummaryDir 'defaults.snapshot.json'
+  $softwareTestPreparedReferencePath = Join-Path $softwareTestPreparedSummaryDir 'references\project-context.txt'
+  $softwareTestPreparedReplayReportPath = Join-Path $softwareTestPreparedSummaryDir 'report.replay.txt'
+  foreach ($fixturePath in @(
+      $softwareTestPreparedSummaryPath,
+      $softwareTestPreparedPromptPath,
+      $softwareTestPreparedMetadataPath,
+      $softwareTestPreparedRequirementsPath,
+      $softwareTestPreparedDefaultsPath,
+      $softwareTestPreparedReferencePath,
+      $softwareTestPreparedReplayReportPath
+    )) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Software-test prepared-summary fixture is missing: {0}" -f $fixturePath)
+  }
+
+  $softwareTestPreparedBuildOutputDir = Join-Path $tempRoot 'software-test-prepared-summary-url-build-output'
+  & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
+    -TemplatePath $softwareTestTemplateDocx `
+    -PreparedInputsSummaryPath $softwareTestPreparedSummaryPath `
+    -OutputDir $softwareTestPreparedBuildOutputDir `
+    -StyleProfile auto `
+    -PreGeneratedReportPath $softwareTestPreparedReplayReportPath `
+    -SkipSessionReset | Out-Null
+  $softwareTestPreparedBuildSummaryPath = Join-Path $softwareTestPreparedBuildOutputDir 'url-build-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $softwareTestPreparedBuildSummaryPath) -Message 'Software-test prepared-summary URL wrapper did not create the wrapper summary.'
+  $softwareTestPreparedBuildSummary = (Get-Content -LiteralPath $softwareTestPreparedBuildSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.reportProfileName -eq 'software-test-report') -Message 'Software-test prepared-summary URL wrapper should inherit the software-test-report profile.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.reportProfileDisplayName -eq '软件测试报告') -Message 'Software-test prepared-summary URL wrapper should inherit the software-test-report display name.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.reportProfilePath -eq (Join-Path $repoRoot 'profiles\software-test-report.json')) -Message 'Software-test prepared-summary URL wrapper should resolve the relative reportProfilePath.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.detailLevel -eq 'full') -Message 'Software-test prepared-summary URL wrapper should preserve the prepared-summary detail level.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.generationMode -eq 'replay') -Message 'Software-test prepared-summary URL wrapper should mark the report generation mode as replay.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.reportInputsSummaryPath -eq $softwareTestPreparedSummaryPath) -Message 'Software-test prepared-summary URL wrapper should keep the original input summary path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.promptPath -eq $softwareTestPreparedPromptPath) -Message 'Software-test prepared-summary URL wrapper should resolve the relative prompt path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.metadataPath -eq $softwareTestPreparedMetadataPath) -Message 'Software-test prepared-summary URL wrapper should resolve the relative metadata path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.requirementsPath -eq $softwareTestPreparedRequirementsPath) -Message 'Software-test prepared-summary URL wrapper should resolve the relative requirements path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.defaultsPath -eq $softwareTestPreparedDefaultsPath) -Message 'Software-test prepared-summary URL wrapper should resolve the relative defaults path.'
+  Assert-True -Condition (@($softwareTestPreparedBuildSummary.referenceTextPaths).Count -eq 1) -Message 'Software-test prepared-summary URL wrapper should keep one resolved reference text path.'
+  Assert-True -Condition ([string]@($softwareTestPreparedBuildSummary.referenceTextPaths)[0] -eq $softwareTestPreparedReferencePath) -Message 'Software-test prepared-summary URL wrapper should resolve the relative reference text path.'
+  Assert-True -Condition (@($softwareTestPreparedBuildSummary.fetchedReferenceTextPaths).Count -eq 0) -Message 'Software-test prepared-summary URL wrapper should keep fetchedReferenceTextPaths empty for local fixtures.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.requestedCourseName -eq 'OpenClaw 实验报告技能仓库') -Message 'Software-test prepared-summary URL wrapper lost the requested course name.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.requestedExperimentName -eq 'prepared replay 回归链路测试') -Message 'Software-test prepared-summary URL wrapper lost the requested test title.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.preGeneratedReportPath -eq $softwareTestPreparedReplayReportPath) -Message 'Software-test prepared-summary URL wrapper summary is missing the replay report path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.buildReportInputMode -eq 'path') -Message 'Software-test prepared-summary URL wrapper should expose buildReportInputMode=path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Software-test prepared-summary URL wrapper should expose buildMetadataInputMode=path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Software-test prepared-summary URL wrapper should expose buildRequirementsInputMode=path.'
+  Assert-True -Condition ([string]$softwareTestPreparedBuildSummary.buildImageInputMode -eq 'none') -Message 'Software-test prepared-summary URL wrapper should expose buildImageInputMode=none.'
+  Assert-True -Condition ([bool]$softwareTestPreparedBuildSummary.validationPassed) -Message 'Software-test prepared-summary URL wrapper should expose validationPassed=true.'
+  Assert-True -Condition ([int]$softwareTestPreparedBuildSummary.validationWarningCount -eq 0) -Message 'Software-test prepared-summary URL wrapper should expose zero validation warnings.'
+  Assert-True -Condition ([int]$softwareTestPreparedBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Software-test prepared-summary URL wrapper should expose zero pagination risks.'
+  Assert-True -Condition ([int]$softwareTestPreparedBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Software-test prepared-summary URL wrapper should expose zero structural issues.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$softwareTestPreparedBuildSummary.pipelineTracePath)) -Message 'Software-test prepared-summary URL wrapper should create a pipeline-trace JSON.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$softwareTestPreparedBuildSummary.pipelineTraceMarkdownPath)) -Message 'Software-test prepared-summary URL wrapper should create a pipeline-trace markdown file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$softwareTestPreparedBuildSummary.rawReportPath)) -Message 'Software-test prepared-summary URL wrapper did not write the raw report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$softwareTestPreparedBuildSummary.cleanedReportPath)) -Message 'Software-test prepared-summary URL wrapper did not write the cleaned report file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$softwareTestPreparedBuildSummary.finalDocxPath)) -Message 'Software-test prepared-summary URL wrapper final docx path does not exist.'
+  $softwareTestPreparedTrace = (Get-Content -LiteralPath ([string]$softwareTestPreparedBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$softwareTestPreparedTrace.wrapper.generationMode -eq 'replay') -Message 'Software-test prepared-summary URL pipeline trace should keep generationMode=replay.'
+  Assert-True -Condition ([string]$softwareTestPreparedTrace.artifacts.promptPath -eq $softwareTestPreparedPromptPath) -Message 'Software-test prepared-summary URL pipeline trace should expose the resolved prompt path.'
+  Assert-True -Condition ([string]$softwareTestPreparedTrace.build.reportInputMode -eq 'path') -Message 'Software-test prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
+  Assert-True -Condition ([string]$softwareTestPreparedTrace.build.imageInputMode -eq 'none') -Message 'Software-test prepared-summary URL pipeline trace should keep build.imageInputMode=none.'
+  Assert-True -Condition ([bool]$softwareTestPreparedTrace.build.validationPassed) -Message 'Software-test prepared-summary URL pipeline trace should expose validationPassed.'
+  Assert-True -Condition ([int]$softwareTestPreparedTrace.build.validationPaginationRiskCount -eq 0) -Message 'Software-test prepared-summary URL pipeline trace should expose zero pagination risks.'
+  $softwareTestPreparedTraceMarkdown = Get-Content -LiteralPath ([string]$softwareTestPreparedBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($softwareTestPreparedTraceMarkdown -match 'Generation mode: replay') -Message 'Software-test prepared-summary URL pipeline markdown should include the replay generation mode.'
+  Assert-True -Condition ($softwareTestPreparedTraceMarkdown -match 'Image input mode: none') -Message 'Software-test prepared-summary URL pipeline markdown should include the build image input mode.'
+  Assert-True -Condition ($softwareTestPreparedTraceMarkdown -match 'Validation passed: True') -Message 'Software-test prepared-summary URL pipeline markdown should include validation status.'
+  $softwareTestPreparedCleanedReport = Get-Content -LiteralPath ([string]$softwareTestPreparedBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
+  Assert-True -Condition ($softwareTestPreparedCleanedReport -match '测试结果') -Message 'Software-test prepared-summary URL wrapper cleaned report is missing the expected results heading.'
+  $results.Add('build-report-from-url software-test prepared summary OK') | Out-Null
+
   $urlWarningOutputDir = Join-Path $tempRoot 'url-warning-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
     -TemplatePath $sampleDocx `
@@ -4365,6 +4541,8 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\software-test-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the software-test prepared-summary fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\software-test-report-prepared\report.replay.txt')) -Message 'Install script did not copy the software-test replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\weekly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the weekly prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\weekly-report-prepared\report.replay.txt')) -Message 'Install script did not copy the weekly replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\monthly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the monthly prepared-summary fixture.'

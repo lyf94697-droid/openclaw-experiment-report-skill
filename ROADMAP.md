@@ -237,9 +237,11 @@ Implemented baseline:
 - schema-backed `paginationRiskThresholds` in report profiles and preset examples
 - profile-specific `paginationRiskRemediations` propagated through generated requirements, validation summaries, and wrapper traces
 - `software-test-report` and `deployment-report` now carry profile-specific pagination remediation guidance for test evidence, deployment commands, verification screenshots, and rollback-heavy sections
+- `examples/software-test-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/weekly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/monthly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/meeting-minutes-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
+- smoke coverage for replaying a checked-in software-test-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in weekly-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in monthly prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in meeting-minutes prepared-summary bundle through `build-report-from-url.ps1`

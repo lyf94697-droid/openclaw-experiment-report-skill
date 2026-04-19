@@ -29,6 +29,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added issue templates, a PR template, and a matrix quality workflow under `.github/`.
 - Added `demo/` assets and a demo guide suitable for GitHub repository previews.
 - Added `.gitattributes` to keep Office files and demo images treated as binary content.
+- Added `examples/software-test-report-prepared/` as a reusable prepared-summary replay bundle for the built-in `software-test-report` profile.
 - Added `examples/weekly-report-prepared/` as a reusable prepared-summary replay bundle for the built-in `weekly-report` profile.
 - Added `examples/monthly-report-prepared/` as a reusable prepared-summary replay bundle for the built-in `monthly-report` profile.
 - Added `examples/meeting-minutes-prepared/` as a reusable prepared-summary replay bundle for the built-in `meeting-minutes` profile.
@@ -54,6 +55,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added end-to-end smoke coverage for pagination-risk warning propagation through build-report, URL wrapper, and Feishu wrapper summaries.
 - Propagated profile-specific pagination-risk remediations through generated requirements, validation summaries, build summaries, and wrapper traces.
 - Added smoke coverage for template-frame docx generation and wrapper summary propagation.
+- Expanded smoke coverage so a checked-in `software-test-report` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 - Expanded smoke coverage so a checked-in `weekly-report` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 - Expanded smoke coverage so a checked-in `monthly-report` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 - Expanded smoke coverage so a checked-in `meeting-minutes` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
