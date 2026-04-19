@@ -4729,6 +4729,22 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignTemplateOutline -match '四、方案设计与实现') -Message 'Checked-in course-design template example should contain the implementation heading.'
   $results.Add('report template examples OK') | Out-Null
 
+  $referenceImportOutputDir = Join-Path $tempRoot 'real-template-reference-import'
+  $referenceImportSummary = & (Join-Path $repoRoot 'scripts\import-report-template-references.ps1') `
+    -Path (Join-Path $templateExamplesDir 'experiment-report-template.docx') `
+    -OutputDir $referenceImportOutputDir
+  Assert-True -Condition ([int]$referenceImportSummary.importedCount -eq 1) -Message 'Reference importer should import the sample docx reference.'
+  Assert-True -Condition ([int]$referenceImportSummary.failedCount -eq 0) -Message 'Reference importer should not fail for a sample docx reference.'
+  $referenceImportSummaryPath = Join-Path $referenceImportOutputDir 'import-summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $referenceImportSummaryPath -PathType Leaf) -Message 'Reference importer did not write import-summary.json.'
+  $referenceImportFirst = @($referenceImportSummary.imported)[0]
+  Assert-True -Condition (([string]$referenceImportFirst.status) -eq 'copied') -Message 'Reference importer should copy docx references without Office conversion.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$referenceImportFirst.convertedDocxPath) -PathType Leaf) -Message 'Reference importer did not copy the docx reference into converted-docx.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$referenceImportFirst.outlinePath) -PathType Leaf) -Message 'Reference importer did not extract the copied docx outline.'
+  $referenceImportOutline = Get-Content -LiteralPath ([string]$referenceImportFirst.outlinePath) -Raw -Encoding UTF8
+  Assert-True -Condition ($referenceImportOutline -match 'Table count: 1') -Message 'Reference importer outline should preserve template structure details.'
+  $results.Add('real template reference importer OK') | Out-Null
+
   $installRoot = Join-Path $tempRoot 'install-root'
   $installTarget = Join-Path $installRoot 'skill-install'
   & (Join-Path $repoRoot 'scripts\install-skill.ps1') -TargetDir $installTarget | Out-Null
@@ -4752,6 +4768,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-image-map.ps1')) -Message 'Install script did not copy image-map generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-report-inputs.ps1')) -Message 'Install script did not copy report-input generation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\export-report-template-examples.ps1')) -Message 'Install script did not copy the template-example exporter script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\import-report-template-references.ps1')) -Message 'Install script did not copy the real-template reference importer script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\new-report-profile.ps1')) -Message 'Install script did not copy profile scaffold generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
@@ -4781,6 +4798,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\experiment-report-template.docx')) -Message 'Install script did not copy the experiment template example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\course-design-report-template.docx')) -Message 'Install script did not copy the course-design template example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\weekly-report-template.docx')) -Message 'Install script did not copy the weekly template example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'docs\real-template-patterns.md')) -Message 'Install script did not copy the real-template pattern documentation.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the deployment prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report.replay.txt')) -Message 'Install script did not copy the deployment replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\image-specs.json')) -Message 'Install script did not copy the deployment replay image specs fixture.'

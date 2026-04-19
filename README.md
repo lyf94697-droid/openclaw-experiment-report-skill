@@ -241,6 +241,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-docx-image-map.ps1 `
   -OutFile "E:\reports\image-plan.md"
 ```
 
+如果你拿到一批真实学校模板或示例，想先本地分析它们的结构，不要直接把原文件提交到仓库：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\import-report-template-references.ps1 `
+  -Path "E:\reports\experiment-template.doc","E:\reports\course-design-template.doc","E:\reports\filled-example.pdf"
+```
+
+这个脚本会把参考文件复制到被 `.gitignore` 忽略的 `tests-output/real-template-references-*` 目录，优先用 WPS COM 把 `.doc` 转成 `.docx`，再提取模板大纲和表格结构。`.pdf` 默认只复制登记，避免 Word 的 PDF 转换在后台卡住；确实需要 PDF 转 `docx` 大纲时可以显式加 `-ConvertPdf`。匿名化后的真实模板结构总结见 [docs/real-template-patterns.md](docs/real-template-patterns.md)。
+
 如果你要做月报、周报或会议纪要，先生成可检查的输入包：
 
 ```powershell

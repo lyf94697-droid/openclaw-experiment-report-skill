@@ -244,6 +244,8 @@ Implemented baseline:
 - `examples/monthly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/meeting-minutes-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `scripts/export-report-template-examples.ps1` plus `examples/report-templates/` as a checked-in template pack generated from the built-in profiles
+- `scripts/import-report-template-references.ps1` for local-only importing, conversion, and outline extraction of real school templates without committing private or copyrighted references
+- `docs/real-template-patterns.md` as an anonymized design note for observed real experiment-report and course-design template structures
 - smoke coverage for replaying a checked-in deployment-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in software-test-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in weekly-report prepared-summary bundle through `build-report-from-url.ps1`
