@@ -328,6 +328,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 如果你想沿用 path-based 方式试跑或继续做 profile 分叉，可以先看 `examples/profile-presets/`：目前保留 `weekly-report.json`、`meeting-minutes.json` 和 `monthly-report.json` 三份示例快照；对应的 built-in profile 也都已经在 `profiles/` 下可直接使用，这些快照更适合验证“这条 pipeline 能不能复用”或继续做定制分叉
 - 如果你把 `report-inputs-summary.json` 连同 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、参考文本一起提交到仓库，`build-report-from-url.ps1` / `build-report-from-feishu.ps1` 现在会把 summary 里的相对路径按 summary 文件所在目录解析；checked-in prepared-summary bundle 不再要求保留原来的临时生成目录
 - 仓库里现在附带了五份可直接 replay 的 prepared-summary 输入包：部署运维报告示例 `examples/deployment-report-prepared/`、软件测试报告示例 `examples/software-test-report-prepared/`、周报示例 `examples/weekly-report-prepared/`、月报示例 `examples/monthly-report-prepared/` 和会议纪要示例 `examples/meeting-minutes-prepared/`；它们都包含 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、本地参考文本和一份 `report.replay.txt`
+- 其中 `examples/deployment-report-prepared/` 现在还附带了 `image-specs.json` 和 `images/` 下三张 checked-in 截图示例，适合直接 smoke 或手动回放“部署环境 / 验证结果 / 回滚预案”这条带图链路
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
@@ -429,12 +430,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
   -TemplatePath ".\your-deployment-template.docx" `
   -PreparedInputsSummaryPath ".\examples\deployment-report-prepared\report-inputs-summary.json" `
+  -ImageSpecsPath ".\examples\deployment-report-prepared\image-specs.json" `
   -PreGeneratedReportPath ".\examples\deployment-report-prepared\report.replay.txt" `
   -OutputDir ".\tests-output\deployment-report-replay" `
   -StyleProfile auto
 ```
 
-这条命令更适合验证部署步骤、验证结果和回滚预案这类更偏运维执行的文档，尤其适合检查 profile-specific remediation、prepared replay 路径解析和 wrapper trace 是否已经稳固。
+这条命令更适合验证部署步骤、验证结果和回滚预案这类更偏运维执行的文档，尤其适合检查 profile-specific remediation、prepared replay 路径解析、checked-in 截图输入和 wrapper trace 是否已经稳固。
 
 如果你要验证会议纪要这一类结构明显不同的文档，也可以直接回放仓库内置的会议纪要 prepared-summary 示例：
 

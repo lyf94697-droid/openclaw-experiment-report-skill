@@ -238,6 +238,7 @@ Implemented baseline:
 - profile-specific `paginationRiskRemediations` propagated through generated requirements, validation summaries, and wrapper traces
 - `software-test-report` and `deployment-report` now carry profile-specific pagination remediation guidance for test evidence, deployment commands, verification screenshots, and rollback-heavy sections
 - `examples/deployment-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
+- `examples/deployment-report-prepared/image-specs.json` and checked-in screenshot fixtures under `examples/deployment-report-prepared/images/` so the deployment replay path covers realistic screenshot-backed evidence inputs
 - `examples/software-test-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/weekly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/monthly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths

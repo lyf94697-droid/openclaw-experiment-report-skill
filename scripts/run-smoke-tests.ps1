@@ -4397,6 +4397,10 @@ URL: https://example.com/network-lab
   $deploymentPreparedDefaultsPath = Join-Path $deploymentPreparedSummaryDir 'defaults.snapshot.json'
   $deploymentPreparedReferencePath = Join-Path $deploymentPreparedSummaryDir 'references\project-context.txt'
   $deploymentPreparedReplayReportPath = Join-Path $deploymentPreparedSummaryDir 'report.replay.txt'
+  $deploymentPreparedImageSpecsPath = Join-Path $deploymentPreparedSummaryDir 'image-specs.json'
+  $deploymentPreparedEnvironmentImagePath = Join-Path $deploymentPreparedSummaryDir 'images\deploy-env.png'
+  $deploymentPreparedVerifyImagePath = Join-Path $deploymentPreparedSummaryDir 'images\deploy-verify.png'
+  $deploymentPreparedRollbackImagePath = Join-Path $deploymentPreparedSummaryDir 'images\deploy-rollback.png'
   foreach ($fixturePath in @(
       $deploymentPreparedSummaryPath,
       $deploymentPreparedPromptPath,
@@ -4404,7 +4408,11 @@ URL: https://example.com/network-lab
       $deploymentPreparedRequirementsPath,
       $deploymentPreparedDefaultsPath,
       $deploymentPreparedReferencePath,
-      $deploymentPreparedReplayReportPath
+      $deploymentPreparedReplayReportPath,
+      $deploymentPreparedImageSpecsPath,
+      $deploymentPreparedEnvironmentImagePath,
+      $deploymentPreparedVerifyImagePath,
+      $deploymentPreparedRollbackImagePath
     )) {
     Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Deployment prepared-summary fixture is missing: {0}" -f $fixturePath)
   }
@@ -4413,6 +4421,7 @@ URL: https://example.com/network-lab
   & (Join-Path $repoRoot 'scripts\build-report-from-url.ps1') `
     -TemplatePath $deploymentTemplateDocx `
     -PreparedInputsSummaryPath $deploymentPreparedSummaryPath `
+    -ImageSpecsPath $deploymentPreparedImageSpecsPath `
     -OutputDir $deploymentPreparedBuildOutputDir `
     -StyleProfile auto `
     -PreGeneratedReportPath $deploymentPreparedReplayReportPath `
@@ -4439,26 +4448,41 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildReportInputMode -eq 'path') -Message 'Deployment prepared-summary URL wrapper should expose buildReportInputMode=path.'
   Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildMetadataInputMode -eq 'path') -Message 'Deployment prepared-summary URL wrapper should expose buildMetadataInputMode=path.'
   Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildRequirementsInputMode -eq 'path') -Message 'Deployment prepared-summary URL wrapper should expose buildRequirementsInputMode=path.'
-  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildImageInputMode -eq 'none') -Message 'Deployment prepared-summary URL wrapper should expose buildImageInputMode=none.'
+  Assert-True -Condition ([string]$deploymentPreparedBuildSummary.buildImageInputMode -eq 'specs-path') -Message 'Deployment prepared-summary URL wrapper should expose buildImageInputMode=specs-path.'
   Assert-True -Condition ([bool]$deploymentPreparedBuildSummary.validationPassed) -Message 'Deployment prepared-summary URL wrapper should expose validationPassed=true.'
   Assert-True -Condition ([int]$deploymentPreparedBuildSummary.validationWarningCount -eq 0) -Message 'Deployment prepared-summary URL wrapper should expose zero validation warnings.'
   Assert-True -Condition ([int]$deploymentPreparedBuildSummary.validationPaginationRiskCount -eq 0) -Message 'Deployment prepared-summary URL wrapper should expose zero pagination risks.'
   Assert-True -Condition ([int]$deploymentPreparedBuildSummary.validationStructuralIssueCount -eq 0) -Message 'Deployment prepared-summary URL wrapper should expose zero structural issues.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTracePath)) -Message 'Deployment prepared-summary URL wrapper should create a pipeline-trace JSON.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTraceMarkdownPath)) -Message 'Deployment prepared-summary URL wrapper should create a pipeline-trace markdown file.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.buildSummaryPath)) -Message 'Deployment prepared-summary URL wrapper should keep the downstream build summary path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.imagePlanPath)) -Message 'Deployment prepared-summary URL wrapper should expose the generated image-plan path.'
+  Assert-True -Condition ([int]$deploymentPreparedBuildSummary.imagePlanLowConfidenceCount -eq 0) -Message 'Deployment prepared-summary URL wrapper reported an unexpected low-confidence image-plan count.'
+  Assert-True -Condition (-not [bool]$deploymentPreparedBuildSummary.imagePlanNeedsReview) -Message 'Deployment prepared-summary URL wrapper should not require manual image review for explicit image specs.'
+  Assert-True -Condition ([bool]$deploymentPreparedBuildSummary.layoutCheckPassed) -Message 'Deployment prepared-summary URL wrapper reported a failed layout check.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.layoutCheckPath)) -Message 'Deployment prepared-summary URL wrapper should expose the layout-check path.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.rawReportPath)) -Message 'Deployment prepared-summary URL wrapper did not write the raw report file.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.cleanedReportPath)) -Message 'Deployment prepared-summary URL wrapper did not write the cleaned report file.'
   Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedBuildSummary.finalDocxPath)) -Message 'Deployment prepared-summary URL wrapper final docx path does not exist.'
+  $deploymentPreparedPipelineBuildSummary = (Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.buildSummaryPath) -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition ([string]$deploymentPreparedPipelineBuildSummary.reportProfileName -eq 'deployment-report') -Message 'Deployment prepared-summary downstream build summary should keep the deployment-report profile.'
+  Assert-True -Condition ([string]$deploymentPreparedPipelineBuildSummary.imageInputMode -eq 'specs-path') -Message 'Deployment prepared-summary downstream build summary should keep imageInputMode=specs-path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedPipelineBuildSummary.imagePlanPath)) -Message 'Deployment prepared-summary downstream build summary should expose the image-plan path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedPipelineBuildSummary.imageMapPath)) -Message 'Deployment prepared-summary downstream build summary should expose the image-map path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$deploymentPreparedPipelineBuildSummary.filledDocxWithImagesPath)) -Message 'Deployment prepared-summary downstream build summary should expose the filled-docx-with-images path.'
+  Assert-True -Condition ([int]$deploymentPreparedPipelineBuildSummary.imagePlanLowConfidenceCount -eq 0) -Message 'Deployment prepared-summary downstream build summary reported an unexpected low-confidence image-plan count.'
+  Assert-True -Condition (-not [bool]$deploymentPreparedPipelineBuildSummary.imagePlanNeedsReview) -Message 'Deployment prepared-summary downstream build summary should not require manual image review for explicit image specs.'
+  Assert-True -Condition ([bool]$deploymentPreparedPipelineBuildSummary.layoutCheckPassed) -Message 'Deployment prepared-summary downstream build summary reported a failed layout check.'
   $deploymentPreparedTrace = (Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTracePath) -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition ([string]$deploymentPreparedTrace.wrapper.generationMode -eq 'replay') -Message 'Deployment prepared-summary URL pipeline trace should keep generationMode=replay.'
   Assert-True -Condition ([string]$deploymentPreparedTrace.artifacts.promptPath -eq $deploymentPreparedPromptPath) -Message 'Deployment prepared-summary URL pipeline trace should expose the resolved prompt path.'
   Assert-True -Condition ([string]$deploymentPreparedTrace.build.reportInputMode -eq 'path') -Message 'Deployment prepared-summary URL pipeline trace should keep build.reportInputMode=path.'
-  Assert-True -Condition ([string]$deploymentPreparedTrace.build.imageInputMode -eq 'none') -Message 'Deployment prepared-summary URL pipeline trace should keep build.imageInputMode=none.'
+  Assert-True -Condition ([string]$deploymentPreparedTrace.build.imageInputMode -eq 'specs-path') -Message 'Deployment prepared-summary URL pipeline trace should keep build.imageInputMode=specs-path.'
   Assert-True -Condition ([bool]$deploymentPreparedTrace.build.validationPassed) -Message 'Deployment prepared-summary URL pipeline trace should expose validationPassed.'
   Assert-True -Condition ([int]$deploymentPreparedTrace.build.validationPaginationRiskCount -eq 0) -Message 'Deployment prepared-summary URL pipeline trace should expose zero pagination risks.'
   $deploymentPreparedTraceMarkdown = Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.pipelineTraceMarkdownPath) -Raw -Encoding UTF8
   Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Generation mode: replay') -Message 'Deployment prepared-summary URL pipeline markdown should include the replay generation mode.'
-  Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Image input mode: none') -Message 'Deployment prepared-summary URL pipeline markdown should include the build image input mode.'
+  Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Image input mode: specs-path') -Message 'Deployment prepared-summary URL pipeline markdown should include the build image input mode.'
   Assert-True -Condition ($deploymentPreparedTraceMarkdown -match 'Validation passed: True') -Message 'Deployment prepared-summary URL pipeline markdown should include validation status.'
   $deploymentPreparedCleanedReport = Get-Content -LiteralPath ([string]$deploymentPreparedBuildSummary.cleanedReportPath) -Raw -Encoding UTF8
   Assert-True -Condition ($deploymentPreparedCleanedReport -match '验证结果') -Message 'Deployment prepared-summary URL wrapper cleaned report is missing the expected results heading.'
@@ -4719,6 +4743,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the deployment prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report.replay.txt')) -Message 'Install script did not copy the deployment replay report fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\image-specs.json')) -Message 'Install script did not copy the deployment replay image specs fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\images\deploy-env.png')) -Message 'Install script did not copy the deployment environment screenshot fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\images\deploy-verify.png')) -Message 'Install script did not copy the deployment verification screenshot fixture.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\images\deploy-rollback.png')) -Message 'Install script did not copy the deployment rollback screenshot fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\software-test-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the software-test prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\software-test-report-prepared\report.replay.txt')) -Message 'Install script did not copy the software-test replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\weekly-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the weekly prepared-summary fixture.'
