@@ -1,6 +1,9 @@
 ﻿{
   "generatedCount": 3,
   "outputDir": "E:\\游戏\\openclaw-experiment-report-skill\\examples\\realistic-report-fixtures",
+  "assets": {
+    "studentCourseSelectionFlowchart": "E:\\游戏\\openclaw-experiment-report-skill\\examples\\realistic-report-fixtures\\student-course-selection-flowchart.png"
+  },
   "fixtures": [
     {
       "fileName": "single-table-experiment-filled.docx",

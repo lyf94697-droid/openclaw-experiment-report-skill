@@ -16,4 +16,6 @@ Regenerate the pack with:
 powershell -ExecutionPolicy Bypass -File .\scripts\export-realistic-report-fixtures.ps1 -Overwrite
 ```
 
+The standalone `student-course-selection-flowchart.png` asset is also generated and embedded as `图4-1` in `course-design-full-example.docx`.
+
 Use `scripts\extract-docx-template.ps1` to inspect outlines before changing field-map or layout logic.

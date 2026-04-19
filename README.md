@@ -410,7 +410,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\export-report-template-exampl
 powershell -ExecutionPolicy Bypass -File .\scripts\export-realistic-report-fixtures.ps1 -Overwrite
 ```
 
-默认会输出到 `examples/realistic-report-fixtures/`。这批文件是匿名合成的，不包含真实学生信息或原始学校模板，覆盖单表格填满实验报告、多表综合实验报告和完整课程设计报告三种结构，适合用来回归测试表格框架、摘要关键词、评分表、图表标题和截图密集正文。
+默认会输出到 `examples/realistic-report-fixtures/`。这批文件是匿名合成的，不包含真实学生信息或原始学校模板，覆盖单表格填满实验报告、多表综合实验报告和完整课程设计报告三种结构，适合用来回归测试表格框架、摘要关键词、评分表、图表标题、流程图和截图密集正文。其中 `student-course-selection-flowchart.png` 会作为 `图4-1` 嵌入完整课程设计报告。
 
 例如，直接回放仓库内置的月报 prepared-summary 示例：
 

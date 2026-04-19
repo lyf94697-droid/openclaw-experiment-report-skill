@@ -4,7 +4,7 @@ This note summarizes anonymized structure patterns observed from local universit
 
 Use this document as design guidance for profiles, field maps, image placement, and future template fixtures.
 
-Synthetic checked-in fixtures live in `examples/realistic-report-fixtures/` and can be regenerated with `scripts/export-realistic-report-fixtures.ps1`. They are derived from these patterns but use anonymized, made-up content.
+Synthetic checked-in fixtures live in `examples/realistic-report-fixtures/` and can be regenerated with `scripts/export-realistic-report-fixtures.ps1`. They are derived from these patterns but use anonymized, made-up content. The course-design fixture also embeds a generated student-course-selection flowchart as `图4-1`.
 
 ## Local Import Workflow
 

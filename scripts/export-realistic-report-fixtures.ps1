@@ -8,6 +8,203 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+Add-Type -AssemblyName System.Drawing
+
+function New-CourseSelectionFlowchartPng {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $width = 1400
+  $height = 1980
+  $bitmap = New-Object System.Drawing.Bitmap($width, $height)
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+
+  $titleFont = New-Object System.Drawing.Font("Microsoft YaHei", 30, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+  $font = New-Object System.Drawing.Font("Microsoft YaHei", 30, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+  $smallFont = New-Object System.Drawing.Font("Microsoft YaHei", 24, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+
+  $inkBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(35, 45, 55))
+  $noteBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(95, 105, 115))
+  $linePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 90, 105), 4)
+  $thinLinePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 90, 105), 3)
+  $boxBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(232, 241, 250))
+  $decisionBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 242, 218))
+  $endBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(226, 242, 232))
+  $warnBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(252, 232, 229))
+  $whiteBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+
+  function New-Rect {
+    param([int]$X, [int]$Y, [int]$W, [int]$H)
+    return (New-Object System.Drawing.Rectangle($X, $Y, $W, $H))
+  }
+
+  function Draw-CenteredText {
+    param(
+      [System.Drawing.Graphics]$G,
+      [System.Drawing.Rectangle]$Rect,
+      [string]$Text,
+      [System.Drawing.Font]$TextFont,
+      [System.Drawing.Brush]$Brush
+    )
+
+    $format = New-Object System.Drawing.StringFormat
+    $format.Alignment = [System.Drawing.StringAlignment]::Center
+    $format.LineAlignment = [System.Drawing.StringAlignment]::Center
+    $rectF = New-Object System.Drawing.RectangleF([single]$Rect.X, [single]$Rect.Y, [single]$Rect.Width, [single]$Rect.Height)
+    $G.DrawString($Text, $TextFont, $Brush, $rectF, $format)
+    $format.Dispose()
+  }
+
+  function Draw-RoundedRectangle {
+    param(
+      [System.Drawing.Graphics]$G,
+      [System.Drawing.Rectangle]$Rect,
+      [int]$Radius,
+      [System.Drawing.Brush]$Fill,
+      [System.Drawing.Pen]$Pen
+    )
+
+    $diameter = $Radius * 2
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddArc($Rect.X, $Rect.Y, $diameter, $diameter, 180, 90)
+    $path.AddArc($Rect.Right - $diameter, $Rect.Y, $diameter, $diameter, 270, 90)
+    $path.AddArc($Rect.Right - $diameter, $Rect.Bottom - $diameter, $diameter, $diameter, 0, 90)
+    $path.AddArc($Rect.X, $Rect.Bottom - $diameter, $diameter, $diameter, 90, 90)
+    $path.CloseFigure()
+    $G.FillPath($Fill, $path)
+    $G.DrawPath($Pen, $path)
+    $path.Dispose()
+  }
+
+  function Draw-Diamond {
+    param(
+      [System.Drawing.Graphics]$G,
+      [System.Drawing.Rectangle]$Rect,
+      [System.Drawing.Brush]$Fill,
+      [System.Drawing.Pen]$Pen
+    )
+
+    $points = @(
+      (New-Object System.Drawing.Point(($Rect.X + [int]($Rect.Width / 2)), $Rect.Y)),
+      (New-Object System.Drawing.Point($Rect.Right, ($Rect.Y + [int]($Rect.Height / 2)))),
+      (New-Object System.Drawing.Point(($Rect.X + [int]($Rect.Width / 2)), $Rect.Bottom)),
+      (New-Object System.Drawing.Point($Rect.X, ($Rect.Y + [int]($Rect.Height / 2))))
+    )
+    $G.FillPolygon($Fill, $points)
+    $G.DrawPolygon($Pen, $points)
+  }
+
+  function Draw-Node {
+    param(
+      [System.Drawing.Graphics]$G,
+      [string]$Kind,
+      [System.Drawing.Rectangle]$Rect,
+      [string]$Text,
+      [System.Drawing.Brush]$Fill
+    )
+
+    if ($Kind -eq "round") {
+      Draw-RoundedRectangle -G $G -Rect $Rect -Radius 42 -Fill $Fill -Pen $thinLinePen
+    } elseif ($Kind -eq "diamond") {
+      Draw-Diamond -G $G -Rect $Rect -Fill $Fill -Pen $thinLinePen
+    } else {
+      Draw-RoundedRectangle -G $G -Rect $Rect -Radius 14 -Fill $Fill -Pen $thinLinePen
+    }
+    Draw-CenteredText -G $G -Rect $Rect -Text $Text -TextFont $font -Brush $inkBrush
+  }
+
+  function Draw-Arrow {
+    param(
+      [System.Drawing.Graphics]$G,
+      [int]$X1,
+      [int]$Y1,
+      [int]$X2,
+      [int]$Y2,
+      [string]$Label = "",
+      [int]$LabelDx = 0,
+      [int]$LabelDy = 0
+    )
+
+    $G.DrawLine($linePen, $X1, $Y1, $X2, $Y2)
+    $angle = [Math]::Atan2(($Y2 - $Y1), ($X2 - $X1))
+    $size = 18
+    $a1 = $angle + [Math]::PI * 0.82
+    $a2 = $angle - [Math]::PI * 0.82
+    $points = @(
+      (New-Object System.Drawing.Point($X2, $Y2)),
+      (New-Object System.Drawing.Point(([int]($X2 + $size * [Math]::Cos($a1))), ([int]($Y2 + $size * [Math]::Sin($a1))))),
+      (New-Object System.Drawing.Point(([int]($X2 + $size * [Math]::Cos($a2))), ([int]($Y2 + $size * [Math]::Sin($a2)))))
+    )
+    $G.FillPolygon((New-Object System.Drawing.SolidBrush($linePen.Color)), $points)
+
+    if (-not [string]::IsNullOrWhiteSpace($Label)) {
+      $labelX = [int](($X1 + $X2) / 2 + $LabelDx)
+      $labelY = [int](($Y1 + $Y2) / 2 + $LabelDy)
+      $labelSize = $G.MeasureString($Label, $smallFont)
+      $labelRect = New-Object System.Drawing.Rectangle(
+        ([int]($labelX - 8)),
+        ([int]($labelY - 4)),
+        ([int]($labelSize.Width + 16)),
+        ([int]($labelSize.Height + 8))
+      )
+      $G.FillRectangle($whiteBrush, $labelRect)
+      $G.DrawString($Label, $smallFont, $inkBrush, $labelX, $labelY)
+    }
+  }
+
+  try {
+    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+    $graphics.Clear([System.Drawing.Color]::White)
+
+    $titleRect = New-Object System.Drawing.Rectangle(0, 28, $width, 58)
+    Draw-CenteredText -G $graphics -Rect $titleRect -Text "学生选课系统流程图" -TextFont $titleFont -Brush $inkBrush
+
+    Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 100 300 90) -Text "开始" -Fill $endBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 270 460 100) -Text "输入用户名和密码" -Fill $boxBrush
+    Draw-Node -G $graphics -Kind "diamond" -Rect (New-Rect 500 460 400 190) -Text "用户名和密码`n是否正确" -Fill $decisionBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 100 500 320 120) -Text "提示登录失败`n重新输入" -Fill $warnBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 750 460 110) -Text "进入对应角色页面" -Fill $boxBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 960 460 110) -Text "选择选课 / 退课 / 查询" -Fill $boxBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 1160 460 110) -Text "提交操作请求" -Fill $boxBrush
+    Draw-Node -G $graphics -Kind "diamond" -Rect (New-Rect 500 1360 400 190) -Text "课程容量和时间`n是否满足" -Fill $decisionBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 970 1400 330 120) -Text "提示容量不足`n或时间冲突" -Fill $warnBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 1640 460 110) -Text "写入选课记录`n刷新课表" -Fill $boxBrush
+    Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 1810 300 80) -Text "结束" -Fill $endBrush
+
+    Draw-Arrow -G $graphics -X1 700 -Y1 190 -X2 700 -Y2 270
+    Draw-Arrow -G $graphics -X1 700 -Y1 370 -X2 700 -Y2 460
+    Draw-Arrow -G $graphics -X1 700 -Y1 650 -X2 700 -Y2 750 -Label "是" -LabelDx 22 -LabelDy -8
+    Draw-Arrow -G $graphics -X1 700 -Y1 860 -X2 700 -Y2 960
+    Draw-Arrow -G $graphics -X1 700 -Y1 1070 -X2 700 -Y2 1160
+    Draw-Arrow -G $graphics -X1 700 -Y1 1270 -X2 700 -Y2 1360
+    Draw-Arrow -G $graphics -X1 700 -Y1 1550 -X2 700 -Y2 1640 -Label "是" -LabelDx 22 -LabelDy -8
+    Draw-Arrow -G $graphics -X1 700 -Y1 1750 -X2 700 -Y2 1810
+    Draw-Arrow -G $graphics -X1 500 -Y1 555 -X2 420 -Y2 555 -Label "否" -LabelDx -35 -LabelDy -36
+    $graphics.DrawLine($linePen, 100, 560, 60, 560)
+    $graphics.DrawLine($linePen, 60, 560, 60, 320)
+    $graphics.DrawLine($linePen, 60, 320, 430, 320)
+    Draw-Arrow -G $graphics -X1 430 -Y1 320 -X2 470 -Y2 320
+    Draw-Arrow -G $graphics -X1 900 -Y1 1455 -X2 970 -Y2 1455 -Label "否" -LabelDx 10 -LabelDy -36
+    $graphics.DrawLine($linePen, 1135, 1400, 1135, 1020)
+    $graphics.DrawLine($linePen, 1135, 1020, 970, 1020)
+    Draw-Arrow -G $graphics -X1 970 -Y1 1020 -X2 930 -Y2 1020
+
+    $noteRect = New-Object System.Drawing.Rectangle(0, ($height - 42), $width, 36)
+    Draw-CenteredText -G $graphics -Rect $noteRect -Text "合成样例：用于报告生成流程图测试，不含真实学生信息" -TextFont $smallFont -Brush $noteBrush
+
+    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+  } finally {
+    foreach ($resource in @($graphics, $bitmap, $titleFont, $font, $smallFont, $inkBrush, $noteBrush, $linePen, $thinLinePen, $boxBrush, $decisionBrush, $endBrush, $warnBrush, $whiteBrush)) {
+      if ($null -ne $resource) {
+        $resource.Dispose()
+      }
+    }
+  }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $OutputDir = Join-Path $repoRoot "examples\realistic-report-fixtures"
@@ -20,6 +217,7 @@ $fixtureFileNames = @(
   "single-table-experiment-filled.docx",
   "integrated-experiment-multi-table.docx",
   "course-design-full-example.docx",
+  "student-course-selection-flowchart.png",
   "README.md",
   "realistic-report-fixtures-summary.json"
 )
@@ -33,10 +231,16 @@ foreach ($fileName in $fixtureFileNames) {
 
 $specPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), ("realistic-report-fixtures-" + [Guid]::NewGuid().ToString("N") + ".json"))
 $scriptPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), ("realistic-report-fixtures-" + [Guid]::NewGuid().ToString("N") + ".py"))
+$flowchartPath = Join-Path $resolvedOutputDir "student-course-selection-flowchart.png"
+
+New-CourseSelectionFlowchartPng -Path $flowchartPath
 
 [System.IO.File]::WriteAllText(
   $specPath,
-  (([pscustomobject]@{ outputDir = $resolvedOutputDir } | ConvertTo-Json -Depth 4) + [Environment]::NewLine),
+  (([pscustomobject]@{
+      outputDir = $resolvedOutputDir
+      flowchartPath = $flowchartPath
+    } | ConvertTo-Json -Depth 4) + [Environment]::NewLine),
   (New-Object System.Text.UTF8Encoding($true))
 )
 
@@ -509,6 +713,8 @@ def write_readme(path, fixtures):
         "powershell -ExecutionPolicy Bypass -File .\\scripts\\export-realistic-report-fixtures.ps1 -Overwrite",
         "```",
         "",
+        "The standalone `student-course-selection-flowchart.png` asset is also generated and embedded as `图4-1` in `course-design-full-example.docx`.",
+        "",
         "Use `scripts\\extract-docx-template.ps1` to inspect outlines before changing field-map or layout logic.",
         "",
     ])
@@ -545,12 +751,11 @@ def main():
             "chart": os.path.join(asset_dir, "chart.png"),
             "terminal": os.path.join(asset_dir, "terminal.png"),
             "topology": os.path.join(asset_dir, "topology.png"),
-            "flow": os.path.join(asset_dir, "flow.png"),
+            "flow": spec["flowchartPath"],
         }
         write_png(assets["chart"], 900, 360, (214, 231, 246))
         write_png(assets["terminal"], 900, 360, (232, 238, 224))
         write_png(assets["topology"], 900, 360, (240, 230, 216))
-        write_png(assets["flow"], 900, 360, (228, 224, 242))
 
         build_single_table_experiment(os.path.join(output_dir, fixtures[0]["fileName"]), assets)
         build_integrated_experiment(os.path.join(output_dir, fixtures[1]["fileName"]), assets)
@@ -563,6 +768,9 @@ def main():
     summary = {
         "generatedCount": len(fixtures),
         "outputDir": output_dir,
+        "assets": {
+            "studentCourseSelectionFlowchart": spec["flowchartPath"],
+        },
         "fixtures": fixtures,
     }
     with open(os.path.join(output_dir, "realistic-report-fixtures-summary.json"), "w", encoding="utf-8-sig", newline="\n") as handle:

@@ -39,6 +39,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added `scripts/import-report-template-references.ps1` for local-only importing, WPS/Word conversion, and outline extraction of real report templates and examples.
 - Added `docs/real-template-patterns.md` with anonymized real-world experiment-report and course-design template patterns for future profile and fixture upgrades.
 - Added `scripts/export-realistic-report-fixtures.ps1` and `examples/realistic-report-fixtures/` with synthetic real-world-style `docx` fixtures for filled single-table experiment reports, integrated experiment reports, and full course-design reports.
+- Added a generated `student-course-selection-flowchart.png` fixture and embedded it as `图4-1` in the full course-design report example.
 
 ### Changed
 

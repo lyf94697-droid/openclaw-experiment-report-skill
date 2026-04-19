@@ -4732,12 +4732,13 @@ URL: https://example.com/network-lab
   $realisticFixtureDir = Join-Path $repoRoot 'examples\realistic-report-fixtures'
   $realisticFixtureReadmePath = Join-Path $realisticFixtureDir 'README.md'
   $realisticFixtureSummaryPath = Join-Path $realisticFixtureDir 'realistic-report-fixtures-summary.json'
+  $realisticFlowchartPath = Join-Path $realisticFixtureDir 'student-course-selection-flowchart.png'
   $realisticFixtureFiles = @(
     'single-table-experiment-filled.docx',
     'integrated-experiment-multi-table.docx',
     'course-design-full-example.docx'
   )
-  foreach ($fixturePath in @($realisticFixtureReadmePath, $realisticFixtureSummaryPath) + @($realisticFixtureFiles | ForEach-Object { Join-Path $realisticFixtureDir $_ })) {
+  foreach ($fixturePath in @($realisticFixtureReadmePath, $realisticFixtureSummaryPath, $realisticFlowchartPath) + @($realisticFixtureFiles | ForEach-Object { Join-Path $realisticFixtureDir $_ })) {
     Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Realistic report fixture is missing: {0}" -f $fixturePath)
   }
   $realisticFixtureOutputDir = Join-Path $tempRoot 'realistic-report-fixtures-regenerated'
@@ -4751,6 +4752,16 @@ URL: https://example.com/network-lab
     $generatedFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $generatedFixturePath -Format markdown | Out-String
     Assert-True -Condition ((Normalize-OutlineForComparison -Text $checkedInFixtureOutline) -eq (Normalize-OutlineForComparison -Text $generatedFixtureOutline)) -Message ("Checked-in realistic fixture drifted from regenerated output: {0}" -f $fixtureFile)
   }
+  $generatedFlowchartPath = Join-Path $realisticFixtureOutputDir 'student-course-selection-flowchart.png'
+  Assert-True -Condition (Test-Path -LiteralPath $generatedFlowchartPath -PathType Leaf) -Message 'Realistic fixture exporter did not generate the standalone course-design flowchart image.'
+  Assert-True -Condition ((Get-FileHash -LiteralPath $realisticFlowchartPath -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $generatedFlowchartPath -Algorithm SHA256).Hash) -Message 'Checked-in realistic flowchart image drifted from regenerated output.'
+  $flowchartImage = [System.Drawing.Image]::FromFile($realisticFlowchartPath)
+  try {
+    Assert-True -Condition ($flowchartImage.Width -ge 1200) -Message 'Realistic flowchart image should be wide enough for readable report insertion.'
+    Assert-True -Condition ($flowchartImage.Height -ge 1600) -Message 'Realistic flowchart image should be tall enough for the full course-design process.'
+  } finally {
+    $flowchartImage.Dispose()
+  }
   $singleTableFixtureOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $realisticFixtureDir 'single-table-experiment-filled.docx') -Format markdown | Out-String
   Assert-True -Condition ($singleTableFixtureOutline -match 'Table count: 1') -Message 'Single-table realistic fixture should keep the framed one-table report shape.'
   Assert-True -Condition ($singleTableFixtureOutline -match '一、实验目的') -Message 'Single-table realistic fixture should include filled report sections inside the body cell.'
@@ -4761,6 +4772,14 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignFixtureOutline -match '摘要：') -Message 'Course-design fixture should include an abstract block.'
   Assert-True -Condition ($courseDesignFixtureOutline -match '关键词：') -Message 'Course-design fixture should include keywords.'
   Assert-True -Condition ($courseDesignFixtureOutline -match '表3-1') -Message 'Course-design fixture should include realistic table captions.'
+  $courseDesignFlowchartInspectDir = Join-Path $tempRoot 'course-design-flowchart-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $realisticFixtureDir 'course-design-full-example.docx'), $courseDesignFlowchartInspectDir)
+  $flowchartHash = (Get-FileHash -LiteralPath $realisticFlowchartPath -Algorithm SHA256).Hash
+  $courseDesignMediaHashes = @(
+    Get-ChildItem -LiteralPath (Join-Path $courseDesignFlowchartInspectDir 'word\media') -Filter '*.png' -File |
+      ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
+  )
+  Assert-True -Condition ($courseDesignMediaHashes -contains $flowchartHash) -Message 'Course-design fixture should embed the generated course-selection flowchart image.'
   $results.Add('realistic report fixtures OK') | Out-Null
 
   $referenceImportOutputDir = Join-Path $tempRoot 'real-template-reference-import'
