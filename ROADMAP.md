@@ -243,11 +243,13 @@ Implemented baseline:
 - `examples/weekly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/monthly-report-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
 - `examples/meeting-minutes-prepared/` as a checked-in prepared-summary replay bundle with relative linked paths
+- `scripts/export-report-template-examples.ps1` plus `examples/report-templates/` as a checked-in template pack generated from the built-in profiles
 - smoke coverage for replaying a checked-in deployment-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in software-test-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in weekly-report prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in monthly prepared-summary bundle through `build-report-from-url.ps1`
 - smoke coverage for replaying a checked-in meeting-minutes prepared-summary bundle through `build-report-from-url.ps1`
+- smoke coverage for regenerating the checked-in report-template example pack and comparing its extracted outlines against the committed `docx` files
 
 `weekly-report`, `meeting-minutes`, and `monthly-report` have crossed the threshold into `profiles/`, while the preset copies remain as reusable example snapshots and sample-runner inputs.
 

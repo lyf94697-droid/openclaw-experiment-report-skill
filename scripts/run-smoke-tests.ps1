@@ -4694,6 +4694,41 @@ URL: https://example.com/network-lab
   }
   $results.Add('course-design Feishu wrapper OK') | Out-Null
 
+  $templateExamplesDir = Join-Path $repoRoot 'examples\report-templates'
+  $templateExamplesReadmePath = Join-Path $templateExamplesDir 'README.md'
+  $templateExamplesSummaryPath = Join-Path $templateExamplesDir 'report-template-examples-summary.json'
+  $templateExampleFiles = @(
+    'course-design-report-template.docx',
+    'deployment-report-template.docx',
+    'experiment-report-template.docx',
+    'internship-report-template.docx',
+    'meeting-minutes-template.docx',
+    'monthly-report-template.docx',
+    'software-test-report-template.docx',
+    'weekly-report-template.docx'
+  )
+  foreach ($fixturePath in @($templateExamplesReadmePath, $templateExamplesSummaryPath) + @($templateExampleFiles | ForEach-Object { Join-Path $templateExamplesDir $_ })) {
+    Assert-True -Condition (Test-Path -LiteralPath $fixturePath -PathType Leaf) -Message ("Report-template example fixture is missing: {0}" -f $fixturePath)
+  }
+  $templateExamplesOutputDir = Join-Path $tempRoot 'report-template-examples-regenerated'
+  $templateExamplesGeneration = & (Join-Path $repoRoot 'scripts\export-report-template-examples.ps1') -OutputDir $templateExamplesOutputDir -Overwrite
+  Assert-True -Condition ([int]$templateExamplesGeneration.generatedCount -eq 8) -Message 'Template-example exporter should generate one template for each built-in report profile.'
+  foreach ($templateFile in $templateExampleFiles) {
+    $checkedInTemplatePath = Join-Path $templateExamplesDir $templateFile
+    $generatedTemplatePath = Join-Path $templateExamplesOutputDir $templateFile
+    Assert-True -Condition (Test-Path -LiteralPath $generatedTemplatePath -PathType Leaf) -Message ("Template-example exporter did not generate: {0}" -f $templateFile)
+    $checkedInOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $checkedInTemplatePath -Format markdown | Out-String
+    $generatedOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $generatedTemplatePath -Format markdown | Out-String
+    Assert-True -Condition ((Normalize-OutlineForComparison -Text $checkedInOutline) -eq (Normalize-OutlineForComparison -Text $generatedOutline)) -Message ("Checked-in template example drifted from regenerated output: {0}" -f $templateFile)
+  }
+  $experimentTemplateOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $templateExamplesDir 'experiment-report-template.docx') -Format markdown | Out-String
+  Assert-True -Condition ($experimentTemplateOutline -match 'Table count: 1') -Message 'Checked-in experiment template example should contain a metadata table.'
+  Assert-True -Condition ($experimentTemplateOutline -match '一、实验目的') -Message 'Checked-in experiment template example should contain numbered report headings.'
+  $courseDesignTemplateOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $templateExamplesDir 'course-design-report-template.docx') -Format markdown | Out-String
+  Assert-True -Condition ($courseDesignTemplateOutline -match 'Table count: 1') -Message 'Checked-in course-design template example should contain a metadata table.'
+  Assert-True -Condition ($courseDesignTemplateOutline -match '四、方案设计与实现') -Message 'Checked-in course-design template example should contain the implementation heading.'
+  $results.Add('report template examples OK') | Out-Null
+
   $installRoot = Join-Path $tempRoot 'install-root'
   $installTarget = Join-Path $installRoot 'skill-install'
   & (Join-Path $repoRoot 'scripts\install-skill.ps1') -TargetDir $installTarget | Out-Null
@@ -4716,6 +4751,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-field-map.ps1')) -Message 'Install script did not copy field-map generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-docx-image-map.ps1')) -Message 'Install script did not copy image-map generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\generate-report-inputs.ps1')) -Message 'Install script did not copy report-input generation script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\export-report-template-examples.ps1')) -Message 'Install script did not copy the template-example exporter script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\insert-docx-images.ps1')) -Message 'Install script did not copy image insertion script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\new-report-profile.ps1')) -Message 'Install script did not copy profile scaffold generator script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\prepare-report-prompt.ps1')) -Message 'Install script did not copy prompt preparation script.'
@@ -4741,6 +4777,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\weekly-report.json')) -Message 'Install script did not copy the weekly profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\meeting-minutes.json')) -Message 'Install script did not copy the meeting-minutes profile preset example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\profile-presets\monthly-report.json')) -Message 'Install script did not copy the monthly-report profile preset example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\README.md')) -Message 'Install script did not copy the report-template example README.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\experiment-report-template.docx')) -Message 'Install script did not copy the experiment template example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\course-design-report-template.docx')) -Message 'Install script did not copy the course-design template example.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\weekly-report-template.docx')) -Message 'Install script did not copy the weekly template example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report-inputs-summary.json')) -Message 'Install script did not copy the deployment prepared-summary fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\report.replay.txt')) -Message 'Install script did not copy the deployment replay report fixture.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\deployment-report-prepared\image-specs.json')) -Message 'Install script did not copy the deployment replay image specs fixture.'

@@ -35,6 +35,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Added `examples/weekly-report-prepared/` as a reusable prepared-summary replay bundle for the built-in `weekly-report` profile.
 - Added `examples/monthly-report-prepared/` as a reusable prepared-summary replay bundle for the built-in `monthly-report` profile.
 - Added `examples/meeting-minutes-prepared/` as a reusable prepared-summary replay bundle for the built-in `meeting-minutes` profile.
+- Added `scripts/export-report-template-examples.ps1` and `examples/report-templates/` so the repository now ships a checked-in template pack for all built-in report profiles.
 
 ### Changed
 
@@ -63,6 +64,7 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - Expanded smoke coverage so a checked-in `weekly-report` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 - Expanded smoke coverage so a checked-in `monthly-report` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
 - Expanded smoke coverage so a checked-in `meeting-minutes` prepared-summary bundle can replay through `build-report-from-url.ps1` with resolved relative prompt, metadata, requirements, defaults, and reference-text paths.
+- Expanded smoke coverage so the checked-in report-template example pack is regenerated and compared against the committed `docx` outlines.
 
 ### Fixed
 

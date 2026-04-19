@@ -329,6 +329,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 如果你把 `report-inputs-summary.json` 连同 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、参考文本一起提交到仓库，`build-report-from-url.ps1` / `build-report-from-feishu.ps1` 现在会把 summary 里的相对路径按 summary 文件所在目录解析；checked-in prepared-summary bundle 不再要求保留原来的临时生成目录
 - 仓库里现在附带了五份可直接 replay 的 prepared-summary 输入包：部署运维报告示例 `examples/deployment-report-prepared/`、软件测试报告示例 `examples/software-test-report-prepared/`、周报示例 `examples/weekly-report-prepared/`、月报示例 `examples/monthly-report-prepared/` 和会议纪要示例 `examples/meeting-minutes-prepared/`；它们都包含 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、本地参考文本和一份 `report.replay.txt`
 - 其中 `examples/deployment-report-prepared/` 现在还附带了 `image-specs.json` 和 `images/` 下三张 checked-in 截图示例，适合直接 smoke 或手动回放“部署环境 / 验证结果 / 回滚预案”这条带图链路
+- 如果你只是想先拿现成 `docx` 模板试跑，不想自己再找空白模板，可以直接使用 `examples/report-templates/` 下的 8 份内置模板样例；它们覆盖 `experiment-report`、`course-design-report`、`internship-report`、`software-test-report`、`deployment-report`、`weekly-report`、`meeting-minutes` 和 `monthly-report`
+- 这些模板样例由 `scripts/export-report-template-examples.ps1` 按当前 profile 自动导出；如果你改了 profile 里的 metadata 字段或章节标题，可以重新运行这个脚本刷新模板 pack
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
@@ -385,11 +387,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-profile-preset-samples.ps
 
 这个命令会额外写出 `profile-preset-samples.md`，方便直接预览每个 preset 对应的 `prompt.txt`、`metadata.auto.json` 和 `requirements.auto.json` 路径。
 
+如果你想把当前 built-in profile 对应的模板样例一次性导出来：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\export-report-template-examples.ps1
+```
+
+默认会输出到 `examples/report-templates/`；如果你想导到别的目录，可以额外传 `-OutputDir`。
+
 例如，直接回放仓库内置的月报 prepared-summary 示例：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
-  -TemplatePath ".\your-monthly-template.docx" `
+  -TemplatePath ".\examples\report-templates\monthly-report-template.docx" `
   -PreparedInputsSummaryPath ".\examples\monthly-report-prepared\report-inputs-summary.json" `
   -PreGeneratedReportPath ".\examples\monthly-report-prepared\report.replay.txt" `
   -OutputDir ".\tests-output\monthly-report-replay" `
@@ -402,7 +412,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
-  -TemplatePath ".\your-weekly-template.docx" `
+  -TemplatePath ".\examples\report-templates\weekly-report-template.docx" `
   -PreparedInputsSummaryPath ".\examples\weekly-report-prepared\report-inputs-summary.json" `
   -PreGeneratedReportPath ".\examples\weekly-report-prepared\report.replay.txt" `
   -OutputDir ".\tests-output\weekly-report-replay" `
@@ -415,7 +425,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
-  -TemplatePath ".\your-software-test-template.docx" `
+  -TemplatePath ".\examples\report-templates\software-test-report-template.docx" `
   -PreparedInputsSummaryPath ".\examples\software-test-report-prepared\report-inputs-summary.json" `
   -PreGeneratedReportPath ".\examples\software-test-report-prepared\report.replay.txt" `
   -OutputDir ".\tests-output\software-test-report-replay" `
@@ -428,7 +438,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
-  -TemplatePath ".\your-deployment-template.docx" `
+  -TemplatePath ".\examples\report-templates\deployment-report-template.docx" `
   -PreparedInputsSummaryPath ".\examples\deployment-report-prepared\report-inputs-summary.json" `
   -ImageSpecsPath ".\examples\deployment-report-prepared\image-specs.json" `
   -PreGeneratedReportPath ".\examples\deployment-report-prepared\report.replay.txt" `
@@ -442,7 +452,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-url.ps1 `
-  -TemplatePath ".\your-meeting-template.docx" `
+  -TemplatePath ".\examples\report-templates\meeting-minutes-template.docx" `
   -PreparedInputsSummaryPath ".\examples\meeting-minutes-prepared\report-inputs-summary.json" `
   -PreGeneratedReportPath ".\examples\meeting-minutes-prepared\report.replay.txt" `
   -OutputDir ".\tests-output\meeting-minutes-replay" `
