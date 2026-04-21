@@ -621,6 +621,27 @@ function Resolve-ImageInputSpec {
   }
 }
 
+function Test-IsCourseDesignFlowchartImageSpec {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$ImageSpec
+  )
+
+  $signals = @(
+    [string]$ImageSpec.Caption,
+    [string]$ImageSpec.SectionName,
+    [string]$ImageSpec.BaseName
+  )
+
+  foreach ($signal in $signals) {
+    if (-not [string]::IsNullOrWhiteSpace($signal) -and $signal -match '(?i)(流程图|flowchart|flow-chart)') {
+      return $true
+    }
+  }
+
+  return $false
+}
+
 function New-ImageLayoutOutput {
   param(
     [AllowNull()]
@@ -1025,6 +1046,14 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
   $resolvedRule = $sectionRuleLookup[$resolvedSectionId]
   $caption = if ($spec.CaptionProvided) { $spec.Caption } else { Get-DefaultCaption -Index ($index + 1) -SectionId $resolvedSectionId -BaseName $spec.BaseName }
   $widthCm = if ($null -ne $spec.WidthCm) { $spec.WidthCm } else { $defaultImageWidthCm }
+  $isRowLayout = ($null -ne $spec.Layout -and [string]::Equals([string]$spec.Layout.mode, "row", [System.StringComparison]::OrdinalIgnoreCase))
+  if (
+    [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+    (-not $isRowLayout) -and
+    (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $spec)
+  ) {
+    $widthCm = [Math]::Max([double]$widthCm, 14.8)
+  }
 
   $sectionHeading = ($discoveredSections | Where-Object { $_.id -eq $resolvedSectionId } | Select-Object -First 1 -ExpandProperty headingText)
 

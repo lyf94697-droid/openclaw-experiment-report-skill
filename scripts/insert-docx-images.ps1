@@ -719,6 +719,54 @@ function Resolve-ImageSpecification {
   }
 }
 
+function Test-IsCourseDesignFlowchartImageSpec {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$ImageSpec
+  )
+
+  $signals = @(
+    [string]$ImageSpec.Caption,
+    [string]$ImageSpec.SectionName,
+    [System.IO.Path]::GetFileNameWithoutExtension([string]$ImageSpec.ImagePath)
+  )
+
+  foreach ($signal in $signals) {
+    if (-not [string]::IsNullOrWhiteSpace($signal) -and $signal -match '(?i)(流程图|flowchart|flow-chart)') {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Apply-ProfileSpecificImageSpecAdjustments {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object[]]$ImageSpecs,
+
+    [Parameter(Mandatory = $true)]
+    [object]$ReportProfile
+  )
+
+  if (-not [string]::Equals([string]$ReportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+    return $ImageSpecs
+  }
+
+  foreach ($imageSpec in $ImageSpecs) {
+    $isRowLayout = ($null -ne $imageSpec.Layout -and [string]::Equals([string]$imageSpec.Layout.Mode, "row", [System.StringComparison]::OrdinalIgnoreCase))
+    if ($isRowLayout) {
+      continue
+    }
+
+    if (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $imageSpec) {
+      $imageSpec.WidthCm = [Math]::Max([double]$imageSpec.WidthCm, 14.8)
+    }
+  }
+
+  return $ImageSpecs
+}
+
 function Get-ImageContentType {
   param(
     [Parameter(Mandatory = $true)]
@@ -1540,6 +1588,7 @@ Initialize-SectionRules -ReportProfile $reportProfile
 
 $imageItems = Get-ImageMappingItems -RootObject $imageMappingDocument.RootObject
 $imageSpecs = @($imageItems | ForEach-Object { Resolve-ImageSpecification -Item $_ })
+$imageSpecs = @(Apply-ProfileSpecificImageSpecAdjustments -ImageSpecs $imageSpecs -ReportProfile $reportProfile)
 if ($imageSpecs.Count -eq 0) {
   throw "No image mapping items were provided."
 }

@@ -388,6 +388,84 @@ function Remove-TrailingEmptyBodyParagraphs {
   return $removedCount
 }
 
+function Get-NextMeaningfulBodyParagraphInfo {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $candidate = $Paragraph.NextSibling
+  while ($null -ne $candidate) {
+    if ($candidate.LocalName -eq "p") {
+      $text = Get-ParagraphText -Paragraph $candidate -NamespaceManager $NamespaceManager
+      if (-not [string]::IsNullOrWhiteSpace($text)) {
+        return [pscustomobject]@{
+          Paragraph = $candidate
+          Text = $text
+        }
+      }
+    }
+
+    $candidate = $candidate.NextSibling
+  }
+
+  return $null
+}
+
+function Remove-CourseDesignDuplicatePlaceholderParagraphs {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $removedCount = 0
+  $paragraphs = @($Body.SelectNodes("./w:p", $NamespaceManager))
+  foreach ($paragraph in $paragraphs) {
+    if ($null -eq $paragraph.ParentNode) {
+      continue
+    }
+
+    $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $NamespaceManager
+    if ([string]::IsNullOrWhiteSpace($text)) {
+      continue
+    }
+
+    $nextInfo = Get-NextMeaningfulBodyParagraphInfo -Paragraph $paragraph -NamespaceManager $NamespaceManager
+    if ($null -eq $nextInfo) {
+      continue
+    }
+
+    $removeParagraph = $false
+    switch ($text) {
+      "问题分析（需求分析、可行性分析）" {
+        $removeParagraph = [string]::Equals([string]$nextInfo.Text, "摘要：", [System.StringComparison]::Ordinal)
+        break
+      }
+      "实现结果" {
+        $removeParagraph = ([string]$nextInfo.Text -match '^[五5][、\.．]\s*实现结果$')
+        break
+      }
+      "总结" {
+        $removeParagraph = ([string]$nextInfo.Text -match '^[七7][、\.．]\s*(设计)?总结$')
+        break
+      }
+    }
+
+    if ($removeParagraph) {
+      [void]$paragraph.ParentNode.RemoveChild($paragraph)
+      $removedCount++
+    }
+  }
+
+  return $removedCount
+}
+
 function Get-HeadingPattern {
   param(
     [Parameter(Mandatory = $true)]
@@ -1511,6 +1589,11 @@ try {
     Apply-CourseDesignCoverStyles -Body $body
   }
 
+  $removedCourseDesignPlaceholderCount = 0
+  if ($isCourseDesignReport) {
+    $removedCourseDesignPlaceholderCount = Remove-CourseDesignDuplicatePlaceholderParagraphs -Body $body -NamespaceManager $script:namespaceManager
+  }
+
   foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
     if (Normalize-TableRowLayout -Row $row -NormalizeCellMargins (-not $useTemplateLikeCompactStyle)) {
       $normalizedBodyRowCount++
@@ -1544,6 +1627,7 @@ try {
     styledCodeCount = $styledCodeCount
     styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
+    removedCourseDesignPlaceholderCount = $removedCourseDesignPlaceholderCount
     removedTrailingEmptyParagraphCount = $removedTrailingEmptyParagraphCount
   }
 } finally {
