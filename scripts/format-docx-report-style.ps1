@@ -1049,6 +1049,135 @@ function Get-TopLevelTableProfileSignal {
   }
 }
 
+function Test-IsCourseDesignCoverTitleText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $compact = Normalize-OpenXmlText -Text $Text
+  return ($compact -match '课程设计报告$')
+}
+
+function Test-IsCourseDesignCoverSubtitleText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $compact = Normalize-OpenXmlText -Text $Text
+  return ($compact -match '学年.*学期')
+}
+
+function Get-CourseDesignCoverElements {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  $titleParagraph = $null
+  $subtitleParagraph = $null
+  $coverTable = $null
+
+  foreach ($child in @($Body.ChildNodes)) {
+    if ($child.LocalName -eq "p") {
+      $text = Get-ParagraphText -Paragraph $child -NamespaceManager $script:namespaceManager
+      if ([string]::IsNullOrWhiteSpace($text)) {
+        continue
+      }
+
+      if ($null -eq $titleParagraph -and (Test-IsCourseDesignCoverTitleText -Text $text)) {
+        $titleParagraph = $child
+        continue
+      }
+
+      if ($null -ne $titleParagraph -and $null -eq $subtitleParagraph -and (Test-IsCourseDesignCoverSubtitleText -Text $text)) {
+        $subtitleParagraph = $child
+        continue
+      }
+
+      if (Test-IsSectionHeading -Text $text) {
+        break
+      }
+
+      continue
+    }
+
+    if ($child.LocalName -eq "tbl" -and $null -eq $coverTable) {
+      $tableSignal = Get-TopLevelTableProfileSignal -Table $child
+      if (
+        -not $tableSignal.HasDrawing -and
+        -not $tableSignal.HasSectionHeading -and
+        $tableSignal.RowCount -ge 4 -and
+        $tableSignal.MetadataParagraphCount -ge 4
+      ) {
+        $coverTable = $child
+      }
+      continue
+    }
+  }
+
+  return [pscustomobject]@{
+    TitleParagraph = $titleParagraph
+    SubtitleParagraph = $subtitleParagraph
+    CoverTable = $coverTable
+  }
+}
+
+function Apply-CourseDesignCoverStyles {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  $coverElements = Get-CourseDesignCoverElements -Body $Body
+
+  if ($null -ne $coverElements.TitleParagraph) {
+    Set-ParagraphJustification -Paragraph $coverElements.TitleParagraph -Value "center"
+    Set-ParagraphIndent -Paragraph $coverElements.TitleParagraph -FirstLine 0
+    Set-ParagraphSpacing -Paragraph $coverElements.TitleParagraph -Before 0 -After 120 -Line 320
+    Set-ParagraphBold -Paragraph $coverElements.TitleParagraph
+    Set-RunTypography -Paragraph $coverElements.TitleParagraph -FontName "黑体" -SizeHalfPoints 52
+  }
+
+  if ($null -ne $coverElements.SubtitleParagraph) {
+    Set-ParagraphJustification -Paragraph $coverElements.SubtitleParagraph -Value "center"
+    Set-ParagraphIndent -Paragraph $coverElements.SubtitleParagraph -FirstLine 0
+    Set-ParagraphSpacing -Paragraph $coverElements.SubtitleParagraph -Before 0 -After 160 -Line 320
+    Set-ParagraphPagination -Paragraph $coverElements.SubtitleParagraph -KeepNext $false -KeepLines $false
+    Set-RunTypography -Paragraph $coverElements.SubtitleParagraph -FontName "楷体_GB2312" -SizeHalfPoints 30
+  }
+
+  if ($null -eq $coverElements.CoverTable) {
+    return
+  }
+
+  $rows = @($coverElements.CoverTable.SelectNodes("./w:tr", $script:namespaceManager))
+  for ($rowIndex = 0; $rowIndex -lt $rows.Count; $rowIndex++) {
+    $cells = @($rows[$rowIndex].SelectNodes("./w:tc", $script:namespaceManager))
+    for ($cellIndex = 0; $cellIndex -lt $cells.Count; $cellIndex++) {
+      foreach ($paragraph in @($cells[$cellIndex].SelectNodes(".//w:p", $script:namespaceManager))) {
+        $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $script:namespaceManager
+        if ([string]::IsNullOrWhiteSpace($text)) {
+          continue
+        }
+
+        Set-ParagraphJustification -Paragraph $paragraph -Value "center"
+        Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+        Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line 320
+        Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
+
+        if ($cellIndex -eq 0) {
+          Set-ParagraphBold -Paragraph $paragraph
+          Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints 32
+        } else {
+          Set-RunTypography -Paragraph $paragraph -FontName "楷体_GB2312" -SizeHalfPoints 32
+        }
+      }
+    }
+  }
+}
+
 function Resolve-StyleProfileDecision {
   param(
     [Parameter(Mandatory = $true)]
@@ -1225,6 +1354,18 @@ try {
     }
   }
   $styleSettings = [pscustomobject]$effectiveStyleSettings
+  $isCourseDesignReport = [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase)
+  if ($isCourseDesignReport) {
+    $styleSettings.BodyLineTwips = 320
+    $styleSettings.BodyFontHalfPoints = 21
+    $styleSettings.MetadataFontHalfPoints = 21
+    $styleSettings.ListFontHalfPoints = 21
+    $styleSettings.CaptionFontHalfPoints = 18
+    $styleSettings.HeadingFontHalfPoints = 24
+    $styleSettings.HeadingBeforeTwips = 80
+    $styleSettings.HeadingAfterTwips = 40
+    $styleSettings.CaptionAfterTwips = 40
+  }
   $useTemplateLikeCompactStyle = ([string]$profileDecision.ResolvedProfile -eq "compact")
   $usePaginationHints = (-not $useTemplateLikeCompactStyle)
 
@@ -1358,11 +1499,16 @@ try {
     Set-ParagraphIndent -Paragraph $paragraph -FirstLine $(if ($isInTable) { 0 } else { $styleSettings.BodyFirstLineTwips })
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
     if (-not $useTemplateLikeCompactStyle) {
-      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints
+      $bodyFontHalfPoints = if ($isCourseDesignReport -and $isInTable) { 18 } else { $styleSettings.BodyFontHalfPoints }
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $bodyFontHalfPoints
     }
     Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
     $styledBodyCount++
     if ($isInTable) { $styledTableParagraphCount++ }
+  }
+
+  if ($isCourseDesignReport) {
+    Apply-CourseDesignCoverStyles -Body $body
   }
 
   foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
