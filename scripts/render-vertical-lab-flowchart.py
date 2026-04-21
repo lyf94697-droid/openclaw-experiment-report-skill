@@ -83,9 +83,9 @@ def draw_arrow(
     end: tuple[int, int],
     color: tuple[int, int, int],
 ) -> None:
-    draw.line((start, end), fill=color, width=4)
+    draw.line((start, end), fill=color, width=5)
     tip_x, tip_y = end
-    size = 16
+    size = 18
     draw.polygon(
         [
             (tip_x, tip_y),
@@ -96,51 +96,88 @@ def draw_arrow(
     )
 
 
+def draw_badge(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    text: str,
+    font: ImageFont.ImageFont,
+    fill: tuple[int, int, int],
+    ink: tuple[int, int, int],
+) -> None:
+    radius = 28
+    x, y = center
+    draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=fill, outline=ink, width=3)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    draw.text((x - (bbox[2] - bbox[0]) / 2, y - (bbox[3] - bbox[1]) / 2 - 2), text, font=font, fill=ink)
+
+
 def render_flowchart(title: str, steps: Iterable[str], out_path: Path) -> None:
     steps = list(steps)
     if len(steps) < 2:
         raise ValueError("At least two flowchart steps are required.")
 
-    width = 1100
-    box_width = 760
-    box_height = 128
-    gap = 52
-    title_top = 52
-    title_gap = 60
-    bottom_margin = 70
-    start_y = title_top + 48 + title_gap
+    width = 1300
+    box_width = 820
+    box_height = 136
+    gap = 58
+    header_height = 156
+    bottom_margin = 90
+    start_y = header_height + 48
     total_height = start_y + len(steps) * box_height + (len(steps) - 1) * gap + bottom_margin
 
-    img = Image.new("RGB", (width, total_height), "white")
+    img = Image.new("RGB", (width, total_height), (248, 250, 252))
     draw = ImageDraw.Draw(img)
 
-    ink = (34, 45, 56)
-    line = (88, 104, 122)
-    blue = (233, 241, 251)
-    green = (228, 243, 232)
+    ink = (31, 42, 55)
+    muted = (86, 100, 116)
+    line = (74, 92, 110)
+    blue = (229, 240, 251)
+    green = (226, 242, 232)
+    yellow = (255, 244, 220)
+    card_outline = (62, 78, 96)
+    header_fill = (34, 58, 76)
+    shadow = (220, 226, 232)
+    white = (255, 255, 255)
 
-    title_font = load_font(38)
-    box_font = load_font(28)
+    title_font = load_font(40)
+    small_font = load_font(22)
+    badge_font = load_font(24)
+    box_font = load_font(29)
 
+    draw.rectangle((0, 0, width, header_height), fill=header_fill)
+    draw.rounded_rectangle((88, 44, 184, 88), radius=8, fill=(231, 238, 244))
+    draw.text((111, 51), "流程", font=small_font, fill=header_fill)
     title_width = draw.textlength(title, font=title_font)
-    draw.text(((width - title_width) / 2, title_top), title, font=title_font, fill=ink)
+    draw.text(((width - title_width) / 2, 46), title, font=title_font, fill=white)
+    subtitle = "按报告版式优化的纵向流程图"
+    subtitle_width = draw.textlength(subtitle, font=small_font)
+    draw.text(((width - subtitle_width) / 2, 102), subtitle, font=small_font, fill=(218, 227, 235))
 
     x1 = (width - box_width) // 2
     x2 = x1 + box_width
     boxes: list[tuple[int, int, int, int]] = []
     y = start_y
     for index, step in enumerate(steps):
-        fill = green if index in (0, len(steps) - 1) else blue
-        radius = 64 if index in (0, len(steps) - 1) else 22
+        fill = green if index in (0, len(steps) - 1) else (yellow if "?" in step or "是否" in step else blue)
+        radius = 48 if index in (0, len(steps) - 1) else 14
         box = (x1, y, x2, y + box_height)
-        draw.rounded_rectangle(box, radius=radius, fill=fill, outline=line, width=4)
-        draw_centered_text(draw, box, step, box_font, ink)
+        shadow_box = (box[0] + 8, box[1] + 8, box[2] + 8, box[3] + 8)
+        draw.rounded_rectangle(shadow_box, radius=radius, fill=shadow)
+        draw.rounded_rectangle(box, radius=radius, fill=fill, outline=card_outline, width=4)
+        badge_fill = white if index not in (0, len(steps) - 1) else (241, 248, 244)
+        draw_badge(draw, (x1 + 54, y + box_height // 2), str(index + 1), badge_font, badge_fill, card_outline)
+        text_box = (x1 + 108, y, x2 - 32, y + box_height)
+        draw_centered_text(draw, text_box, step, box_font, ink, line_gap=8)
         boxes.append(box)
         y += box_height + gap
 
     center_x = width // 2
     for first, second in zip(boxes, boxes[1:]):
-        draw_arrow(draw, (center_x, first[3]), (center_x, second[1]), line)
+        draw_arrow(draw, (center_x, first[3] + 4), (center_x, second[1] - 4), line)
+
+    footer = "可直接插入课程设计或实验报告正文"
+    footer_width = draw.textlength(footer, font=small_font)
+    draw.text(((width - footer_width) / 2, total_height - 54), footer, font=small_font, fill=muted)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path)

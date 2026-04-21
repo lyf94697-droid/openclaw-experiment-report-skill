@@ -594,13 +594,19 @@ function Get-ReportProfileImagePlacementDefaults {
   }
 }
 
-function Get-ReportProfileFieldMapCompositeRules {
+function Get-ReportProfileCompositeRules {
   param(
     [Parameter(Mandatory = $true)]
-    [psobject]$Profile
+    [psobject]$Profile,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PropertyName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RuleLabel
   )
 
-  $rawRulesValue = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "fieldMapCompositeRules"
+  $rawRulesValue = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name $PropertyName
   $rawRules = if ($null -eq $rawRulesValue) { @() } else { @($rawRulesValue) }
   if (@($rawRules).Count -eq 0) {
     return @()
@@ -614,12 +620,12 @@ function Get-ReportProfileFieldMapCompositeRules {
           Select-Object -Unique
       )
       if (@($matchAll).Count -eq 0) {
-        throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without matchAll."
+        throw "Report profile '$([string]$Profile.name)' has a $RuleLabel without matchAll."
       }
 
       $rawBlocks = @($ruleTable["blocks"])
       if (@($rawBlocks).Count -eq 0) {
-        throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without blocks."
+        throw "Report profile '$([string]$Profile.name)' has a $RuleLabel without blocks."
       }
 
       $blocks = @(
@@ -642,7 +648,7 @@ function Get-ReportProfileFieldMapCompositeRules {
           }
 
           if ($sectionIds.Count -eq 0) {
-            throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule block without sectionIds/sectionKeys."
+            throw "Report profile '$([string]$Profile.name)' has a $RuleLabel block without sectionIds/sectionKeys."
           }
 
           [pscustomobject]@{
@@ -659,6 +665,24 @@ function Get-ReportProfileFieldMapCompositeRules {
       }
     }
   )
+}
+
+function Get-ReportProfileFieldMapCompositeRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  return @(Get-ReportProfileCompositeRules -Profile $Profile -PropertyName "fieldMapCompositeRules" -RuleLabel "fieldMapCompositeRule")
+}
+
+function Get-ReportProfileParagraphCompositeRules {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile
+  )
+
+  return @(Get-ReportProfileCompositeRules -Profile $Profile -PropertyName "paragraphCompositeRules" -RuleLabel "paragraphCompositeRule")
 }
 
 function Normalize-ReportProfileLookupKey {

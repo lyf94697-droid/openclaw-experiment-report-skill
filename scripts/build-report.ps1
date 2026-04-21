@@ -70,8 +70,141 @@ function Ensure-ParentDirectory {
   }
 }
 
+function Convert-TemplateToDocxIfNeeded {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+
+    [Parameter(Mandatory = $true)]
+    [string]$OutputDir
+  )
+
+  $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
+  if ($extension -eq ".docx") {
+    return [pscustomobject]@{
+      templatePath = $Path
+      sourceTemplatePath = $Path
+      status = "none"
+      converter = "none"
+      convertedTemplatePath = $null
+    }
+  }
+
+  if ($extension -ne ".doc") {
+    throw "Only .docx templates are supported directly; .doc templates can be converted with Word COM: $Path"
+  }
+
+  $convertedDir = Join-Path $OutputDir "converted-templates"
+  New-Item -ItemType Directory -Path $convertedDir -Force | Out-Null
+  $convertedPath = Join-Path $convertedDir (([System.IO.Path]::GetFileNameWithoutExtension($Path)) + ".docx")
+  if (Test-Path -LiteralPath $convertedPath) {
+    Remove-Item -LiteralPath $convertedPath -Force
+  }
+
+  $wpsErrorMessage = ""
+  $wpsApp = $null
+  $wpsDoc = $null
+  try {
+    $wpsApp = New-Object -ComObject KWPS.Application
+    $wpsApp.Visible = $false
+    $wpsDoc = $wpsApp.Documents.Open($Path)
+    Start-Sleep -Milliseconds 300
+    $wpsDoc.SaveAs($convertedPath, 16)
+    Start-Sleep -Milliseconds 300
+    if (Test-Path -LiteralPath $convertedPath -PathType Leaf) {
+      return [pscustomobject]@{
+        templatePath = (Resolve-Path -LiteralPath $convertedPath).Path
+        sourceTemplatePath = $Path
+        status = "converted"
+        converter = "wps"
+        convertedTemplatePath = (Resolve-Path -LiteralPath $convertedPath).Path
+      }
+    }
+  } catch {
+    $wpsErrorMessage = $_.Exception.Message
+    if (Test-Path -LiteralPath $convertedPath) {
+      Remove-Item -LiteralPath $convertedPath -Force -ErrorAction SilentlyContinue
+    }
+  } finally {
+    if ($null -ne $wpsDoc) {
+      try {
+        $wpsDoc.Close($false)
+      } catch {
+        # Best-effort cleanup only.
+      }
+    }
+    if ($null -ne $wpsApp) {
+      try {
+        $wpsApp.Quit()
+      } catch {
+        # Best-effort cleanup only.
+      }
+    }
+  }
+
+  $lastErrorMessage = ""
+  for ($attempt = 1; $attempt -le 3; $attempt++) {
+    $app = $null
+    $doc = $null
+    try {
+      $app = New-Object -ComObject Word.Application
+      $app.Visible = $false
+      $app.DisplayAlerts = 0
+      try {
+        $app.AutomationSecurity = 3
+      } catch {
+        # Older Word automation hosts may not expose AutomationSecurity.
+      }
+      Start-Sleep -Milliseconds (300 * $attempt)
+      $doc = $app.Documents.Open($Path, $false, $true, $false)
+      Start-Sleep -Milliseconds (500 * $attempt)
+      $doc.SaveAs2($convertedPath, 16)
+      Start-Sleep -Milliseconds 300
+      break
+    } catch {
+      $lastErrorMessage = $_.Exception.Message
+      if (Test-Path -LiteralPath $convertedPath) {
+        Remove-Item -LiteralPath $convertedPath -Force -ErrorAction SilentlyContinue
+      }
+      if ($attempt -eq 3) {
+        throw "Failed to convert .doc template to .docx. WPS error: $wpsErrorMessage. Word COM error after 3 attempts: $lastErrorMessage"
+      }
+      Start-Sleep -Milliseconds (900 * $attempt)
+    } finally {
+      if ($null -ne $doc) {
+        try {
+          $doc.Close($false)
+        } catch {
+          # Best-effort cleanup only.
+        }
+      }
+      if ($null -ne $app) {
+        try {
+          $app.Quit()
+        } catch {
+          # Best-effort cleanup only.
+        }
+      }
+    }
+  }
+
+  if (-not (Test-Path -LiteralPath $convertedPath -PathType Leaf)) {
+    throw "Word COM did not produce the converted template: $convertedPath"
+  }
+
+  return [pscustomobject]@{
+    templatePath = (Resolve-Path -LiteralPath $convertedPath).Path
+    sourceTemplatePath = $Path
+    status = "converted"
+    converter = "word"
+    convertedTemplatePath = (Resolve-Path -LiteralPath $convertedPath).Path
+  }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
+$sourceTemplatePath = $resolvedTemplatePath
+$templateConversion = $null
 $resolvedReportPath = (Resolve-Path -LiteralPath $ReportPath).Path
 
 $resolvedMetadataPath = $null
@@ -126,10 +259,10 @@ $imageInputMode = if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
 
 $styleOutputRequested = $StyleFinalDocx -or (-not [string]::IsNullOrWhiteSpace($StyledDocxOutPath))
 $runFullPipeline = [string]::Equals($PipelineMode, "full", [System.StringComparison]::OrdinalIgnoreCase)
-$shouldRunValidation = $runFullPipeline
+$shouldRunValidation = $runFullPipeline -or ($requirementsInputMode -ne "none")
 $shouldGenerateDebugOutlines = $runFullPipeline
-$shouldGenerateImagePlan = $runFullPipeline -or (-not [string]::IsNullOrWhiteSpace($ImagePlanOutPath))
-$shouldRunLayoutCheck = $runFullPipeline
+$shouldGenerateImagePlan = $imageInputsProvided -or (-not [string]::IsNullOrWhiteSpace($ImagePlanOutPath))
+$shouldRunLayoutCheck = $runFullPipeline -or $imageInputsProvided
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $OutputDir = Join-Path $repoRoot ("tests-output\build-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
@@ -137,6 +270,9 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+
+$templateConversion = Convert-TemplateToDocxIfNeeded -Path $resolvedTemplatePath -OutputDir $resolvedOutputDir
+$resolvedTemplatePath = [string]$templateConversion.templatePath
 
 $resolvedFieldMapOutPath = if ([string]::IsNullOrWhiteSpace($FieldMapOutPath)) {
   Join-Path $resolvedOutputDir "generated-field-map.json"
@@ -171,10 +307,7 @@ $imagePlanLowConfidenceCount = $null
 $imagePlanNeedsReview = $null
 
 $validationResult = $null
-if (
-  $shouldRunValidation -and
-  (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath) -or -not [string]::IsNullOrWhiteSpace($RequirementsJson))
-) {
+if ($shouldRunValidation) {
   $validationPath = Join-Path $resolvedOutputDir "validation.json"
   $validationParams = @{
     Path = $resolvedReportPath
@@ -188,7 +321,7 @@ if (
   }
   if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath)) {
     $validationParams.RequirementsPath = $resolvedRequirementsPath
-  } else {
+  } elseif (-not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
     $validationParams.RequirementsJson = $RequirementsJson
   }
 
@@ -407,6 +540,10 @@ $summary = [pscustomobject]@{
   reportProfileName = [string]$reportProfile.name
   reportProfilePath = $resolvedReportProfilePath
   templatePath = $resolvedTemplatePath
+  sourceTemplatePath = $sourceTemplatePath
+  templateConversionStatus = $(if ($null -ne $templateConversion) { [string]$templateConversion.status } else { "none" })
+  templateConversionConverter = $(if ($null -ne $templateConversion) { [string]$templateConversion.converter } else { "none" })
+  convertedTemplatePath = $(if ($null -ne $templateConversion) { [string]$templateConversion.convertedTemplatePath } else { $null })
   reportPath = $resolvedReportPath
   reportInputMode = "path"
   metadataPath = $resolvedMetadataPath

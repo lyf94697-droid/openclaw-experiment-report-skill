@@ -699,6 +699,7 @@ function Test-ReportProfile {
   Test-PaginationRiskThresholds -Findings $Findings -Thresholds (Get-OptionalPropertyValue -InputObject $Profile -Name "paginationRiskThresholds") -Path "$Path.paginationRiskThresholds"
   Test-PaginationRiskRemediations -Findings $Findings -Remediations (Get-OptionalPropertyValue -InputObject $Profile -Name "paginationRiskRemediations") -Path "$Path.paginationRiskRemediations"
   Test-FieldMapCompositeRules -Findings $Findings -Rules (Get-OptionalPropertyValue -InputObject $Profile -Name "fieldMapCompositeRules") -KnownSectionIds $knownSectionIds -Path "$Path.fieldMapCompositeRules"
+  Test-FieldMapCompositeRules -Findings $Findings -Rules (Get-OptionalPropertyValue -InputObject $Profile -Name "paragraphCompositeRules") -KnownSectionIds $knownSectionIds -Path "$Path.paragraphCompositeRules"
   Test-DetailProfiles -Findings $Findings -DetailProfiles (Get-OptionalPropertyValue -InputObject $Profile -Name "detailProfiles") -Path "$Path.detailProfiles"
 
   $forbiddenPatterns = Get-OptionalPropertyValue -InputObject $Profile -Name "forbiddenPatterns"

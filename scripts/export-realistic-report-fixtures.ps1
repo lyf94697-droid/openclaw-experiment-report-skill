@@ -24,11 +24,15 @@ function New-CourseSelectionFlowchartPng {
   $titleFont = New-Object System.Drawing.Font("Microsoft YaHei", 30, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
   $font = New-Object System.Drawing.Font("Microsoft YaHei", 30, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
   $smallFont = New-Object System.Drawing.Font("Microsoft YaHei", 24, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+  $badgeFont = New-Object System.Drawing.Font("Microsoft YaHei", 22, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
 
   $inkBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(35, 45, 55))
+  $headerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(34, 58, 76))
   $noteBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(95, 105, 115))
   $linePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 90, 105), 4)
   $thinLinePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 90, 105), 3)
+  $shadowBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 226, 232))
+  $shadowPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(220, 226, 232), 1)
   $boxBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(232, 241, 250))
   $decisionBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 242, 218))
   $endBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(226, 242, 232))
@@ -102,17 +106,33 @@ function New-CourseSelectionFlowchartPng {
       [string]$Kind,
       [System.Drawing.Rectangle]$Rect,
       [string]$Text,
-      [System.Drawing.Brush]$Fill
+      [System.Drawing.Brush]$Fill,
+      [string]$Badge = ""
     )
 
+    $shadowRect = New-Object System.Drawing.Rectangle(($Rect.X + 8), ($Rect.Y + 8), $Rect.Width, $Rect.Height)
     if ($Kind -eq "round") {
+      Draw-RoundedRectangle -G $G -Rect $shadowRect -Radius 42 -Fill $shadowBrush -Pen $shadowPen
       Draw-RoundedRectangle -G $G -Rect $Rect -Radius 42 -Fill $Fill -Pen $thinLinePen
     } elseif ($Kind -eq "diamond") {
+      Draw-Diamond -G $G -Rect $shadowRect -Fill $shadowBrush -Pen $shadowPen
       Draw-Diamond -G $G -Rect $Rect -Fill $Fill -Pen $thinLinePen
     } else {
+      Draw-RoundedRectangle -G $G -Rect $shadowRect -Radius 14 -Fill $shadowBrush -Pen $shadowPen
       Draw-RoundedRectangle -G $G -Rect $Rect -Radius 14 -Fill $Fill -Pen $thinLinePen
     }
-    Draw-CenteredText -G $G -Rect $Rect -Text $Text -TextFont $font -Brush $inkBrush
+
+    $textRect = $Rect
+    if (-not [string]::IsNullOrWhiteSpace($Badge) -and $Kind -ne "diamond") {
+      $textRect = New-Object System.Drawing.Rectangle(($Rect.X + 72), $Rect.Y, ($Rect.Width - 92), $Rect.Height)
+      $badgeSize = 46
+      $badgeRect = New-Object System.Drawing.Rectangle(($Rect.X + 22), ($Rect.Y + [int](($Rect.Height - $badgeSize) / 2)), $badgeSize, $badgeSize)
+      $G.FillEllipse($whiteBrush, $badgeRect)
+      $G.DrawEllipse($thinLinePen, $badgeRect)
+      Draw-CenteredText -G $G -Rect $badgeRect -Text $Badge -TextFont $badgeFont -Brush $inkBrush
+    }
+
+    Draw-CenteredText -G $G -Rect $textRect -Text $Text -TextFont $font -Brush $inkBrush
   }
 
   function Draw-Arrow {
@@ -159,45 +179,46 @@ function New-CourseSelectionFlowchartPng {
     $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
     $graphics.Clear([System.Drawing.Color]::White)
 
-    $titleRect = New-Object System.Drawing.Rectangle(0, 28, $width, 58)
-    Draw-CenteredText -G $graphics -Rect $titleRect -Text "学生选课系统流程图" -TextFont $titleFont -Brush $inkBrush
+    $graphics.FillRectangle($headerBrush, 0, 0, $width, 104)
+    $titleRect = New-Object System.Drawing.Rectangle(0, 26, $width, 58)
+    Draw-CenteredText -G $graphics -Rect $titleRect -Text "学生选课系统流程图" -TextFont $titleFont -Brush $whiteBrush
 
-    Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 100 300 90) -Text "开始" -Fill $endBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 270 460 100) -Text "输入用户名和密码" -Fill $boxBrush
-    Draw-Node -G $graphics -Kind "diamond" -Rect (New-Rect 500 460 400 190) -Text "用户名和密码`n是否正确" -Fill $decisionBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 100 500 320 120) -Text "提示登录失败`n重新输入" -Fill $warnBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 750 460 110) -Text "进入对应角色页面" -Fill $boxBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 960 460 110) -Text "选择选课 / 退课 / 查询" -Fill $boxBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 1160 460 110) -Text "提交操作请求" -Fill $boxBrush
-    Draw-Node -G $graphics -Kind "diamond" -Rect (New-Rect 500 1360 400 190) -Text "课程容量和时间`n是否满足" -Fill $decisionBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 970 1400 330 120) -Text "提示容量不足`n或时间冲突" -Fill $warnBrush
-    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 1640 460 110) -Text "写入选课记录`n刷新课表" -Fill $boxBrush
-    Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 1810 300 80) -Text "结束" -Fill $endBrush
+    Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 120 300 90) -Text "开始" -Fill $endBrush -Badge "1"
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 290 460 100) -Text "输入用户名和密码" -Fill $boxBrush -Badge "2"
+    Draw-Node -G $graphics -Kind "diamond" -Rect (New-Rect 500 480 400 190) -Text "用户名和密码`n是否正确" -Fill $decisionBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 100 520 320 120) -Text "提示登录失败`n重新输入" -Fill $warnBrush -Badge "3"
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 770 460 110) -Text "进入对应角色页面" -Fill $boxBrush -Badge "4"
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 980 460 110) -Text "选择选课 / 退课 / 查询" -Fill $boxBrush -Badge "5"
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 1180 460 110) -Text "提交操作请求" -Fill $boxBrush -Badge "6"
+    Draw-Node -G $graphics -Kind "diamond" -Rect (New-Rect 500 1380 400 190) -Text "课程容量和时间`n是否满足" -Fill $decisionBrush
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 970 1420 330 120) -Text "提示容量不足`n或时间冲突" -Fill $warnBrush -Badge "7"
+    Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 1660 460 110) -Text "写入选课记录`n刷新课表" -Fill $boxBrush -Badge "8"
+    Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 1830 300 80) -Text "结束" -Fill $endBrush -Badge "9"
 
-    Draw-Arrow -G $graphics -X1 700 -Y1 190 -X2 700 -Y2 270
-    Draw-Arrow -G $graphics -X1 700 -Y1 370 -X2 700 -Y2 460
-    Draw-Arrow -G $graphics -X1 700 -Y1 650 -X2 700 -Y2 750 -Label "是" -LabelDx 22 -LabelDy -8
-    Draw-Arrow -G $graphics -X1 700 -Y1 860 -X2 700 -Y2 960
-    Draw-Arrow -G $graphics -X1 700 -Y1 1070 -X2 700 -Y2 1160
-    Draw-Arrow -G $graphics -X1 700 -Y1 1270 -X2 700 -Y2 1360
-    Draw-Arrow -G $graphics -X1 700 -Y1 1550 -X2 700 -Y2 1640 -Label "是" -LabelDx 22 -LabelDy -8
-    Draw-Arrow -G $graphics -X1 700 -Y1 1750 -X2 700 -Y2 1810
-    Draw-Arrow -G $graphics -X1 500 -Y1 555 -X2 420 -Y2 555 -Label "否" -LabelDx -35 -LabelDy -36
-    $graphics.DrawLine($linePen, 100, 560, 60, 560)
-    $graphics.DrawLine($linePen, 60, 560, 60, 320)
-    $graphics.DrawLine($linePen, 60, 320, 430, 320)
-    Draw-Arrow -G $graphics -X1 430 -Y1 320 -X2 470 -Y2 320
-    Draw-Arrow -G $graphics -X1 900 -Y1 1455 -X2 970 -Y2 1455 -Label "否" -LabelDx 10 -LabelDy -36
-    $graphics.DrawLine($linePen, 1135, 1400, 1135, 1020)
-    $graphics.DrawLine($linePen, 1135, 1020, 970, 1020)
-    Draw-Arrow -G $graphics -X1 970 -Y1 1020 -X2 930 -Y2 1020
+    Draw-Arrow -G $graphics -X1 700 -Y1 210 -X2 700 -Y2 290
+    Draw-Arrow -G $graphics -X1 700 -Y1 390 -X2 700 -Y2 480
+    Draw-Arrow -G $graphics -X1 700 -Y1 670 -X2 700 -Y2 770 -Label "是" -LabelDx 22 -LabelDy -8
+    Draw-Arrow -G $graphics -X1 700 -Y1 880 -X2 700 -Y2 980
+    Draw-Arrow -G $graphics -X1 700 -Y1 1090 -X2 700 -Y2 1180
+    Draw-Arrow -G $graphics -X1 700 -Y1 1290 -X2 700 -Y2 1380
+    Draw-Arrow -G $graphics -X1 700 -Y1 1570 -X2 700 -Y2 1660 -Label "是" -LabelDx 22 -LabelDy -8
+    Draw-Arrow -G $graphics -X1 700 -Y1 1770 -X2 700 -Y2 1830
+    Draw-Arrow -G $graphics -X1 500 -Y1 575 -X2 420 -Y2 575 -Label "否" -LabelDx -35 -LabelDy -36
+    $graphics.DrawLine($linePen, 100, 580, 60, 580)
+    $graphics.DrawLine($linePen, 60, 580, 60, 340)
+    $graphics.DrawLine($linePen, 60, 340, 430, 340)
+    Draw-Arrow -G $graphics -X1 430 -Y1 340 -X2 470 -Y2 340
+    Draw-Arrow -G $graphics -X1 900 -Y1 1475 -X2 970 -Y2 1475 -Label "否" -LabelDx 10 -LabelDy -36
+    $graphics.DrawLine($linePen, 1135, 1420, 1135, 1040)
+    $graphics.DrawLine($linePen, 1135, 1040, 970, 1040)
+    Draw-Arrow -G $graphics -X1 970 -Y1 1040 -X2 930 -Y2 1040
 
     $noteRect = New-Object System.Drawing.Rectangle(0, ($height - 42), $width, 36)
     Draw-CenteredText -G $graphics -Rect $noteRect -Text "合成样例：用于报告生成流程图测试，不含真实学生信息" -TextFont $smallFont -Brush $noteBrush
 
     $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
   } finally {
-    foreach ($resource in @($graphics, $bitmap, $titleFont, $font, $smallFont, $inkBrush, $noteBrush, $linePen, $thinLinePen, $boxBrush, $decisionBrush, $endBrush, $warnBrush, $whiteBrush)) {
+    foreach ($resource in @($graphics, $bitmap, $titleFont, $font, $smallFont, $badgeFont, $inkBrush, $headerBrush, $noteBrush, $linePen, $thinLinePen, $shadowBrush, $shadowPen, $boxBrush, $decisionBrush, $endBrush, $warnBrush, $whiteBrush)) {
       if ($null -ne $resource) {
         $resource.Dispose()
       }
@@ -620,11 +641,14 @@ def build_course_design(path, assets):
     add_body_paragraph(document, "系统需要支持学生选课退课、教师成绩提交、管理员维护课程与用户信息，并输出可复核的运行结果。")
 
     add_heading(document, "二、设计正文", level=1)
-    add_heading(document, "2.1 需求分析", level=2)
-    add_body_paragraph(document, "系统面向学生、教师和管理员三类用户。学生用户完成选课、退课和查看成绩；教师用户提交课程成绩；管理员维护学生、教师、课程和院系基础信息。")
-    add_picture_block(document, assets["topology"], "图2-1 系统功能结构图")
+    add_heading(document, "2.1 开发环境", level=2)
+    add_body_paragraph(document, "课程设计在 Windows 11、Python 3、SQLite 和 VS Code 环境下完成。SQLite 用于保存学生、教师、课程和选课记录，便于在本地快速演示和验证核心业务流程。")
 
-    add_heading(document, "2.2 总体设计", level=2)
+    add_heading(document, "2.2 需求分析", level=2)
+    add_body_paragraph(document, "系统面向学生、教师和管理员三类用户。学生用户完成选课、退课和查看成绩；教师用户提交课程成绩；管理员维护学生、教师、课程和院系基础信息。")
+    add_picture_block(document, assets["topology"], "图1 系统功能结构图")
+
+    add_heading(document, "2.3 总体设计", level=2)
     add_body_paragraph(document, "系统采用界面层、业务逻辑层和数据访问层三层结构。界面层负责交互，业务逻辑层封装选课规则，数据访问层完成数据库读写。")
     module_table = document.add_table(rows=5, cols=3)
     module_table.style = "Table Grid"
@@ -643,7 +667,7 @@ def build_course_design(path, assets):
                 set_cell_shading(module_table.cell(row_index, col_index), "EDEDED")
     add_caption(document, "表3-1 学生选课系统功能模块表")
 
-    add_heading(document, "2.3 数据库设计", level=2)
+    add_heading(document, "2.4 数据库设计", level=2)
     add_body_paragraph(document, "数据库至少包含学生表、教师表、课程表、选课表和管理员表。选课表通过学生编号和课程编号建立业务关联，并记录选课状态。")
     db_table = document.add_table(rows=6, cols=4)
     db_table.style = "Table Grid"
@@ -663,11 +687,11 @@ def build_course_design(path, assets):
                 set_cell_shading(db_table.cell(row_index, col_index), "EDEDED")
     add_caption(document, "表3-2 Elect选课信息表")
 
-    add_heading(document, "2.4 详细设计与实现", level=2)
+    add_heading(document, "2.5 详细设计与实现", level=2)
     add_body_paragraph(document, "用户登录后，系统根据角色加载不同功能菜单。学生提交选课请求时，业务层先检查课程容量和时间冲突，再写入选课表。")
-    add_picture_block(document, assets["flow"], "图4-1 学生选课流程图")
+    add_picture_block(document, assets["flow"], "图2 学生选课流程图")
 
-    add_heading(document, "2.5 测试结果", level=2)
+    add_heading(document, "2.6 测试结果", level=2)
     test_table = document.add_table(rows=4, cols=4)
     test_table.style = "Table Grid"
     test_rows = [
@@ -682,7 +706,10 @@ def build_course_design(path, assets):
             if row_index == 0:
                 set_cell_shading(test_table.cell(row_index, col_index), "EDEDED")
     add_caption(document, "表5-1 系统功能测试表")
-    add_picture_block(document, assets["terminal"], "图5-1 运行结果与测试输出")
+    add_picture_block(document, assets["terminal"], "图3 运行结果与测试输出")
+
+    add_heading(document, "2.7 问题与改进", level=2)
+    add_body_paragraph(document, "当前样例系统重点验证主流程，异常提示、日志记录和并发访问仍较简单。后续可以补充分页查询、课程推荐、权限细分和数据库事务处理，使系统更接近真实部署场景。")
 
     add_heading(document, "三、总结", level=1)
     add_body_paragraph(document, "本次课程设计完成了从需求到实现、从数据库到流程图、从测试到总结的完整文档链路。后续可以继续补充异常处理、日志记录和更细粒度的权限控制。")

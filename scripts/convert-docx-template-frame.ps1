@@ -595,16 +595,20 @@ function Set-MetadataRowsToTemplateStandard {
 
   $rows = @($Table.SelectNodes("./w:tr", $NamespaceManager))
   if ($rows.Count -lt $rowSpecs.Count) {
-    throw "The metadata table has fewer than four rows, so the template-frame cover cannot be normalized safely: $resolvedDocxPath"
+    return
   }
 
   for ($rowIndex = 0; $rowIndex -lt $rowSpecs.Count; $rowIndex++) {
     $cells = @($rows[$rowIndex].SelectNodes("./w:tc", $NamespaceManager))
     $cellSpecs = @($rowSpecs[$rowIndex])
     if ($cells.Count -ne $cellSpecs.Count) {
-      throw "The metadata table row $($rowIndex + 1) does not match the expected template column structure."
+      return
     }
+  }
 
+  for ($rowIndex = 0; $rowIndex -lt $rowSpecs.Count; $rowIndex++) {
+    $cells = @($rows[$rowIndex].SelectNodes("./w:tc", $NamespaceManager))
+    $cellSpecs = @($rowSpecs[$rowIndex])
     for ($cellIndex = 0; $cellIndex -lt $cellSpecs.Count; $cellIndex++) {
       $cellSpec = $cellSpecs[$cellIndex]
       $widthValue = [string]($cellSpec["Width"])

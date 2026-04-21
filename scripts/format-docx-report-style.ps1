@@ -763,6 +763,38 @@ function Set-RunFontSize {
   }
 }
 
+function Set-RunColor {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Color
+  )
+
+  $runProperties = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  [void]$runProperties.Add((Get-OrCreateChildElement -Parent $pPr -LocalName "rPr"))
+
+  foreach ($run in @($Paragraph.SelectNodes("./w:r", $script:namespaceManager))) {
+    $runRPr = $run.SelectSingleNode("./w:rPr", $script:namespaceManager)
+    if ($null -eq $runRPr) {
+      $runRPr = $Paragraph.OwnerDocument.CreateElement("w", "rPr", $wordNamespace)
+      if ($run.HasChildNodes) {
+        $run.InsertBefore($runRPr, $run.FirstChild) | Out-Null
+      } else {
+        $run.AppendChild($runRPr) | Out-Null
+      }
+    }
+    [void]$runProperties.Add($runRPr)
+  }
+
+  foreach ($rPr in $runProperties) {
+    $colorNode = Get-OrCreateChildElement -Parent $rPr -LocalName "color"
+    Set-WordAttribute -Element $colorNode -LocalName "val" -Value $Color
+  }
+}
+
 function Set-RunTypography {
   param(
     [Parameter(Mandatory = $true)]
@@ -782,6 +814,7 @@ function Set-RunTypography {
   } else {
     Set-RunFont -Paragraph $Paragraph -FontName $FontName -SizeHalfPoints $SizeHalfPoints
   }
+  Set-RunColor -Paragraph $Paragraph -Color "000000"
 }
 
 function Set-ParagraphShading {

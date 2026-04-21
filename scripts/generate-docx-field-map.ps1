@@ -29,6 +29,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 $fieldMapCompositeRules = @(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile)
+$paragraphCompositeRules = @(Get-ReportProfileParagraphCompositeRules -Profile $reportProfile)
 
 $labelPattern = '^(?<label>[^:\uFF1A]{1,60})[:\uFF1A]\s*(?<rest>.*)$'
 $placeholderPattern = '[_\uFF3F]{2,}|\.{3,}|\uFF08\s*\uFF09|\(\s*\)|\u25A1|\u25A0'
@@ -128,6 +129,46 @@ function Is-PlaceholderLike {
   }
 
   return [bool]($Text -match $placeholderPattern)
+}
+
+function Is-FillableInstructionLike {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $true
+  }
+
+  if ($normalizedText -match $labelPattern) {
+    return $false
+  }
+
+  if (Is-PlaceholderLike -Text $normalizedText) {
+    return $true
+  }
+
+  return [bool]($normalizedText -match '^[（(].*(针对|描述|给出|总结|明确|采用|验证|说明).*[）)]$')
+}
+
+function Is-ExplicitFillTargetInstructionLike {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $false
+  }
+
+  if ($normalizedText -match $labelPattern) {
+    return $false
+  }
+
+  return [bool]($normalizedText -match '^[（(].*(针对|描述|给出|总结|明确|采用|验证|说明).*[）)]$')
 }
 
 function Get-OptionFieldInfo {
@@ -920,27 +961,30 @@ function Add-SectionParagraphBlock {
   return $true
 }
 
-function Get-CompositeCellFillSpec {
+function Get-CompositeFillSpec {
   param(
     [AllowNull()]
-    [string]$CellText,
+    [string]$Text,
+
+    [AllowNull()]
+    [object[]]$Rules,
 
     [Parameter(Mandatory = $true)]
     [hashtable]$SectionsById
   )
 
-  $normalizedCellText = Normalize-OpenXmlText -Text $CellText
-  if ([string]::IsNullOrWhiteSpace($normalizedCellText)) {
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
     return $null
   }
 
   $paragraphs = New-Object System.Collections.Generic.List[string]
   $mappedSectionIds = New-Object System.Collections.Generic.List[string]
 
-  foreach ($compositeRule in $fieldMapCompositeRules) {
+  foreach ($compositeRule in @($Rules)) {
     $matchesRule = $true
     foreach ($pattern in @($compositeRule.matchAll)) {
-      if ([string]::IsNullOrWhiteSpace([string]$pattern) -or $normalizedCellText -notmatch [string]$pattern) {
+      if ([string]::IsNullOrWhiteSpace([string]$pattern) -or $normalizedText -notmatch [string]$pattern) {
         $matchesRule = $false
         break
       }
@@ -995,6 +1039,30 @@ function Get-CompositeCellFillSpec {
   }
 
   return $null
+}
+
+function Get-CompositeCellFillSpec {
+  param(
+    [AllowNull()]
+    [string]$CellText,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$SectionsById
+  )
+
+  return Get-CompositeFillSpec -Text $CellText -Rules $fieldMapCompositeRules -SectionsById $SectionsById
+}
+
+function Get-CompositeParagraphFillSpec {
+  param(
+    [AllowNull()]
+    [string]$ParagraphText,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$SectionsById
+  )
+
+  return Get-CompositeFillSpec -Text $ParagraphText -Rules $paragraphCompositeRules -SectionsById $SectionsById
 }
 
 function Get-CompositeTableBodyFillSpec {
@@ -1164,14 +1232,49 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
       continue
     }
 
+    if (Is-FillableInstructionLike -Text $paragraphText) {
+      continue
+    }
+
+    $paragraphCompositeFill = Get-CompositeParagraphFillSpec -ParagraphText $paragraphText -SectionsById $reportAnalysis.SectionsById
+    if ($null -ne $paragraphCompositeFill) {
+      $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
+      $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
+      $fieldMapKey = if ($nextBlockIsFillTarget -and -not [string]::IsNullOrWhiteSpace([string]$nextBlock.location)) {
+        [string]$nextBlock.location
+      } else {
+        $paragraphText
+      }
+      $sectionValue = if ($nextBlockIsFillTarget) {
+        @($paragraphCompositeFill.Paragraphs)
+      } else {
+        [ordered]@{
+          mode = "after"
+          paragraphs = @($paragraphCompositeFill.Paragraphs)
+        }
+      }
+
+      if (Add-FieldMapEntry -FieldMap $fieldMap -Key $fieldMapKey -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
+        $mappedSectionCount += @($paragraphCompositeFill.MappedSectionIds).Count
+      }
+      continue
+    }
+
     $sectionRule = Resolve-SectionRule -HeadingText $paragraphText
     if ($null -ne $sectionRule) {
       if ($reportAnalysis.SectionsById.ContainsKey($sectionRule.id)) {
         $sectionInfo = $reportAnalysis.SectionsById[$sectionRule.id]
         if (@($sectionInfo.paragraphs).Count -gt 0) {
           $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
-          $useAfter = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-PlaceholderLike -Text ([string]$nextBlock.text))
-          $sectionValue = if ($useAfter) {
+          $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
+          $fieldMapKey = if ($nextBlockIsFillTarget -and -not [string]::IsNullOrWhiteSpace([string]$nextBlock.location)) {
+            [string]$nextBlock.location
+          } else {
+            $paragraphText
+          }
+          $sectionValue = if ($nextBlockIsFillTarget) {
+            @($sectionInfo.paragraphs)
+          } elseif (($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-PlaceholderLike -Text ([string]$nextBlock.text))) {
             [ordered]@{
               mode = "after"
               paragraphs = @($sectionInfo.paragraphs)
@@ -1182,7 +1285,7 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
             @($sectionInfo.paragraphs)
           }
 
-          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $paragraphText -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
+          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $fieldMapKey -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
             $mappedSectionCount++
           }
         } else {

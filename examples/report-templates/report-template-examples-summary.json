@@ -1,6 +1,6 @@
 ﻿{
     "outputDir":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates",
-    "generatedCount":  8,
+    "generatedCount":  9,
     "generated":  [
                       {
                           "reportProfileName":  "course-design-report",
@@ -37,6 +37,12 @@
                           "reportProfileDisplayName":  "月报",
                           "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\monthly-report.json",
                           "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\monthly-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "os-process-scheduling-school-template",
+                          "reportProfileDisplayName":  "操作系统实验报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\os-process-scheduling-school-template.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\os-process-scheduling-school-template-template.docx"
                       },
                       {
                           "reportProfileName":  "software-test-report",

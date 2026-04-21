@@ -1480,7 +1480,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignPromptText -match '课题名称: 校园导览小程序设计') -Message 'Auto prompt helper did not emit the course-design title label.'
   Assert-True -Condition ($courseDesignPromptText -match '方案设计与实现') -Message 'Auto prompt helper did not include course-design required headings.'
   $courseDesignRequirements = (New-ReportProfileAutoRequirementsJson -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -ExtraKeywords @('小程序', '校园导览小程序设计') -DetailLevel 'full') | ConvertFrom-Json
-  Assert-True -Condition ([int]$courseDesignRequirements.minChars -eq 1400) -Message 'Auto requirements helper did not use the course-design full minChars.'
+  Assert-True -Condition ([int]$courseDesignRequirements.minChars -eq 2200) -Message 'Auto requirements helper did not use the course-design full minChars.'
   Assert-True -Condition (@($courseDesignRequirements.sections | Where-Object { $_.name -eq '方案设计与实现' }).Count -eq 1) -Message 'Auto requirements helper did not preserve the course-design implementation section heading.'
   $courseDesignMetadata = (New-ReportProfileAutoMetadataJson -ResolvedCourseName '软件工程综合实践' -ResolvedExperimentName '校园导览小程序设计' -Profile $courseDesignProfile -ResolvedStudentName '李四' -ResolvedStudentId '20261234' -ResolvedClassName '软工 2302' -ResolvedTeacherName '王老师' -ResolvedExperimentProperty '课程设计' -ResolvedExperimentDate '2026-04-08' -ResolvedExperimentLocation '实验楼 A201') | ConvertFrom-Json
   Assert-True -Condition ([string]$courseDesignMetadata.学生姓名 -eq '李四') -Message 'Auto metadata helper did not emit the course-design student label.'
@@ -1697,7 +1697,7 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([string]$generatedMetadata.学生姓名 -eq '李四') -Message 'Report-input generation metadata is missing the course-design student label.'
     Assert-True -Condition ([string]$generatedMetadata.课题名称 -eq '校园导览小程序设计') -Message 'Report-input generation metadata is missing the course-design title label.'
     $generatedRequirements = (Get-Content -LiteralPath (Join-Path $reportInputsOutputDir 'requirements.auto.json') -Raw -Encoding UTF8) | ConvertFrom-Json
-    Assert-True -Condition ([int]$generatedRequirements.minChars -eq 1400) -Message 'Report-input generation requirements are missing the expected course-design minChars.'
+    Assert-True -Condition ([int]$generatedRequirements.minChars -eq 2200) -Message 'Report-input generation requirements are missing the expected course-design minChars.'
     Assert-True -Condition (@($generatedRequirements.sections | Where-Object { $_.name -eq '方案设计与实现' }).Count -eq 1) -Message 'Report-input generation requirements are missing the course-design implementation section.'
     Assert-True -Condition ([int]$generatedRequirements.paginationRiskThresholds.longSectionChars -eq 1000) -Message 'Report-input generation requirements are missing profile pagination-risk thresholds.'
 
@@ -2809,6 +2809,12 @@ URL: https://example.com/network-lab
 完成时间：2026-04-08
 设计地点：实验楼 A201
 
+摘要：
+本课程设计围绕校园导览小程序展开，目标是将校园地点信息、分类检索、路线提示和收藏管理整合到一个可演示的移动端原型中。系统采用前后端分层思路组织功能，前端负责页面交互和结果展示，后端负责地点数据整理、关键词匹配和路线提示结果返回。通过需求分析、环境搭建、模块设计、功能实现和演示测试，最终形成了能够覆盖主要使用场景的课程设计作品。
+
+关键词：
+校园导览；小程序；需求分析；系统设计；路线提示
+
 一、设计目标
 本次课程设计的目标是完成一个面向校园访客和学生的导览小程序，使用户能够快速查看教学楼、实验室和生活服务点的位置分布。
 除了完成基础的地图展示功能，还需要在交互流程中突出搜索、路线提示和常用地点收藏等核心能力，保证项目具备完整的演示价值。
@@ -2837,6 +2843,10 @@ URL: https://example.com/network-lab
 七、设计总结
 通过这次课程设计，进一步理解了从需求分析、页面拆分到接口联调的完整实现流程，也明确了前后端边界划分对项目稳定性的影响。
 项目从可运行原型逐步完善到可演示成品的过程中，最大的收获是学会了围绕用户任务链路组织设计重点，而不是只堆叠单个功能模块。
+
+参考文献
+[1] 微信小程序官方文档. 小程序开发指南.
+[2] 软件工程课程设计指导书. 需求分析与系统设计章节.
 '@ | Set-Content -LiteralPath $courseDesignReportPath -Encoding UTF8
 
   $courseDesignMetadataPath = Join-Path $tempRoot 'course-design-metadata.json'
@@ -4019,6 +4029,12 @@ URL: https://example.com/network-lab
 完成时间：2026-04-08
 设计地点：实验楼 A201
 
+摘要：
+本课程设计以校园导览小程序为对象，围绕新生和访客在校园内查找教学楼、实验室、宿舍区和公共服务点的实际需求，完成了从需求分析、系统设计、功能实现到运行验证的完整实践。系统采用小程序前端与本地模拟数据接口配合的方式，重点实现地点搜索、分类浏览、详情展示、收藏管理和路线提示等功能，并通过演示测试验证主要任务链路的稳定性。课程设计过程体现了以用户场景组织功能、以可运行原型验证方案、以问题分析推动后续改进的基本工程思路。
+
+关键词：
+校园导览；微信小程序；需求分析；系统设计；路线提示；运行测试
+
 一、设计目标
 本次课程设计面向新生入校后对校园空间陌生、目标地点分散、路线信息不明确的典型问题，设计并实现一个聚焦校园导览场景的小程序系统。系统目标不仅是展示地点列表，而是围绕“搜索地点、查看详情、获得路线、完成到达”这一条连续任务链路组织页面能力，保证用户在教学楼、实验楼、宿舍区和公共服务区之间切换时可以快速完成信息查询与路径判断。为了让课程设计报告体现完整的工程思路，目标部分还强调了界面清晰度、检索速度、地点信息准确性、可演示性和后续扩展能力五项约束，使小程序既能用于课堂答辩展示，也能作为后续校园导览产品原型继续迭代。
 
@@ -4039,6 +4055,11 @@ URL: https://example.com/network-lab
 
 七、设计总结
 通过本次课程设计，进一步理解了从需求分析、页面拆分、数据建模、接口模拟到联调演示的完整实现流程，也更加明确了“以用户任务链路为中心”对小程序设计的重要性。校园导览场景看似简单，但真正落地时需要同时处理搜索效率、信息组织、交互连续性、演示稳定性和后续扩展性等多方面问题，因此课程设计过程不仅锻炼了编码能力，也训练了围绕目标场景拆解需求和验证结果的能力。最终完成的校园导览小程序虽然仍有改进空间，但已经形成了一套结构清晰、功能闭环明确、适合课堂展示和后续迭代的实现方案。整个过程最大的收获，是学会了把课程设计报告中的分析、设计、实现、结果和改进真正对应到一个可运行的小程序系统上，而不是停留在概念层面的描述。
+
+参考文献
+[1] 微信小程序官方文档. 小程序开发指南.
+[2] 软件工程课程设计指导书. 需求分析、系统设计与测试章节.
+[3] SQLite 官方文档. 数据建模与本地存储说明.
 '@ | Set-Content -LiteralPath $preparedSummaryMockReportPath -Encoding UTF8
 
   $preparedSummaryBuildOutputDir = Join-Path $tempRoot 'prepared-summary-url-build-output'
@@ -4704,6 +4725,7 @@ URL: https://example.com/network-lab
     'internship-report-template.docx',
     'meeting-minutes-template.docx',
     'monthly-report-template.docx',
+    'os-process-scheduling-school-template-template.docx',
     'software-test-report-template.docx',
     'weekly-report-template.docx'
   )
@@ -4712,7 +4734,7 @@ URL: https://example.com/network-lab
   }
   $templateExamplesOutputDir = Join-Path $tempRoot 'report-template-examples-regenerated'
   $templateExamplesGeneration = & (Join-Path $repoRoot 'scripts\export-report-template-examples.ps1') -OutputDir $templateExamplesOutputDir -Overwrite
-  Assert-True -Condition ([int]$templateExamplesGeneration.generatedCount -eq 8) -Message 'Template-example exporter should generate one template for each built-in report profile.'
+  Assert-True -Condition ([int]$templateExamplesGeneration.generatedCount -eq 9) -Message 'Template-example exporter should generate one template for each built-in report profile.'
   foreach ($templateFile in $templateExampleFiles) {
     $checkedInTemplatePath = Join-Path $templateExamplesDir $templateFile
     $generatedTemplatePath = Join-Path $templateExamplesOutputDir $templateFile
@@ -4726,7 +4748,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($experimentTemplateOutline -match '一、实验目的') -Message 'Checked-in experiment template example should contain numbered report headings.'
   $courseDesignTemplateOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path (Join-Path $templateExamplesDir 'course-design-report-template.docx') -Format markdown | Out-String
   Assert-True -Condition ($courseDesignTemplateOutline -match 'Table count: 1') -Message 'Checked-in course-design template example should contain a metadata table.'
-  Assert-True -Condition ($courseDesignTemplateOutline -match '四、方案设计与实现') -Message 'Checked-in course-design template example should contain the implementation heading.'
+  Assert-True -Condition ($courseDesignTemplateOutline -match '摘要') -Message 'Checked-in course-design template example should contain the abstract heading.'
+  Assert-True -Condition ($courseDesignTemplateOutline -match '关键词') -Message 'Checked-in course-design template example should contain the keywords heading.'
+  Assert-True -Condition ($courseDesignTemplateOutline -match '方案设计与实现') -Message 'Checked-in course-design template example should contain the implementation heading.'
   $results.Add('report template examples OK') | Out-Null
 
   $realisticFixtureDir = Join-Path $repoRoot 'examples\realistic-report-fixtures'
