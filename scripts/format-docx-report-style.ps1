@@ -1147,6 +1147,47 @@ function Test-IsCourseDesignCoverSubtitleText {
   return ($compact -match '学年.*学期')
 }
 
+function Test-IsCourseDesignCoverLabelText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $compact = (($Text -replace '\s+', '') -replace '：|:', '')
+  return ($compact -match '^(题目|专业|班级|学号|姓名|时间|小组成员)$')
+}
+
+function Test-IsCourseDesignCoverTable {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Table
+  )
+
+  $rows = @($Table.SelectNodes("./w:tr", $script:namespaceManager))
+  if ($rows.Count -lt 4) {
+    return $false
+  }
+
+  $matchedLabelCount = 0
+  foreach ($row in $rows) {
+    $firstCell = $row.SelectSingleNode("./w:tc[1]", $script:namespaceManager)
+    if ($null -eq $firstCell) {
+      continue
+    }
+
+    $cellText = Normalize-OpenXmlText -Text (($firstCell.SelectNodes(".//w:t | .//w:instrText", $script:namespaceManager) | ForEach-Object { $_.InnerText }) -join "")
+    if (Test-IsCourseDesignCoverLabelText -Text $cellText) {
+      $matchedLabelCount++
+    }
+  }
+
+  return ($matchedLabelCount -ge 4)
+}
+
 function Get-CourseDesignCoverElements {
   param(
     [Parameter(Mandatory = $true)]
@@ -1182,13 +1223,7 @@ function Get-CourseDesignCoverElements {
     }
 
     if ($child.LocalName -eq "tbl" -and $null -eq $coverTable) {
-      $tableSignal = Get-TopLevelTableProfileSignal -Table $child
-      if (
-        -not $tableSignal.HasDrawing -and
-        -not $tableSignal.HasSectionHeading -and
-        $tableSignal.RowCount -ge 4 -and
-        $tableSignal.MetadataParagraphCount -ge 4
-      ) {
+      if (Test-IsCourseDesignCoverTable -Table $child) {
         $coverTable = $child
       }
       continue
@@ -1235,11 +1270,6 @@ function Apply-CourseDesignCoverStyles {
     $cells = @($rows[$rowIndex].SelectNodes("./w:tc", $script:namespaceManager))
     for ($cellIndex = 0; $cellIndex -lt $cells.Count; $cellIndex++) {
       foreach ($paragraph in @($cells[$cellIndex].SelectNodes(".//w:p", $script:namespaceManager))) {
-        $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $script:namespaceManager
-        if ([string]::IsNullOrWhiteSpace($text)) {
-          continue
-        }
-
         Set-ParagraphJustification -Paragraph $paragraph -Value "center"
         Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
         Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line 320
@@ -1254,6 +1284,70 @@ function Apply-CourseDesignCoverStyles {
       }
     }
   }
+}
+
+function Ensure-SectionHasTitlePageElement {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$SectionProperties
+  )
+
+  $titlePg = $SectionProperties.SelectSingleNode("./w:titlePg", $script:namespaceManager)
+  if ($null -ne $titlePg) {
+    return $false
+  }
+
+  $titlePg = $SectionProperties.OwnerDocument.CreateElement("w", "titlePg", $wordNamespace)
+  $pgSz = $SectionProperties.SelectSingleNode("./w:pgSz", $script:namespaceManager)
+  if ($null -ne $pgSz) {
+    [void]$SectionProperties.InsertBefore($titlePg, $pgSz)
+  } else {
+    [void]$SectionProperties.AppendChild($titlePg)
+  }
+
+  return $true
+}
+
+function Ensure-SectionPageNumberStart {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$SectionProperties,
+
+    [int]$Start = 1
+  )
+
+  $pgNumType = $SectionProperties.SelectSingleNode("./w:pgNumType", $script:namespaceManager)
+  if ($null -eq $pgNumType) {
+    $pgNumType = $SectionProperties.OwnerDocument.CreateElement("w", "pgNumType", $wordNamespace)
+    $cols = $SectionProperties.SelectSingleNode("./w:cols", $script:namespaceManager)
+    if ($null -ne $cols) {
+      [void]$SectionProperties.InsertBefore($pgNumType, $cols)
+    } else {
+      [void]$SectionProperties.AppendChild($pgNumType)
+    }
+  }
+
+  $currentValue = $pgNumType.GetAttribute("w:start")
+  if ([string]::Equals($currentValue, [string]$Start, [System.StringComparison]::Ordinal)) {
+    return $false
+  }
+
+  Set-WordAttribute -Element $pgNumType -LocalName "start" -Value ([string]$Start)
+  return $true
+}
+
+function Ensure-CourseDesignCoverUsesDifferentFirstPage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  $sectPr = $Body.SelectSingleNode("./w:sectPr", $script:namespaceManager)
+  if ($null -eq $sectPr) {
+    return $false
+  }
+
+  return (Ensure-SectionHasTitlePageElement -SectionProperties $sectPr)
 }
 
 function Resolve-StyleProfileDecision {
@@ -1590,8 +1684,12 @@ try {
   }
 
   $removedCourseDesignPlaceholderCount = 0
+  $enabledCourseDesignTitlePageCount = 0
   if ($isCourseDesignReport) {
     $removedCourseDesignPlaceholderCount = Remove-CourseDesignDuplicatePlaceholderParagraphs -Body $body -NamespaceManager $script:namespaceManager
+    if (Ensure-CourseDesignCoverUsesDifferentFirstPage -Body $body) {
+      $enabledCourseDesignTitlePageCount = 1
+    }
   }
 
   foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
@@ -1628,6 +1726,7 @@ try {
     styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
     removedCourseDesignPlaceholderCount = $removedCourseDesignPlaceholderCount
+    enabledCourseDesignTitlePageCount = $enabledCourseDesignTitlePageCount
     removedTrailingEmptyParagraphCount = $removedTrailingEmptyParagraphCount
   }
 } finally {
