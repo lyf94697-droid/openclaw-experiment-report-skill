@@ -1313,7 +1313,7 @@ try {
       continue
     }
 
-    if (Test-IsCommandParagraph -Text $text) {
+    if ((-not $isInTable) -and (Test-IsCommandParagraph -Text $text)) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
@@ -1327,7 +1327,7 @@ try {
       continue
     }
 
-    if (Test-IsCodeParagraph -Text $text) {
+    if ((-not $isInTable) -and (Test-IsCodeParagraph -Text $text)) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.CommandLineTwips

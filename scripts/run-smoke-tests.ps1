@@ -1211,6 +1211,7 @@ try {
       (Join-Path $repoRoot 'scripts\generate-report-inputs.ps1'),
       (Join-Path $repoRoot 'scripts\generate-report-chat.ps1'),
       (Join-Path $repoRoot 'scripts\install-skill.ps1'),
+      (Join-Path $repoRoot 'scripts\insert-course-design-tables.ps1'),
       (Join-Path $repoRoot 'scripts\insert-docx-images.ps1'),
       (Join-Path $repoRoot 'scripts\new-report-profile.ps1'),
       (Join-Path $repoRoot 'scripts\prepare-report-prompt.ps1'),
@@ -2999,6 +3000,20 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignImageDocumentXml.OuterXml -match '图1 实现过程截图') -Message 'Course-design image insertion is missing the implementation caption.'
   Assert-True -Condition ($courseDesignImageDocumentXml.OuterXml -match '图2 运行结果截图') -Message 'Course-design image insertion is missing the result caption.'
   Remove-Item -LiteralPath $courseDesignImageTemp -Recurse -Force
+
+  $courseDesignTablesDocx = Join-Path $tempRoot 'course-design-template.tables.docx'
+  $courseDesignTablesResult = & (Join-Path $repoRoot 'scripts\insert-course-design-tables.ps1') `
+    -DocxPath $courseDesignImageFilledDocx `
+    -OutPath $courseDesignTablesDocx `
+    -Overwrite
+  Assert-True -Condition (Test-Path -LiteralPath $courseDesignTablesDocx) -Message 'Course-design table insertion did not create the output docx.'
+  Assert-True -Condition ([bool]$courseDesignTablesResult.inserted) -Message 'Course-design table insertion should insert tables for the fixture.'
+  Assert-True -Condition ([int]$courseDesignTablesResult.tableCount -eq 7) -Message 'Course-design table insertion should use the campus-guide table set for the fixture.'
+  $courseDesignTablesOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path $courseDesignTablesDocx -Format markdown | Out-String
+  Assert-True -Condition ($courseDesignTablesOutline -match '表4-1 功能模块表') -Message 'Course-design table insertion is missing the function module table caption.'
+  Assert-True -Condition ($courseDesignTablesOutline -match '表4-2 数据库表') -Message 'Course-design table insertion is missing the database summary table caption.'
+  Assert-True -Condition ($courseDesignTablesOutline -match '表4-4 Place地点信息表') -Message 'Course-design table insertion should choose the campus-guide Place table instead of the course-selection tables.'
+  Assert-True -Condition ($courseDesignTablesOutline -notmatch 'Student学生用户表') -Message 'Course-design table insertion should not treat a generic course-design report as a course-selection system.'
   $results.Add('course-design profile pipeline OK') | Out-Null
 
   $internshipReportPath = Join-Path $tempRoot 'internship-report.md'

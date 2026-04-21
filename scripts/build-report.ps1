@@ -291,6 +291,7 @@ Ensure-ParentDirectory -Path $resolvedFilledDocxOutPath
 $resolvedImagePlanOutPath = $null
 $resolvedImageMapOutPath = $null
 $resolvedFilledDocxWithImagesOutPath = $null
+$resolvedCourseDesignTablesDocxOutPath = $null
 $resolvedStyledDocxOutPath = $null
 $validationPath = $null
 $filledOutlinePath = $null
@@ -301,6 +302,7 @@ $styleResult = $null
 $summaryPath = Join-Path $resolvedOutputDir "summary.json"
 $layoutCheckPath = Join-Path $resolvedOutputDir "layout-check.json"
 $layoutCheckResult = $null
+$courseDesignTablesResult = $null
 $expectedLayoutImageCount = -1
 $expectedLayoutCaptionCount = -1
 $imagePlanLowConfidenceCount = $null
@@ -437,8 +439,18 @@ if ($imageInputsProvided) {
   }
 }
 
+if ([string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+  $courseDesignTablesInputPath = if ($null -ne $resolvedFilledDocxWithImagesOutPath) { $resolvedFilledDocxWithImagesOutPath } else { $resolvedFilledDocxOutPath }
+  $resolvedCourseDesignTablesDocxOutPath = Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($courseDesignTablesInputPath)) + ".course-tables.docx")
+  Ensure-ParentDirectory -Path $resolvedCourseDesignTablesDocxOutPath
+  $courseDesignTablesResult = & (Join-Path $repoRoot "scripts\insert-course-design-tables.ps1") `
+    -DocxPath $courseDesignTablesInputPath `
+    -OutPath $resolvedCourseDesignTablesDocxOutPath `
+    -Overwrite
+}
+
 if ($styleOutputRequested) {
-  $styleInputPath = if ($null -ne $resolvedFilledDocxWithImagesOutPath) { $resolvedFilledDocxWithImagesOutPath } else { $resolvedFilledDocxOutPath }
+  $styleInputPath = if ($null -ne $resolvedCourseDesignTablesDocxOutPath) { $resolvedCourseDesignTablesDocxOutPath } elseif ($null -ne $resolvedFilledDocxWithImagesOutPath) { $resolvedFilledDocxWithImagesOutPath } else { $resolvedFilledDocxOutPath }
   $resolvedStyledDocxOutPath = if ([string]::IsNullOrWhiteSpace($StyledDocxOutPath)) {
     Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($styleInputPath)) + ".styled.docx")
   } else {
@@ -468,6 +480,8 @@ if ($styleOutputRequested) {
 
 $finalDocxPath = if ($null -ne $resolvedStyledDocxOutPath) {
   $resolvedStyledDocxOutPath
+} elseif ($null -ne $resolvedCourseDesignTablesDocxOutPath) {
+  $resolvedCourseDesignTablesDocxOutPath
 } elseif ($null -ne $resolvedFilledDocxWithImagesOutPath) {
   $resolvedFilledDocxWithImagesOutPath
 } else {
@@ -559,6 +573,9 @@ $summary = [pscustomobject]@{
   imageMapPath = $resolvedImageMapOutPath
   filledDocxWithImagesPath = $resolvedFilledDocxWithImagesOutPath
   filledWithImagesOutlinePath = $filledWithImagesOutlinePath
+  courseDesignTablesDocxPath = $resolvedCourseDesignTablesDocxOutPath
+  courseDesignTablesInserted = $(if ($null -ne $courseDesignTablesResult -and $courseDesignTablesResult.PSObject.Properties.Name -contains "inserted") { [bool]$courseDesignTablesResult.inserted } else { $null })
+  courseDesignTablesCount = $(if ($null -ne $courseDesignTablesResult -and $courseDesignTablesResult.PSObject.Properties.Name -contains "tableCount") { [int]$courseDesignTablesResult.tableCount } else { $null })
   styledDocxPath = $resolvedStyledDocxOutPath
   styledOutlinePath = $styledOutlinePath
   templateFrameDocxPath = $resolvedTemplateFrameDocxOutPath
@@ -600,6 +617,9 @@ if ($null -ne $resolvedFilledDocxWithImagesOutPath) {
   }
   Write-Output ("Image-map path: {0}" -f $resolvedImageMapOutPath)
   Write-Output ("Filled docx with images path: {0}" -f $resolvedFilledDocxWithImagesOutPath)
+}
+if ($null -ne $resolvedCourseDesignTablesDocxOutPath) {
+  Write-Output ("Course-design tables docx path: {0}" -f $resolvedCourseDesignTablesDocxOutPath)
 }
 if ($null -ne $resolvedStyledDocxOutPath) {
   Write-Output ("Styled docx path: {0}" -f $resolvedStyledDocxOutPath)
