@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 from typing import Iterable
 
@@ -9,9 +10,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 def load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = [
-        Path(r"C:\Windows\Fonts\msyh.ttc"),
-        Path(r"C:\Windows\Fonts\simhei.ttf"),
         Path(r"C:\Windows\Fonts\simsun.ttc"),
+        Path(r"C:\Windows\Fonts\simhei.ttf"),
+        Path(r"C:\Windows\Fonts\msyh.ttc"),
     ]
     for path in candidates:
         if path.exists():
@@ -83,17 +84,39 @@ def draw_arrow(
     end: tuple[int, int],
     color: tuple[int, int, int],
 ) -> None:
-    draw.line((start, end), fill=color, width=5)
-    tip_x, tip_y = end
-    size = 18
-    draw.polygon(
-        [
-            (tip_x, tip_y),
-            (tip_x - size, tip_y - size),
-            (tip_x + size, tip_y - size),
-        ],
-        fill=color,
+    draw.line((start, end), fill=color, width=3)
+    draw_arrow_head(draw, start, end, color)
+
+
+def draw_polyline_arrow(
+    draw: ImageDraw.ImageDraw,
+    points: list[tuple[int, int]],
+    color: tuple[int, int, int],
+) -> None:
+    if len(points) < 2:
+        return
+    draw.line(points, fill=color, width=3)
+    draw_arrow_head(draw, points[-2], points[-1], color)
+
+
+def draw_arrow_head(
+    draw: ImageDraw.ImageDraw,
+    start: tuple[int, int],
+    end: tuple[int, int],
+    color: tuple[int, int, int],
+) -> None:
+    angle = math.atan2(end[1] - start[1], end[0] - start[0])
+    size = 14
+    wing = math.radians(26)
+    p1 = (
+        end[0] - size * math.cos(angle - wing),
+        end[1] - size * math.sin(angle - wing),
     )
+    p2 = (
+        end[0] - size * math.cos(angle + wing),
+        end[1] - size * math.sin(angle + wing),
+    )
+    draw.polygon([end, p1, p2], fill=color)
 
 
 def draw_badge(
@@ -111,82 +134,252 @@ def draw_badge(
     draw.text((x - (bbox[2] - bbox[0]) / 2, y - (bbox[3] - bbox[1]) / 2 - 2), text, font=font, fill=ink)
 
 
+def draw_process(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    text: str,
+    font: ImageFont.ImageFont,
+    ink: tuple[int, int, int],
+) -> None:
+    draw.rectangle(box, fill=(255, 255, 255), outline=ink, width=2)
+    draw_centered_text(draw, box, text, font, ink, line_gap=5)
+
+
+def draw_terminator(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    text: str,
+    font: ImageFont.ImageFont,
+    ink: tuple[int, int, int],
+) -> None:
+    draw.rounded_rectangle(box, radius=10, fill=(255, 255, 255), outline=ink, width=2)
+    draw_centered_text(draw, box, text, font, ink, line_gap=5)
+
+
+def draw_decision(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    text: str,
+    font: ImageFont.ImageFont,
+    ink: tuple[int, int, int],
+) -> None:
+    x1, y1, x2, y2 = box
+    points = [
+        ((x1 + x2) // 2, y1),
+        (x2, (y1 + y2) // 2),
+        ((x1 + x2) // 2, y2),
+        (x1, (y1 + y2) // 2),
+    ]
+    draw.polygon(points, fill=(255, 255, 255), outline=ink)
+    draw.line(points + [points[0]], fill=ink, width=2)
+    draw_centered_text(draw, box, text, font, ink, line_gap=5)
+
+
+def draw_connector_label(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    text: str,
+    font: ImageFont.ImageFont,
+    ink: tuple[int, int, int],
+) -> None:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    pad = 5
+    rect = (xy[0] - pad, xy[1] - pad, xy[0] + (bbox[2] - bbox[0]) + pad, xy[1] + (bbox[3] - bbox[1]) + pad)
+    draw.rectangle(rect, fill=(255, 255, 255))
+    draw.text(xy, text, font=font, fill=ink)
+
+
+def crop_to_ink(img: Image.Image, pad: int = 28) -> Image.Image:
+    mask = Image.eval(img.convert("L"), lambda px: 255 if px < 250 else 0)
+    bbox = mask.getbbox()
+    if bbox is None:
+        return img
+
+    left = max(0, bbox[0] - pad)
+    top = max(0, bbox[1] - pad)
+    right = min(img.width, bbox[2] + pad)
+    bottom = min(img.height, bbox[3] + pad)
+    return img.crop((left, top, right, bottom))
+
+
+def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> None:
+    width = 1300
+    height = 1560
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    ink = (20, 20, 20)
+
+    title_font = load_font(28)
+    node_font = load_font(24)
+    label_font = load_font(19)
+
+    center_x = width // 2
+    top = 38
+    if title.strip():
+        title_width = draw.textlength(title, font=title_font)
+        draw.text(((width - title_width) / 2, 16), title, font=title_font, fill=ink)
+        top = 70
+
+    node_w = 420
+    node_h = 58
+    term_w = 120
+    term_h = 42
+    gap = 36
+    decision_w = 390
+    decision_h = 122
+
+    decision_index = next((i for i, step in enumerate(steps) if "是否" in step or "?" in step or "？" in step), -1)
+    if decision_index < 1 or len(steps) < decision_index + 3:
+        render_linear_flowchart(title, steps, out_path)
+        return
+
+    def centered_box(y: int, w: int = node_w, h: int = node_h) -> tuple[int, int, int, int]:
+        return (center_x - w // 2, y, center_x + w // 2, y + h)
+
+    y = top
+    start_box = centered_box(y, term_w, term_h)
+    draw_terminator(draw, start_box, "开始", node_font, ink)
+    previous_bottom = ((start_box[0] + start_box[2]) // 2, start_box[3])
+    y = start_box[3] + gap
+
+    search_box: tuple[int, int, int, int] | None = None
+    for idx, step in enumerate(steps[:decision_index]):
+        box = centered_box(y)
+        draw_arrow(draw, previous_bottom, (center_x, box[1]), ink)
+        draw_process(draw, box, step, node_font, ink)
+        if idx == decision_index - 1:
+            search_box = box
+        previous_bottom = (center_x, box[3])
+        y = box[3] + gap
+
+    decision_box = centered_box(y, decision_w, decision_h)
+    draw_arrow(draw, previous_bottom, (center_x, decision_box[1]), ink)
+    draw_decision(draw, decision_box, steps[decision_index], node_font, ink)
+    decision_center_y = (decision_box[1] + decision_box[3]) // 2
+
+    no_box = (900, decision_center_y - 29, 1215, decision_center_y + 29)
+    draw_polyline_arrow(draw, [(decision_box[2], decision_center_y), (no_box[0], decision_center_y)], ink)
+    draw_connector_label(draw, (decision_box[2] + 24, decision_center_y - 34), "否", label_font, ink)
+    draw_process(draw, no_box, "提示无结果", node_font, ink)
+
+    retry_box = (900, decision_center_y + 88, 1215, decision_center_y + 146)
+    draw_arrow(draw, ((no_box[0] + no_box[2]) // 2, no_box[3]), ((retry_box[0] + retry_box[2]) // 2, retry_box[1]), ink)
+    draw_process(draw, retry_box, "调整关键词重新查询", node_font, ink)
+    if search_box is not None:
+        draw_polyline_arrow(
+            draw,
+            [
+                (retry_box[2], (retry_box[1] + retry_box[3]) // 2),
+                (1240, (retry_box[1] + retry_box[3]) // 2),
+                (1240, (search_box[1] + search_box[3]) // 2),
+                (search_box[2], (search_box[1] + search_box[3]) // 2),
+            ],
+            ink,
+        )
+
+    y = decision_box[3] + gap
+    draw_connector_label(draw, (center_x + 18, decision_box[3] + 6), "是", label_font, ink)
+    after = steps[decision_index + 1 :]
+    end_text = after[-1]
+    body = after[:-1]
+
+    first_after = body[0] if body else "执行下一步操作"
+    first_box = centered_box(y)
+    draw_arrow(draw, (center_x, decision_box[3]), (center_x, first_box[1]), ink)
+    draw_process(draw, first_box, first_after, node_font, ink)
+    y = first_box[3] + 56
+
+    remaining = body[1:]
+    merge_start = (center_x, first_box[3])
+    if len(remaining) >= 2:
+        left_box = (70, y, 490, y + node_h)
+        right_box = (760, y, 1180, y + node_h)
+        split_y = y - 24
+        draw_polyline_arrow(draw, [merge_start, (center_x, split_y), ((left_box[0] + left_box[2]) // 2, split_y), ((left_box[0] + left_box[2]) // 2, left_box[1])], ink)
+        draw_polyline_arrow(draw, [(center_x, split_y), ((right_box[0] + right_box[2]) // 2, split_y), ((right_box[0] + right_box[2]) // 2, right_box[1])], ink)
+        draw_process(draw, left_box, remaining[0], node_font, ink)
+        draw_process(draw, right_box, remaining[1], node_font, ink)
+        merge_y = left_box[3] + 52
+        join_left = (center_x - 52, merge_y)
+        join_right = (center_x + 52, merge_y)
+        draw_polyline_arrow(draw, [((left_box[0] + left_box[2]) // 2, left_box[3]), ((left_box[0] + left_box[2]) // 2, merge_y), join_left], ink)
+        draw_polyline_arrow(draw, [((right_box[0] + right_box[2]) // 2, right_box[3]), ((right_box[0] + right_box[2]) // 2, merge_y), join_right], ink)
+        draw.line((join_left, join_right), fill=ink, width=3)
+        draw_arrow(draw, (center_x, merge_y), (center_x, merge_y + 26), ink)
+        y = merge_y + 34
+        previous_bottom = (center_x, merge_y + 26)
+        for step in remaining[2:]:
+            box = centered_box(y)
+            draw_arrow(draw, previous_bottom, (center_x, box[1]), ink)
+            draw_process(draw, box, step, node_font, ink)
+            previous_bottom = (center_x, box[3])
+            y = box[3] + gap
+    else:
+        previous_bottom = (center_x, first_box[3])
+        for step in remaining:
+            box = centered_box(y)
+            draw_arrow(draw, previous_bottom, (center_x, box[1]), ink)
+            draw_process(draw, box, step, node_font, ink)
+            previous_bottom = (center_x, box[3])
+            y = box[3] + gap
+
+    end_box = centered_box(y, term_w, term_h)
+    draw_arrow(draw, previous_bottom, (center_x, end_box[1]), ink)
+    draw_terminator(draw, end_box, "结束", node_font, ink)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    crop_to_ink(img.crop((0, 0, width, min(height, end_box[3] + 46)))).save(out_path)
+
+
+def render_linear_flowchart(title: str, steps: list[str], out_path: Path) -> None:
+    width = 1100
+    node_w = 420
+    node_h = 58
+    gap = 36
+    top = 68 if title.strip() else 30
+    height = top + 58 + len(steps) * (node_h + gap) + 100
+
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    ink = (20, 20, 20)
+    title_font = load_font(28)
+    node_font = load_font(24)
+    center_x = width // 2
+
+    if title.strip():
+        title_width = draw.textlength(title, font=title_font)
+        draw.text(((width - title_width) / 2, 14), title, font=title_font, fill=ink)
+
+    y = top
+    start_box = (center_x - 90, y, center_x + 90, y + 56)
+    draw_terminator(draw, start_box, "开始", node_font, ink)
+    previous_bottom = (center_x, start_box[3])
+    y = start_box[3] + gap
+    for step in steps:
+        box = (center_x - node_w // 2, y, center_x + node_w // 2, y + node_h)
+        draw_arrow(draw, previous_bottom, (center_x, box[1]), ink)
+        draw_process(draw, box, step, node_font, ink)
+        previous_bottom = (center_x, box[3])
+        y = box[3] + gap
+    end_box = (center_x - 90, y, center_x + 90, y + 56)
+    draw_arrow(draw, previous_bottom, (center_x, end_box[1]), ink)
+    draw_terminator(draw, end_box, "结束", node_font, ink)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    crop_to_ink(img.crop((0, 0, width, min(height, end_box[3] + 46)))).save(out_path)
+
+
 def render_flowchart(title: str, steps: Iterable[str], out_path: Path) -> None:
     steps = list(steps)
     if len(steps) < 2:
         raise ValueError("At least two flowchart steps are required.")
 
-    width = 1300
-    box_width = 820
-    box_height = 136
-    gap = 58
-    header_height = 156
-    bottom_margin = 90
-    start_y = header_height + 48
-    total_height = start_y + len(steps) * box_height + (len(steps) - 1) * gap + bottom_margin
-
-    img = Image.new("RGB", (width, total_height), (248, 250, 252))
-    draw = ImageDraw.Draw(img)
-
-    ink = (31, 42, 55)
-    muted = (86, 100, 116)
-    line = (74, 92, 110)
-    blue = (229, 240, 251)
-    green = (226, 242, 232)
-    yellow = (255, 244, 220)
-    card_outline = (62, 78, 96)
-    header_fill = (34, 58, 76)
-    shadow = (220, 226, 232)
-    white = (255, 255, 255)
-
-    title_font = load_font(40)
-    small_font = load_font(22)
-    badge_font = load_font(24)
-    box_font = load_font(29)
-
-    draw.rectangle((0, 0, width, header_height), fill=header_fill)
-    draw.rounded_rectangle((88, 44, 184, 88), radius=8, fill=(231, 238, 244))
-    draw.text((111, 51), "流程", font=small_font, fill=header_fill)
-    title_width = draw.textlength(title, font=title_font)
-    draw.text(((width - title_width) / 2, 46), title, font=title_font, fill=white)
-    subtitle = "按报告版式优化的纵向流程图"
-    subtitle_width = draw.textlength(subtitle, font=small_font)
-    draw.text(((width - subtitle_width) / 2, 102), subtitle, font=small_font, fill=(218, 227, 235))
-
-    x1 = (width - box_width) // 2
-    x2 = x1 + box_width
-    boxes: list[tuple[int, int, int, int]] = []
-    y = start_y
-    for index, step in enumerate(steps):
-        fill = green if index in (0, len(steps) - 1) else (yellow if "?" in step or "是否" in step else blue)
-        radius = 48 if index in (0, len(steps) - 1) else 14
-        box = (x1, y, x2, y + box_height)
-        shadow_box = (box[0] + 8, box[1] + 8, box[2] + 8, box[3] + 8)
-        draw.rounded_rectangle(shadow_box, radius=radius, fill=shadow)
-        draw.rounded_rectangle(box, radius=radius, fill=fill, outline=card_outline, width=4)
-        badge_fill = white if index not in (0, len(steps) - 1) else (241, 248, 244)
-        draw_badge(draw, (x1 + 54, y + box_height // 2), str(index + 1), badge_font, badge_fill, card_outline)
-        text_box = (x1 + 108, y, x2 - 32, y + box_height)
-        draw_centered_text(draw, text_box, step, box_font, ink, line_gap=8)
-        boxes.append(box)
-        y += box_height + gap
-
-    center_x = width // 2
-    for first, second in zip(boxes, boxes[1:]):
-        draw_arrow(draw, (center_x, first[3] + 4), (center_x, second[1] - 4), line)
-
-    footer = "可直接插入课程设计或实验报告正文"
-    footer_width = draw.textlength(footer, font=small_font)
-    draw.text(((width - footer_width) / 2, total_height - 54), footer, font=small_font, fill=muted)
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    img.save(out_path)
+    render_branched_flowchart(title, steps, out_path)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a portrait vertical lab flowchart PNG.")
     parser.add_argument("--out", required=True, help="Output PNG path.")
-    parser.add_argument("--title", required=True, help="Flowchart title.")
+    parser.add_argument("--title", default="", help="Optional flowchart title.")
     parser.add_argument(
         "--steps-file",
         required=True,

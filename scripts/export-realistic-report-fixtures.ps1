@@ -26,17 +26,17 @@ function New-CourseSelectionFlowchartPng {
   $smallFont = New-Object System.Drawing.Font("Microsoft YaHei", 24, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
   $badgeFont = New-Object System.Drawing.Font("Microsoft YaHei", 22, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
 
-  $inkBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(35, 45, 55))
-  $headerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(34, 58, 76))
-  $noteBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(95, 105, 115))
-  $linePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 90, 105), 4)
-  $thinLinePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70, 90, 105), 3)
-  $shadowBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 226, 232))
-  $shadowPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(220, 226, 232), 1)
-  $boxBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(232, 241, 250))
-  $decisionBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 242, 218))
-  $endBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(226, 242, 232))
-  $warnBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(252, 232, 229))
+  $inkBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
+  $headerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+  $noteBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
+  $linePen = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 3)
+  $thinLinePen = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 2)
+  $shadowBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+  $shadowPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1)
+  $boxBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+  $decisionBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+  $endBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+  $warnBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
   $whiteBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
 
   function New-Rect {
@@ -110,29 +110,16 @@ function New-CourseSelectionFlowchartPng {
       [string]$Badge = ""
     )
 
-    $shadowRect = New-Object System.Drawing.Rectangle(($Rect.X + 8), ($Rect.Y + 8), $Rect.Width, $Rect.Height)
     if ($Kind -eq "round") {
-      Draw-RoundedRectangle -G $G -Rect $shadowRect -Radius 42 -Fill $shadowBrush -Pen $shadowPen
-      Draw-RoundedRectangle -G $G -Rect $Rect -Radius 42 -Fill $Fill -Pen $thinLinePen
+      Draw-RoundedRectangle -G $G -Rect $Rect -Radius 32 -Fill $Fill -Pen $thinLinePen
     } elseif ($Kind -eq "diamond") {
-      Draw-Diamond -G $G -Rect $shadowRect -Fill $shadowBrush -Pen $shadowPen
       Draw-Diamond -G $G -Rect $Rect -Fill $Fill -Pen $thinLinePen
     } else {
-      Draw-RoundedRectangle -G $G -Rect $shadowRect -Radius 14 -Fill $shadowBrush -Pen $shadowPen
-      Draw-RoundedRectangle -G $G -Rect $Rect -Radius 14 -Fill $Fill -Pen $thinLinePen
+      $G.FillRectangle($Fill, $Rect)
+      $G.DrawRectangle($thinLinePen, $Rect)
     }
 
-    $textRect = $Rect
-    if (-not [string]::IsNullOrWhiteSpace($Badge) -and $Kind -ne "diamond") {
-      $textRect = New-Object System.Drawing.Rectangle(($Rect.X + 72), $Rect.Y, ($Rect.Width - 92), $Rect.Height)
-      $badgeSize = 46
-      $badgeRect = New-Object System.Drawing.Rectangle(($Rect.X + 22), ($Rect.Y + [int](($Rect.Height - $badgeSize) / 2)), $badgeSize, $badgeSize)
-      $G.FillEllipse($whiteBrush, $badgeRect)
-      $G.DrawEllipse($thinLinePen, $badgeRect)
-      Draw-CenteredText -G $G -Rect $badgeRect -Text $Badge -TextFont $badgeFont -Brush $inkBrush
-    }
-
-    Draw-CenteredText -G $G -Rect $textRect -Text $Text -TextFont $font -Brush $inkBrush
+    Draw-CenteredText -G $G -Rect $Rect -Text $Text -TextFont $font -Brush $inkBrush
   }
 
   function Draw-Arrow {
@@ -179,9 +166,8 @@ function New-CourseSelectionFlowchartPng {
     $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
     $graphics.Clear([System.Drawing.Color]::White)
 
-    $graphics.FillRectangle($headerBrush, 0, 0, $width, 104)
-    $titleRect = New-Object System.Drawing.Rectangle(0, 26, $width, 58)
-    Draw-CenteredText -G $graphics -Rect $titleRect -Text "学生选课系统流程图" -TextFont $titleFont -Brush $whiteBrush
+    $titleRect = New-Object System.Drawing.Rectangle(0, 24, $width, 58)
+    Draw-CenteredText -G $graphics -Rect $titleRect -Text "学生选课系统流程图" -TextFont $titleFont -Brush $inkBrush
 
     Draw-Node -G $graphics -Kind "round" -Rect (New-Rect 550 120 300 90) -Text "开始" -Fill $endBrush -Badge "1"
     Draw-Node -G $graphics -Kind "box" -Rect (New-Rect 470 290 460 100) -Text "输入用户名和密码" -Fill $boxBrush -Badge "2"
@@ -203,7 +189,7 @@ function New-CourseSelectionFlowchartPng {
     Draw-Arrow -G $graphics -X1 700 -Y1 1290 -X2 700 -Y2 1380
     Draw-Arrow -G $graphics -X1 700 -Y1 1570 -X2 700 -Y2 1660 -Label "是" -LabelDx 22 -LabelDy -8
     Draw-Arrow -G $graphics -X1 700 -Y1 1770 -X2 700 -Y2 1830
-    Draw-Arrow -G $graphics -X1 500 -Y1 575 -X2 420 -Y2 575 -Label "否" -LabelDx -35 -LabelDy -36
+    Draw-Arrow -G $graphics -X1 500 -Y1 575 -X2 420 -Y2 575 -Label "否" -LabelDx 0 -LabelDy -36
     $graphics.DrawLine($linePen, 100, 580, 60, 580)
     $graphics.DrawLine($linePen, 60, 580, 60, 340)
     $graphics.DrawLine($linePen, 60, 340, 430, 340)
@@ -212,9 +198,6 @@ function New-CourseSelectionFlowchartPng {
     $graphics.DrawLine($linePen, 1135, 1420, 1135, 1040)
     $graphics.DrawLine($linePen, 1135, 1040, 970, 1040)
     Draw-Arrow -G $graphics -X1 970 -Y1 1040 -X2 930 -Y2 1040
-
-    $noteRect = New-Object System.Drawing.Rectangle(0, ($height - 42), $width, 36)
-    Draw-CenteredText -G $graphics -Rect $noteRect -Text "合成样例：用于报告生成流程图测试，不含真实学生信息" -TextFont $smallFont -Brush $noteBrush
 
     $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
   } finally {

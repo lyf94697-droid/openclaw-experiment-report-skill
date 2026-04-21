@@ -334,6 +334,60 @@ function Get-ParagraphText {
   return Normalize-OpenXmlText -Text ($parts -join "")
 }
 
+function Test-IsRemovableTrailingParagraph {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $text = Get-ParagraphText -Paragraph $Paragraph -NamespaceManager $NamespaceManager
+  if (-not [string]::IsNullOrWhiteSpace($text)) {
+    return $false
+  }
+
+  $protectedContent = $Paragraph.SelectSingleNode(".//w:drawing | .//w:tbl | .//w:sectPr | .//w:br[@w:type='page']", $NamespaceManager)
+  return ($null -eq $protectedContent)
+}
+
+function Remove-TrailingEmptyBodyParagraphs {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $removedCount = 0
+  while ($Body.ChildNodes.Count -gt 1) {
+    $candidateIndex = $Body.ChildNodes.Count - 1
+    $lastChild = $Body.ChildNodes[$candidateIndex]
+    if ($lastChild.LocalName -eq "sectPr") {
+      $candidateIndex--
+      if ($candidateIndex -lt 0) {
+        break
+      }
+      $lastChild = $Body.ChildNodes[$candidateIndex]
+    }
+
+    if ($lastChild.LocalName -ne "p") {
+      break
+    }
+
+    if (-not (Test-IsRemovableTrailingParagraph -Paragraph $lastChild -NamespaceManager $NamespaceManager)) {
+      break
+    }
+
+    [void]$Body.RemoveChild($lastChild)
+    $removedCount++
+  }
+
+  return $removedCount
+}
+
 function Get-HeadingPattern {
   param(
     [Parameter(Mandatory = $true)]
@@ -1317,6 +1371,8 @@ try {
     }
   }
 
+  $removedTrailingEmptyParagraphCount = Remove-TrailingEmptyBodyParagraphs -Body $body -NamespaceManager $script:namespaceManager
+
   [System.IO.File]::WriteAllText($documentXmlPath, $documentXml.OuterXml, (New-Object System.Text.UTF8Encoding($false)))
   Write-OpenXmlPackage -SourceDirectory $tempRoot -DestinationPath $resolvedOutPath
 
@@ -1342,6 +1398,7 @@ try {
     styledCodeCount = $styledCodeCount
     styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
+    removedTrailingEmptyParagraphCount = $removedTrailingEmptyParagraphCount
   }
 } finally {
   if (Test-Path -LiteralPath $tempRoot) {
