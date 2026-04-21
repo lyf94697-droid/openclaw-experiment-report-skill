@@ -1,0 +1,138 @@
+{
+  "name": "os-process-scheduling-school-template",
+  "displayName": "操作系统实验报告",
+  "defaultStyleProfile": "school",
+  "defaultExperimentProperty": "验证性实验",
+  "metadataFields": [
+    { "key": "StudentId", "label": "学号", "aliases": ["学号"] },
+    { "key": "Name", "label": "姓名", "aliases": ["姓名"] },
+    { "key": "ClassName", "label": "班级", "aliases": ["班级"] },
+    { "key": "CourseName", "label": "课程名称", "aliases": ["课程名称"] },
+    { "key": "ExperimentName", "label": "实验内容", "aliases": ["实验内容", "实验名称"] },
+    { "key": "ExperimentProperty", "label": "实验性质", "aliases": ["上机实验性质", "实验性质"] },
+    { "key": "ExperimentDate", "label": "实验时间", "aliases": ["实验时间", "实验日期"] },
+    { "key": "ExperimentLocation", "label": "实验地点", "aliases": ["实验地点"] },
+    { "key": "Equipment", "label": "实验设备", "aliases": ["实验设备"] },
+    { "key": "TeacherName", "label": "指导教师", "aliases": ["指导教师", "任课教师"] },
+    { "key": "Major", "label": "专业", "aliases": ["专业"] },
+    { "key": "College", "label": "学院", "aliases": ["学院"] }
+  ],
+  "extraLabels": [
+    { "key": "Date", "label": "日期" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "实验目的",
+      "aliases": ["实验目的"],
+      "minChars": { "standard": 60, "full": 120 }
+    },
+    {
+      "key": "Environment",
+      "heading": "实验环境",
+      "aliases": ["实验环境", "实验设备与环境", "实验器材"],
+      "minChars": { "standard": 60, "full": 120 }
+    },
+    {
+      "key": "Theory",
+      "heading": "实验原理",
+      "aliases": ["实验原理", "实验任务要求", "原理分析"],
+      "minChars": { "standard": 90, "full": 180 }
+    },
+    {
+      "key": "Steps",
+      "heading": "实验步骤",
+      "aliases": ["实验步骤", "实验方法", "实验过程"],
+      "minChars": { "standard": 180, "full": 420 }
+    },
+    {
+      "key": "Results",
+      "heading": "实验结果",
+      "aliases": ["实验结果", "实验现象与结果记录"],
+      "minChars": { "standard": 120, "full": 260 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题分析",
+      "aliases": ["问题分析", "结果分析"],
+      "minChars": { "standard": 100, "full": 220 }
+    },
+    {
+      "key": "Summary",
+      "heading": "实验总结",
+      "aliases": ["实验总结", "实验小结", "总结与思考"],
+      "minChars": { "standard": 90, "full": 180 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "实验内容",
+    "实验方法"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "steps": "实验步骤与调试过程截图",
+      "result": "实验结果截图",
+      "analysis": "问题分析截图",
+      "environment": "实验环境截图",
+      "summary": "实验总结配图",
+      "default": "实验过程截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "flowchart|流程图", "caption": "实验流程图" },
+      { "pattern": "215011|fcfs", "caption": "FCFS 队尾插入逻辑截图" },
+      { "pattern": "215028|rr", "caption": "RR 时间片轮转逻辑截图" },
+      { "pattern": "215056|sjf", "caption": "SJF 非抢占有序插入逻辑截图" },
+      { "pattern": "error|problem|异常", "caption": "问题分析截图" }
+    ]
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["实验报告", "实验目的", "实验方法", "实验结果", "实验小结"],
+      "throughRowOffset": 1,
+      "blocks": [
+        { "heading": "一、实验目的", "sectionIds": ["purpose"] },
+        { "heading": "二、实验环境", "sectionIds": ["environment"] },
+        { "heading": "三、实验原理", "sectionIds": ["theory"] },
+        { "heading": "四、实验步骤", "sectionIds": ["steps"] },
+        { "heading": "五、实验结果", "sectionIds": ["result"] },
+        { "heading": "六、问题分析", "sectionIds": ["analysis"] },
+        { "heading": "七、实验总结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 1200,
+      "promptGuidance": [
+        "按高校实验报告口吻写作，避免只给提纲式短句。",
+        "步骤、结果、问题分析三部分应比其他部分更具体。"
+      ]
+    },
+    "full": {
+      "minChars": 1800,
+      "promptGuidance": [
+        "优先生成可直接提交的中文实验报告，而不是泛泛而谈的说明文。",
+        "正文应保留真实实验过程中的调试顺序、职责划分、错误定位和修正依据。",
+        "步骤部分要按先阅读框架、再补全 FCFS、再修 RR、再补 SJF、最后整体核查的顺序展开。",
+        "结果部分要明确写出三种算法分别验证了什么，不要把所有结论混成一段。",
+        "若缺少真实编译输出或成绩评语，保持留白意识，不要编造。"
+      ]
+    }
+  },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1200,
+    "denseSectionChars": 680,
+    "denseSectionParagraphs": 3,
+    "figureClusterRefs": 3
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "请填写",
+    "以下是一份",
+    "教师点评",
+    "生成实验报告"
+  ]
+}

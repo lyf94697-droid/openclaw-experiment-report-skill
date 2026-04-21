@@ -413,6 +413,40 @@ function Resolve-SectionId {
   return $null
 }
 
+function Resolve-AvailableSectionId {
+  param(
+    [AllowNull()]
+    [string]$RequestedSectionId,
+
+    [AllowEmptyCollection()]
+    [string[]]$AvailableSectionIds
+  )
+
+  $resolvedAvailableSectionIds = @($AvailableSectionIds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+  if ([string]::IsNullOrWhiteSpace($RequestedSectionId) -or $resolvedAvailableSectionIds.Count -eq 0) {
+    return $null
+  }
+
+  if ($resolvedAvailableSectionIds -contains $RequestedSectionId) {
+    return $RequestedSectionId
+  }
+
+  $preferredOrder = New-Object System.Collections.Generic.List[string]
+  foreach ($candidate in @($RequestedSectionId) + @(Get-ReportProfileImageFallbackSectionOrder -Profile $reportProfile)) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and -not $preferredOrder.Contains($candidate)) {
+      $preferredOrder.Add($candidate) | Out-Null
+    }
+  }
+
+  foreach ($candidate in $preferredOrder) {
+    if ($resolvedAvailableSectionIds -contains $candidate) {
+      return $candidate
+    }
+  }
+
+  return $resolvedAvailableSectionIds[0]
+}
+
 function Get-ZipEntryText {
   param(
     [Parameter(Mandatory = $true)]
@@ -959,11 +993,20 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
       throw "Image section was not recognized: $($spec.SectionName)"
     }
     if ($availableSectionIds -notcontains $resolvedSectionId) {
-      throw "Image section is not available in the target docx: $($spec.SectionName)"
+      $fallbackSectionId = Resolve-AvailableSectionId -RequestedSectionId $resolvedSectionId -AvailableSectionIds $availableSectionIds
+      if ([string]::IsNullOrWhiteSpace($fallbackSectionId)) {
+        throw "Image section is not available in the target docx: $($spec.SectionName)"
+      }
+      $notes.Add(("Image {0} requested section {1}, but the target docx does not contain it. Falling back to {2}." -f ($index + 1), $spec.SectionName, $fallbackSectionId)) | Out-Null
+      $resolvedSectionId = $fallbackSectionId
+      $sectionSource = "explicit-fallback"
+      $sectionReason = "Requested section was not present in the target docx, so the nearest available section was used."
+      $sectionConfidence = "medium"
+    } else {
+      $sectionSource = "explicit"
+      $sectionReason = "Section was provided in the image spec."
+      $sectionConfidence = "high"
     }
-    $sectionSource = "explicit"
-    $sectionReason = "Section was provided in the image spec."
-    $sectionConfidence = "high"
   } else {
     $resolvedSectionId = Infer-SectionIdFromBaseName -BaseName $spec.BaseName
     if (-not [string]::IsNullOrWhiteSpace($resolvedSectionId) -and ($availableSectionIds -contains $resolvedSectionId)) {

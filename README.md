@@ -340,6 +340,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 其中 `examples/deployment-report-prepared/` 现在还附带了 `image-specs.json` 和 `images/` 下三张 checked-in 截图示例，适合直接 smoke 或手动回放“部署环境 / 验证结果 / 回滚预案”这条带图链路
 - 如果你只是想先拿现成 `docx` 模板试跑，不想自己再找空白模板，可以直接使用 `examples/report-templates/` 下的 8 份内置模板样例；它们覆盖 `experiment-report`、`course-design-report`、`internship-report`、`software-test-report`、`deployment-report`、`weekly-report`、`meeting-minutes` 和 `monthly-report`
 - 这些模板样例由 `scripts/export-report-template-examples.ps1` 按当前 profile 自动导出；如果你改了 profile 里的 metadata 字段或章节标题，可以重新运行这个脚本刷新模板 pack
+- 课程设计报告不要并入默认实验报告快线；需要时显式传 `-ReportProfileName course-design-report`，并按 [docs/course-design-fastline.md](docs/course-design-fastline.md) 的快线规则运行。可直接复制的提示词见 [examples/course-design-fastline-prompt.md](examples/course-design-fastline-prompt.md)
 - 自定义 preset 不需要先拷进 `profiles/`，可以直接对 `generate-report-inputs.ps1`、`build-report.ps1`、`build-report-from-url.ps1`、`build-report-from-feishu.ps1` 传 `-ReportProfilePath`
 - 想一次性查看所有示例 preset 会生成什么 prompt、metadata 和 requirements，可以运行 `scripts/run-profile-preset-samples.ps1`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`

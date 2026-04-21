@@ -68,6 +68,9 @@ param(
 
   [switch]$SkipSessionReset,
 
+  [ValidateSet("fast", "full")]
+  [string]$PipelineMode = "fast",
+
   [ValidateSet("auto", "default", "compact", "school")]
   [string]$StyleProfile = "auto",
 
@@ -366,6 +369,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
     ReportPath = $cleanedReportPath
     OutputDir = $resolvedOutputDir
     StyleFinalDocx = $true
+    PipelineMode = $PipelineMode
     StyleProfile = $StyleProfile
   }
 
@@ -491,6 +495,7 @@ $pipelineTrace = [pscustomobject]@{
     script = "build-report-from-url.ps1"
     mode = "generated-report"
     generationMode = $generationMode
+    pipelineMode = $PipelineMode
     reportProfileName = [string]$reportProfile.name
     reportProfileDisplayName = $documentLabel
     detailLevel = $effectiveDetailLevel
@@ -535,6 +540,7 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("- Script: build-report-from-url.ps1")
 [void]$pipelineTraceMarkdownLines.Add("- Mode: generated-report")
 [void]$pipelineTraceMarkdownLines.Add("- Generation mode: $generationMode")
+[void]$pipelineTraceMarkdownLines.Add("- Pipeline mode: $PipelineMode")
 [void]$pipelineTraceMarkdownLines.Add("- Report profile: $([string]$reportProfile.name)")
 [void]$pipelineTraceMarkdownLines.Add("- Display name: $documentLabel")
 [void]$pipelineTraceMarkdownLines.Add("- Detail level: $effectiveDetailLevel")
@@ -582,6 +588,7 @@ $wrapperSummary = [pscustomobject]@{
   usedInferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedInferredExperimentName") { [bool]$inputSummary.usedInferredExperimentName } else { $false })
   detailLevel = $effectiveDetailLevel
   generationMode = $generationMode
+  pipelineMode = $PipelineMode
   promptPath = $promptPathOut
   requestedReferenceUrls = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedReferenceUrls") { @($inputSummary.requestedReferenceUrls) } else { @() })
   referenceUrls = $effectiveReferenceUrlList

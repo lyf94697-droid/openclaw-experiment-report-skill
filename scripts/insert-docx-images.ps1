@@ -563,6 +563,40 @@ function Resolve-SectionId {
   return $null
 }
 
+function Resolve-AvailableSectionId {
+  param(
+    [AllowNull()]
+    [string]$RequestedSectionId,
+
+    [AllowEmptyCollection()]
+    [string[]]$AvailableSectionIds
+  )
+
+  $resolvedAvailableSectionIds = @($AvailableSectionIds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+  if ([string]::IsNullOrWhiteSpace($RequestedSectionId) -or $resolvedAvailableSectionIds.Count -eq 0) {
+    return $null
+  }
+
+  if ($resolvedAvailableSectionIds -contains $RequestedSectionId) {
+    return $RequestedSectionId
+  }
+
+  $preferredOrder = New-Object System.Collections.Generic.List[string]
+  foreach ($candidate in @($RequestedSectionId) + @(Get-ReportProfileImageFallbackSectionOrder -Profile $reportProfile)) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and -not $preferredOrder.Contains($candidate)) {
+      $preferredOrder.Add($candidate) | Out-Null
+    }
+  }
+
+  foreach ($candidate in $preferredOrder) {
+    if ($resolvedAvailableSectionIds -contains $candidate) {
+      return $candidate
+    }
+  }
+
+  return $resolvedAvailableSectionIds[0]
+}
+
 function Resolve-SectionRuleFromHeading {
   param(
     [AllowNull()]
@@ -729,6 +763,86 @@ function Get-ImageSizeEmu {
     }
   } finally {
     $image.Dispose()
+  }
+}
+
+function Get-ImagePixelDimensions {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $image = [System.Drawing.Image]::FromFile($Path)
+  try {
+    if ($image.Width -le 0 -or $image.Height -le 0) {
+      throw "Invalid image dimensions: $Path"
+    }
+
+    return [pscustomobject]@{
+      Width = [int]$image.Width
+      Height = [int]$image.Height
+    }
+  } finally {
+    $image.Dispose()
+  }
+}
+
+function New-PaddedRowImage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$SourcePath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$OutPath,
+
+    [Parameter(Mandatory = $true)]
+    [int]$CanvasWidthPx,
+
+    [Parameter(Mandatory = $true)]
+    [int]$CanvasHeightPx
+  )
+
+  if ($CanvasWidthPx -le 0 -or $CanvasHeightPx -le 0) {
+    throw "Canvas size must be positive."
+  }
+
+  $sourceImage = [System.Drawing.Image]::FromFile($SourcePath)
+  try {
+    if ($sourceImage.Width -le 0 -or $sourceImage.Height -le 0) {
+      throw "Invalid image dimensions: $SourcePath"
+    }
+
+    $drawWidthPx = $CanvasWidthPx
+    $drawHeightPx = $CanvasHeightPx
+
+    $bitmap = New-Object System.Drawing.Bitmap $CanvasWidthPx, $CanvasHeightPx
+    try {
+      if ($sourceImage.HorizontalResolution -gt 0 -and $sourceImage.VerticalResolution -gt 0) {
+        $bitmap.SetResolution($sourceImage.HorizontalResolution, $sourceImage.VerticalResolution)
+      }
+
+      $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+      try {
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+        $graphics.Clear([System.Drawing.Color]::Transparent)
+        $destinationRect = New-Object System.Drawing.Rectangle 0, 0, $drawWidthPx, $drawHeightPx
+        $graphics.DrawImage($sourceImage, $destinationRect)
+      } finally {
+        $graphics.Dispose()
+      }
+
+      $parent = Split-Path -Parent $OutPath
+      if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+      }
+      $bitmap.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+      $bitmap.Dispose()
+    }
+  } finally {
+    $sourceImage.Dispose()
   }
 }
 
@@ -1229,8 +1343,12 @@ function Resolve-TargetReference {
     throw "$ContextLabel was not recognized: $Selector"
   }
   if (-not $SectionLookup.ContainsKey($sectionId)) {
-    $availableSections = @($SectionLookup.Keys | Sort-Object) -join ", "
-    throw "$ContextLabel was not found in the document: $Selector. Available sections: $availableSections"
+    $fallbackSectionId = Resolve-AvailableSectionId -RequestedSectionId $sectionId -AvailableSectionIds @($SectionLookup.Keys)
+    if ([string]::IsNullOrWhiteSpace($fallbackSectionId) -or -not $SectionLookup.ContainsKey($fallbackSectionId)) {
+      $availableSections = @($SectionLookup.Keys | Sort-Object) -join ", "
+      throw "$ContextLabel was not found in the document: $Selector. Available sections: $availableSections"
+    }
+    $sectionId = $fallbackSectionId
   }
 
   $sectionEntry = $SectionLookup[$sectionId]
@@ -1480,6 +1598,8 @@ try {
   $nextMediaIndex = Get-NextMediaIndex -MediaDirectory $mediaDirectory
   $nextRelationshipId = Get-NextRelationshipId -RelationshipsXml $relationshipsXml
   $nextDocPrId = Get-NextDocPrId -DocumentXml $documentXml -NamespaceManager $namespaceManager
+  $preparedRowImageDirectory = Join-Path $tempRoot "_row-layout"
+  New-Item -ItemType Directory -Path $preparedRowImageDirectory -Force | Out-Null
   $insertedCaptionCount = 0
   $insertedImageCount = 0
   $resolvedTargets = New-Object System.Collections.Generic.List[string]
@@ -1535,10 +1655,43 @@ try {
       }
 
       if ($groupEntries.Count -ge 2) {
-        $cellEntries = New-Object System.Collections.Generic.List[object]
+        $groupImageWidthsCm = New-Object System.Collections.Generic.List[double]
         foreach ($groupEntry in $groupEntries) {
-          $rowImageWidthCm = Get-EffectiveRowImageWidthCm -ImageSpec $groupEntry.ImageSpec -Columns $groupColumns -BodyWidthCm $bodyWidthCm
-          $preparedImage = New-PreparedImageBlock -DocumentXml $documentXml -RelationshipsXml $relationshipsXml -ContentTypesXml $contentTypesXml -MediaDirectory $mediaDirectory -ImageSpec $groupEntry.ImageSpec -NextMediaIndex ([ref]$nextMediaIndex) -NextRelationshipId ([ref]$nextRelationshipId) -NextDocPrId ([ref]$nextDocPrId) -WidthCmOverride $rowImageWidthCm
+          $groupImageWidthsCm.Add((Get-EffectiveRowImageWidthCm -ImageSpec $groupEntry.ImageSpec -Columns $groupColumns -BodyWidthCm $bodyWidthCm)) | Out-Null
+        }
+        $commonRowWidthCm = ($groupImageWidthsCm | Measure-Object -Minimum).Minimum
+        if ($commonRowWidthCm -le 0) {
+          throw "Resolved row image width must be positive."
+        }
+
+        $groupImageHeightsEmu = New-Object System.Collections.Generic.List[int64]
+        $groupPixelWidths = New-Object System.Collections.Generic.List[int]
+        foreach ($groupEntry in $groupEntries) {
+          $groupImageHeightsEmu.Add((Get-ImageSizeEmu -Path $groupEntry.ImageSpec.ImagePath -WidthCm $commonRowWidthCm).HeightEmu) | Out-Null
+          $groupPixelWidths.Add((Get-ImagePixelDimensions -Path $groupEntry.ImageSpec.ImagePath).Width) | Out-Null
+        }
+
+        $commonRowHeightEmu = ($groupImageHeightsEmu | Measure-Object -Maximum).Maximum
+        $canvasWidthPx = [int][Math]::Max(1, ($groupPixelWidths | Measure-Object -Maximum).Maximum)
+        $canvasHeightPx = [int][Math]::Max(1, [Math]::Round($canvasWidthPx * ($commonRowHeightEmu / [double][Math]::Round($commonRowWidthCm * 360000.0))))
+
+        $cellEntries = New-Object System.Collections.Generic.List[object]
+        $groupEntryIndex = 0
+        foreach ($groupEntry in $groupEntries) {
+          $groupEntryIndex++
+          $preparedRowImagePath = Join-Path $preparedRowImageDirectory ("row-{0:D2}-{1:D2}.png" -f $nextMediaIndex, $groupEntryIndex)
+          New-PaddedRowImage -SourcePath $groupEntry.ImageSpec.ImagePath -OutPath $preparedRowImagePath -CanvasWidthPx $canvasWidthPx -CanvasHeightPx $canvasHeightPx
+
+          $preparedRowImageSpec = [pscustomobject]@{
+            Anchor = $groupEntry.ImageSpec.Anchor
+            SectionName = $groupEntry.ImageSpec.SectionName
+            Caption = $groupEntry.ImageSpec.Caption
+            ImagePath = $preparedRowImagePath
+            WidthCm = $commonRowWidthCm
+            Layout = $groupEntry.ImageSpec.Layout
+          }
+
+          $preparedImage = New-PreparedImageBlock -DocumentXml $documentXml -RelationshipsXml $relationshipsXml -ContentTypesXml $contentTypesXml -MediaDirectory $mediaDirectory -ImageSpec $preparedRowImageSpec -NextMediaIndex ([ref]$nextMediaIndex) -NextRelationshipId ([ref]$nextRelationshipId) -NextDocPrId ([ref]$nextDocPrId) -WidthCmOverride $commonRowWidthCm
           $cellEntries.Add($preparedImage) | Out-Null
           $insertedImageCount++
           if ($null -ne $preparedImage.CaptionParagraph) {

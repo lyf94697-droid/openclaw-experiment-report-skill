@@ -446,8 +446,39 @@ function Test-IsCommandParagraph {
 
   return (
     $trimmed -match '^(?:PS\s+[^>]+>|[A-Za-z]:\\[^>]*>|>\s*)\s*\S+' -or
-    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b)(?:\s|$)' -or
+    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b|gcc\b|g\+\+\b|clang\b|clang\+\+\b|make\b|cmake\b|\.\/\S+)(?:\s|$)' -or
     $trimmed -match '(?i)^(?:reply from|pinging|packets:|minimum =|maximum =|ipv4 address|subnet mask|default gateway|physical address|ethernet adapter)\b'
+  )
+}
+
+function Test-IsCodeParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 240 -or (Test-IsCommandParagraph -Text $trimmed)) {
+    return $false
+  }
+
+  $matchesExplicitCodePattern = (
+    $trimmed -match '^(?:#\s*(?:define|include)\b|if\s*\(|else(?:\s+if\b.*)?\s*\{?|while\s*\(|for\s*\(|switch\s*\(|return\b.*;|break;|continue;|\{|\}|}\s*else(?:\s+if\b.*)?\s*\{?)' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\->\.\[\]]*\s*=\s*.+;$' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\s\*\->\.\[\]\(\)]*\([^)]*\)\s*\{?$'
+  )
+  if ($matchesExplicitCodePattern) {
+    return $true
+  }
+
+  return (
+    $trimmed -notmatch '[一-龥]' -and
+    ($trimmed -match ';$' -or $trimmed -match '\->') -and
+    $trimmed -match '[A-Za-z_]'
   )
 }
 
@@ -1119,6 +1150,7 @@ try {
   $styledMetadataCount = 0
   $styledListCount = 0
   $styledCommandCount = 0
+  $styledCodeCount = 0
   $styledTableParagraphCount = 0
   $normalizedBodyRowCount = 0
 
@@ -1208,6 +1240,20 @@ try {
       continue
     }
 
+    if (Test-IsCodeParagraph -Text $text) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.CommandLineTwips
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
+      }
+      Set-ParagraphShading -Paragraph $paragraph -Fill "F8F8F8"
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
+      $styledCodeCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
+      continue
+    }
+
     if (Test-IsStepListParagraph -Text $text) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
@@ -1260,6 +1306,7 @@ try {
     styledMetadataCount = $styledMetadataCount
     styledListCount = $styledListCount
     styledCommandCount = $styledCommandCount
+    styledCodeCount = $styledCodeCount
     styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
   }

@@ -44,6 +44,9 @@ param(
 
   [switch]$CreateTemplateFrameDocx,
 
+  [ValidateSet("fast", "full")]
+  [string]$PipelineMode = "fast",
+
   [ValidateSet("auto", "default", "compact", "school")]
   [string]$StyleProfile = "auto",
 
@@ -122,6 +125,11 @@ $imageInputMode = if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
 }
 
 $styleOutputRequested = $StyleFinalDocx -or (-not [string]::IsNullOrWhiteSpace($StyledDocxOutPath))
+$runFullPipeline = [string]::Equals($PipelineMode, "full", [System.StringComparison]::OrdinalIgnoreCase)
+$shouldRunValidation = $runFullPipeline
+$shouldGenerateDebugOutlines = $runFullPipeline
+$shouldGenerateImagePlan = $runFullPipeline -or (-not [string]::IsNullOrWhiteSpace($ImagePlanOutPath))
+$shouldRunLayoutCheck = $runFullPipeline
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $OutputDir = Join-Path $repoRoot ("tests-output\build-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
@@ -163,7 +171,10 @@ $imagePlanLowConfidenceCount = $null
 $imagePlanNeedsReview = $null
 
 $validationResult = $null
-if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath) -or -not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
+if (
+  $shouldRunValidation -and
+  (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath) -or -not [string]::IsNullOrWhiteSpace($RequirementsJson))
+) {
   $validationPath = Join-Path $resolvedOutputDir "validation.json"
   $validationParams = @{
     Path = $resolvedReportPath
@@ -203,17 +214,21 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedMetadataPath)) {
 & (Join-Path $repoRoot "scripts\generate-docx-field-map.ps1") @fieldMapParams | Out-Null
 & (Join-Path $repoRoot "scripts\apply-docx-field-map.ps1") -TemplatePath $resolvedTemplatePath -MappingPath $resolvedFieldMapOutPath -OutPath $resolvedFilledDocxOutPath -Overwrite | Out-Null
 
-$filledOutlinePath = Join-Path $resolvedOutputDir "filled-template-outline.md"
-$filledOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedFilledDocxOutPath -Format markdown | Out-String
-[System.IO.File]::WriteAllText($filledOutlinePath, $filledOutline, (New-Object System.Text.UTF8Encoding($true)))
+if ($shouldGenerateDebugOutlines) {
+  $filledOutlinePath = Join-Path $resolvedOutputDir "filled-template-outline.md"
+  $filledOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedFilledDocxOutPath -Format markdown | Out-String
+  [System.IO.File]::WriteAllText($filledOutlinePath, $filledOutline, (New-Object System.Text.UTF8Encoding($true)))
+}
 
 if ($imageInputsProvided) {
-  $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) {
-    Join-Path $resolvedOutputDir "image-placement-plan.md"
-  } else {
-    [System.IO.Path]::GetFullPath($ImagePlanOutPath)
+  if ($shouldGenerateImagePlan) {
+    $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) {
+      Join-Path $resolvedOutputDir "image-placement-plan.md"
+    } else {
+      [System.IO.Path]::GetFullPath($ImagePlanOutPath)
+    }
+    Ensure-ParentDirectory -Path $resolvedImagePlanOutPath
   }
-  Ensure-ParentDirectory -Path $resolvedImagePlanOutPath
 
   $resolvedImageMapOutPath = if ([string]::IsNullOrWhiteSpace($ImageMapOutPath)) {
     Join-Path $resolvedOutputDir "generated-image-map.json"
@@ -242,30 +257,32 @@ if ($imageInputsProvided) {
     $imageInputParams.ImagePaths = $ImagePaths
   }
 
-  $imagePlanJsonParams = $imageInputParams.Clone()
-  $imagePlanJsonParams.Format = "json"
-  $imagePlanJsonParams.PlanOnly = $true
-  $imagePlanResult = ((& (Join-Path $repoRoot "scripts\generate-docx-image-map.ps1") @imagePlanJsonParams) | Out-String) | ConvertFrom-Json
-  $imagePlanEntries = if ($null -ne $imagePlanResult -and $imagePlanResult.PSObject.Properties.Name -contains "plan") {
-    @($imagePlanResult.plan)
-  } else {
-    @()
-  }
-  $imagePlanLowConfidenceCount = @($imagePlanEntries | Where-Object { [string]$_.confidence -eq "low" }).Count
-  $imagePlanNeedsReview = ($imagePlanLowConfidenceCount -gt 0)
+  if ($shouldGenerateImagePlan) {
+    $imagePlanJsonParams = $imageInputParams.Clone()
+    $imagePlanJsonParams.Format = "json"
+    $imagePlanJsonParams.PlanOnly = $true
+    $imagePlanResult = ((& (Join-Path $repoRoot "scripts\generate-docx-image-map.ps1") @imagePlanJsonParams) | Out-String) | ConvertFrom-Json
+    $imagePlanEntries = if ($null -ne $imagePlanResult -and $imagePlanResult.PSObject.Properties.Name -contains "plan") {
+      @($imagePlanResult.plan)
+    } else {
+      @()
+    }
+    $imagePlanLowConfidenceCount = @($imagePlanEntries | Where-Object { [string]$_.confidence -eq "low" }).Count
+    $imagePlanNeedsReview = ($imagePlanLowConfidenceCount -gt 0)
 
-  $imagePlanMarkdownParams = $imageInputParams.Clone()
-  $imagePlanMarkdownParams.Format = "markdown"
-  $imagePlanMarkdownParams.PlanOnly = $true
-  $imagePlanMarkdownParams.OutFile = $resolvedImagePlanOutPath
-  & (Join-Path $repoRoot "scripts\generate-docx-image-map.ps1") @imagePlanMarkdownParams | Out-Null
+    $imagePlanMarkdownParams = $imageInputParams.Clone()
+    $imagePlanMarkdownParams.Format = "markdown"
+    $imagePlanMarkdownParams.PlanOnly = $true
+    $imagePlanMarkdownParams.OutFile = $resolvedImagePlanOutPath
+    & (Join-Path $repoRoot "scripts\generate-docx-image-map.ps1") @imagePlanMarkdownParams | Out-Null
+  }
 
   $imageMapParams = $imageInputParams.Clone()
   $imageMapParams.Format = "json"
   $imageMapParams.OutFile = $resolvedImageMapOutPath
   & (Join-Path $repoRoot "scripts\generate-docx-image-map.ps1") @imageMapParams | Out-Null
   $generatedImageMap = (Get-Content -LiteralPath $resolvedImageMapOutPath -Raw -Encoding UTF8) | ConvertFrom-Json
-  if ($null -ne $generatedImageMap -and $generatedImageMap.PSObject.Properties.Name -contains "images") {
+  if ($shouldRunLayoutCheck -and $null -ne $generatedImageMap -and $generatedImageMap.PSObject.Properties.Name -contains "images") {
     $expectedLayoutImageCount = @($generatedImageMap.images).Count
     $expectedLayoutCaptionCount = @($generatedImageMap.images | Where-Object {
         $_.PSObject.Properties.Name -contains "caption" -and -not [string]::IsNullOrWhiteSpace([string]$_.caption)
@@ -280,9 +297,11 @@ if ($imageInputsProvided) {
     -OutPath $resolvedFilledDocxWithImagesOutPath `
     -Overwrite | Out-Null
 
-  $filledWithImagesOutlinePath = Join-Path $resolvedOutputDir "filled-template-with-images-outline.md"
-  $filledWithImagesOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedFilledDocxWithImagesOutPath -Format markdown | Out-String
-  [System.IO.File]::WriteAllText($filledWithImagesOutlinePath, $filledWithImagesOutline, (New-Object System.Text.UTF8Encoding($true)))
+  if ($shouldGenerateDebugOutlines) {
+    $filledWithImagesOutlinePath = Join-Path $resolvedOutputDir "filled-template-with-images-outline.md"
+    $filledWithImagesOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedFilledDocxWithImagesOutPath -Format markdown | Out-String
+    [System.IO.File]::WriteAllText($filledWithImagesOutlinePath, $filledWithImagesOutline, (New-Object System.Text.UTF8Encoding($true)))
+  }
 }
 
 if ($styleOutputRequested) {
@@ -307,9 +326,11 @@ if ($styleOutputRequested) {
 
   $styleResult = & (Join-Path $repoRoot "scripts\format-docx-report-style.ps1") @styleParams
 
-  $styledOutlinePath = Join-Path $resolvedOutputDir "styled-template-outline.md"
-  $styledOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedStyledDocxOutPath -Format markdown | Out-String
-  [System.IO.File]::WriteAllText($styledOutlinePath, $styledOutline, (New-Object System.Text.UTF8Encoding($true)))
+  if ($shouldGenerateDebugOutlines) {
+    $styledOutlinePath = Join-Path $resolvedOutputDir "styled-template-outline.md"
+    $styledOutline = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $resolvedStyledDocxOutPath -Format markdown | Out-String
+    [System.IO.File]::WriteAllText($styledOutlinePath, $styledOutline, (New-Object System.Text.UTF8Encoding($true)))
+  }
 }
 
 $finalDocxPath = if ($null -ne $resolvedStyledDocxOutPath) {
@@ -333,25 +354,27 @@ if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($TemplateFra
     -Overwrite | Out-Null
 }
 
-$layoutCheckParams = @{
-  DocxPath = $finalDocxPath
-  Format = "json"
-  OutFile = $layoutCheckPath
+if ($shouldRunLayoutCheck) {
+  $layoutCheckParams = @{
+    DocxPath = $finalDocxPath
+    Format = "json"
+    OutFile = $layoutCheckPath
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
+    $layoutCheckParams.ReportProfileName = $ReportProfileName
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
+    $layoutCheckParams.ReportProfilePath = $resolvedReportProfilePath
+  }
+  if ($expectedLayoutImageCount -ge 0) {
+    $layoutCheckParams.ExpectedImageCount = $expectedLayoutImageCount
+  }
+  if ($expectedLayoutCaptionCount -ge 0) {
+    $layoutCheckParams.ExpectedCaptionCount = $expectedLayoutCaptionCount
+  }
+  & (Join-Path $repoRoot "scripts\check-docx-layout.ps1") @layoutCheckParams | Out-Null
+  $layoutCheckResult = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
 }
-if (-not [string]::IsNullOrWhiteSpace($ReportProfileName)) {
-  $layoutCheckParams.ReportProfileName = $ReportProfileName
-}
-if (-not [string]::IsNullOrWhiteSpace($resolvedReportProfilePath)) {
-  $layoutCheckParams.ReportProfilePath = $resolvedReportProfilePath
-}
-if ($expectedLayoutImageCount -ge 0) {
-  $layoutCheckParams.ExpectedImageCount = $expectedLayoutImageCount
-}
-if ($expectedLayoutCaptionCount -ge 0) {
-  $layoutCheckParams.ExpectedCaptionCount = $expectedLayoutCaptionCount
-}
-& (Join-Path $repoRoot "scripts\check-docx-layout.ps1") @layoutCheckParams | Out-Null
-$layoutCheckResult = (Get-Content -LiteralPath $layoutCheckPath -Raw -Encoding UTF8) | ConvertFrom-Json
 
 $validationWarningSummary = @()
 $validationErrorCodes = @()
@@ -380,6 +403,7 @@ if ($null -ne $validationResult -and $validationResult.summary.PSObject.Properti
 
 $summary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
+  pipelineMode = $PipelineMode
   reportProfileName = [string]$reportProfile.name
   reportProfilePath = $resolvedReportProfilePath
   templatePath = $resolvedTemplatePath
@@ -401,7 +425,7 @@ $summary = [pscustomobject]@{
   styledDocxPath = $resolvedStyledDocxOutPath
   styledOutlinePath = $styledOutlinePath
   templateFrameDocxPath = $resolvedTemplateFrameDocxOutPath
-  layoutCheckPath = $layoutCheckPath
+  layoutCheckPath = $(if ($shouldRunLayoutCheck) { $layoutCheckPath } else { $null })
   layoutCheckPassed = $(if ($null -ne $layoutCheckResult) { [bool]$layoutCheckResult.passed } else { $null })
   layoutCheckMessage = $(if ($null -ne $layoutCheckResult -and $layoutCheckResult.PSObject.Properties.Name -contains "message") { [string]$layoutCheckResult.message } else { $null })
   layoutCheckErrorCount = $(if ($null -ne $layoutCheckResult) { [int]$layoutCheckResult.summary.errorCount } else { $null })
@@ -415,7 +439,7 @@ $summary = [pscustomobject]@{
   styleProfileReason = $(if ($null -ne $styleResult) { [string]$styleResult.profileReason } else { $null })
   appliedStyleSettings = $(if ($null -ne $styleResult) { $styleResult.appliedSettings } else { $null })
   finalDocxPath = $finalDocxPath
-  validationPath = $validationPath
+  validationPath = $(if ($shouldRunValidation) { $validationPath } else { $null })
   validationPassed = $(if ($null -ne $validationResult) { [bool]$validationResult.passed } else { $null })
   validationErrorCount = $(if ($null -ne $validationResult) { [int]$validationResult.summary.errorCount } else { $null })
   validationWarningCount = $(if ($null -ne $validationResult) { [int]$validationResult.summary.warningCount } else { $null })
@@ -434,7 +458,9 @@ $summary = [pscustomobject]@{
 Write-Output ("Field-map path: {0}" -f $resolvedFieldMapOutPath)
 Write-Output ("Filled docx path: {0}" -f $resolvedFilledDocxOutPath)
 if ($null -ne $resolvedFilledDocxWithImagesOutPath) {
-  Write-Output ("Image-plan path: {0}" -f $resolvedImagePlanOutPath)
+  if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
+    Write-Output ("Image-plan path: {0}" -f $resolvedImagePlanOutPath)
+  }
   Write-Output ("Image-map path: {0}" -f $resolvedImageMapOutPath)
   Write-Output ("Filled docx with images path: {0}" -f $resolvedFilledDocxWithImagesOutPath)
 }
@@ -445,7 +471,9 @@ if ($null -ne $resolvedTemplateFrameDocxOutPath) {
   Write-Output ("Template-frame docx path: {0}" -f $resolvedTemplateFrameDocxOutPath)
 }
 Write-Output ("Final docx path: {0}" -f $finalDocxPath)
-Write-Output ("Layout check path: {0}" -f $layoutCheckPath)
+if ($shouldRunLayoutCheck) {
+  Write-Output ("Layout check path: {0}" -f $layoutCheckPath)
+}
 Write-Output ("Summary path: {0}" -f $summaryPath)
 
 if ($null -ne $validationResult -and -not $validationResult.passed) {

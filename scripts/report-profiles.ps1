@@ -602,7 +602,7 @@ function Get-ReportProfileFieldMapCompositeRules {
 
   $rawRulesValue = Get-ReportProfileOptionalPropertyValue -Object $Profile -Name "fieldMapCompositeRules"
   $rawRules = if ($null -eq $rawRulesValue) { @() } else { @($rawRulesValue) }
-  if ($rawRules.Count -eq 0) {
+  if (@($rawRules).Count -eq 0) {
     return @()
   }
 
@@ -613,12 +613,12 @@ function Get-ReportProfileFieldMapCompositeRules {
         ConvertTo-ReportProfileStringArray -Value $ruleTable["matchAll"] |
           Select-Object -Unique
       )
-      if ($matchAll.Count -eq 0) {
+      if (@($matchAll).Count -eq 0) {
         throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without matchAll."
       }
 
       $rawBlocks = @($ruleTable["blocks"])
-      if ($rawBlocks.Count -eq 0) {
+      if (@($rawBlocks).Count -eq 0) {
         throw "Report profile '$([string]$Profile.name)' has a fieldMapCompositeRule without blocks."
       }
 
@@ -654,6 +654,7 @@ function Get-ReportProfileFieldMapCompositeRules {
 
       [pscustomobject]@{
         matchAll = $matchAll
+        throughRowOffset = $(if ($ruleTable.ContainsKey("throughRowOffset") -and $null -ne $ruleTable["throughRowOffset"]) { [int]$ruleTable["throughRowOffset"] } else { 0 })
         blocks = $blocks
       }
     }

@@ -64,6 +64,59 @@ function Normalize-FieldKey {
   return $normalized
 }
 
+function Test-LooksLikeCommandLine {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 180) {
+    return $false
+  }
+
+  return (
+    $trimmed -match '^(?:PS\s+[^>]+>|[A-Za-z]:\\[^>]*>|>\s*)\s*\S+' -or
+    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b|gcc\b|g\+\+\b|clang\b|clang\+\+\b|make\b|cmake\b|\.\/\S+)(?:\s|$)' -or
+    $trimmed -match '(?i)^(?:reply from|pinging|packets:|minimum =|maximum =|ipv4 address|subnet mask|default gateway|physical address|ethernet adapter)\b'
+  )
+}
+
+function Test-LooksLikeCodeLine {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 240 -or (Test-LooksLikeCommandLine -Text $trimmed)) {
+    return $false
+  }
+
+  $matchesExplicitCodePattern = (
+    $trimmed -match '^(?:#\s*(?:define|include)\b|if\s*\(|else(?:\s+if\b.*)?\s*\{?|while\s*\(|for\s*\(|switch\s*\(|return\b.*;|break;|continue;|\{|\}|}\s*else(?:\s+if\b.*)?\s*\{?)' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\->\.\[\]]*\s*=\s*.+;$' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\s\*\->\.\[\]\(\)]*\([^)]*\)\s*\{?$'
+  )
+  if ($matchesExplicitCodePattern) {
+    return $true
+  }
+
+  return (
+    $trimmed -notmatch '[一-龥]' -and
+    ($trimmed -match ';$' -or $trimmed -match '\->') -and
+    $trimmed -match '[A-Za-z_]'
+  )
+}
+
 function Is-PlaceholderLike {
   param(
     [AllowNull()]
@@ -707,6 +760,17 @@ function Convert-ToParagraphList {
       continue
     }
 
+    $preserveStandaloneLine = (Test-LooksLikeCommandLine -Text $trimmedLine) -or (Test-LooksLikeCodeLine -Text $trimmedLine)
+    if ($preserveStandaloneLine) {
+      if ($buffer.Count -gt 0) {
+        [void]$paragraphs.Add((Normalize-OpenXmlText -Text ($buffer -join ' ')))
+        $buffer.Clear()
+      }
+
+      [void]$paragraphs.Add((Normalize-OpenXmlText -Text $trimmedLine))
+      continue
+    }
+
     $startsStructuredParagraph = $trimmedLine -match '^(?:[-*•]\s+|\d+[.\)\u3001]\s*|[（(]?\d+[）)]\s*|[一二三四五六七八九十]+[.\u3001]\s*|(?:主机|步骤|结果|说明|分析)\s*[A-Z0-9一二三四五六七八九十]?\s*[:\uFF1A])'
     if ($startsStructuredParagraph -and $buffer.Count -gt 0) {
       [void]$paragraphs.Add((Normalize-OpenXmlText -Text ($buffer -join ' ')))
@@ -913,9 +977,19 @@ function Get-CompositeCellFillSpec {
     }
 
     if ($paragraphs.Count -gt 0 -and $mappedSectionIds.Count -gt 0) {
+      $throughRowOffset = 0
+      if ($compositeRule.PSObject.Properties.Name -contains "throughRowOffset" -and $null -ne $compositeRule.throughRowOffset) {
+        try {
+          $throughRowOffset = [Math]::Max(0, [int]$compositeRule.throughRowOffset)
+        } catch {
+          $throughRowOffset = 0
+        }
+      }
+
       return [pscustomobject]@{
         Paragraphs = @($paragraphs)
         MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
+        ThroughRowOffset = $throughRowOffset
       }
     }
   }
@@ -953,6 +1027,29 @@ function Get-CompositeTableBodyFillSpec {
     }
   }
 
+  $maxThroughRowOffset = 0
+  foreach ($entry in $orderedEntries) {
+    $entryThroughRowOffset = 0
+    if ($entry.PSObject.Properties.Name -contains "ThroughRowOffset" -and $null -ne $entry.ThroughRowOffset) {
+      try {
+        $entryThroughRowOffset = [Math]::Max(0, [int]$entry.ThroughRowOffset)
+      } catch {
+        $entryThroughRowOffset = 0
+      }
+    }
+
+    if ($entryThroughRowOffset -gt $maxThroughRowOffset) {
+      $maxThroughRowOffset = $entryThroughRowOffset
+    }
+  }
+
+  $expandedThroughRowIndex = [Math]::Min($tableRowCount, ($throughRowIndex + $maxThroughRowOffset))
+  $expandedThroughLocation = if ($expandedThroughRowIndex -eq $throughRowIndex) {
+    [string]$orderedEntries[-1].Location
+  } else {
+    [string]$TableBlock.rows[$expandedThroughRowIndex - 1].cells[0].location
+  }
+
   $paragraphs = New-Object System.Collections.Generic.List[string]
   $mappedSectionIds = New-Object System.Collections.Generic.List[string]
 
@@ -976,7 +1073,7 @@ function Get-CompositeTableBodyFillSpec {
 
   return [pscustomobject]@{
     StartLocation = [string]$orderedEntries[0].Location
-    ThroughLocation = [string]$orderedEntries[-1].Location
+    ThroughLocation = $expandedThroughLocation
     Paragraphs = @($paragraphs)
     MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
   }
@@ -1186,6 +1283,7 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
               CellIndex = $cellIndex + 1
               Paragraphs = @($compositeCellFill.Paragraphs)
               MappedSectionIds = @($compositeCellFill.MappedSectionIds)
+              ThroughRowOffset = $(if ($compositeCellFill.PSObject.Properties.Name -contains "ThroughRowOffset") { [int]$compositeCellFill.ThroughRowOffset } else { 0 })
             }) | Out-Null
           continue
         }

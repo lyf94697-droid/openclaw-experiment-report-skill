@@ -81,6 +81,9 @@ param(
 
   [switch]$SkipSessionReset,
 
+  [ValidateSet("fast", "full")]
+  [string]$PipelineMode = "fast",
+
   [ValidateSet("auto", "default", "compact", "school")]
   [string]$StyleProfile = "auto",
 
@@ -157,8 +160,8 @@ function Copy-InputImagesToArchive {
     [string]$ArchiveDir
   )
 
-  $imagePathList = Get-NonEmptyList -Values $Paths
-  if ($imagePathList.Count -eq 0) {
+  $imagePathList = @(Get-NonEmptyList -Values $Paths)
+  if (@($imagePathList).Count -eq 0) {
     return @()
   }
 
@@ -291,6 +294,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
     ReportPath = $resolvedReportPath
     OutputDir = $resolvedArtifactsDir
     StyleFinalDocx = $true
+    PipelineMode = $PipelineMode
     StyleProfile = $StyleProfile
   }
 
@@ -379,6 +383,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   $buildParams = @{
     TemplatePath = $resolvedTemplatePath
     OutputDir = $resolvedArtifactsDir
+    PipelineMode = $PipelineMode
     StyleProfile = $StyleProfile
     DetailLevel = $DetailLevel
     OpenClawCmd = $OpenClawCmd
@@ -553,6 +558,7 @@ $pipelineTrace = [pscustomobject]@{
     script = "build-report-from-feishu.ps1"
     mode = $wrapperMode
     generationMode = $generationMode
+    pipelineMode = $PipelineMode
     reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { [string]$reportProfile.name })
     reportProfileDisplayName = $documentLabel
     detailLevel = $DetailLevel
@@ -621,6 +627,7 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 [void]$pipelineTraceMarkdownLines.Add("- Report path: $resolvedCopiedReportPath")
 [void]$pipelineTraceMarkdownLines.Add("- Final docx path: $resolvedFinalDocxDestination")
 [void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $resolvedTemplateFrameDocxDestination")
+[void]$pipelineTraceMarkdownLines.Add("- Pipeline mode: $PipelineMode")
 [void]$pipelineTraceMarkdownLines.Add("- Wrapper summary path: $resolvedSummaryPath")
 [void]$pipelineTraceMarkdownLines.Add("- Inner summary path: $innerSummaryPath")
 [void]$pipelineTraceMarkdownLines.Add("- Pre-generated report path: $($pipelineTrace.artifacts.preGeneratedReportPath)")
@@ -632,6 +639,7 @@ $wrapperSummary = [pscustomobject]@{
   templatePath = $resolvedTemplatePath
   mode = $wrapperMode
   generationMode = $generationMode
+  pipelineMode = $PipelineMode
   reportProfileName = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfileName") { [string]$innerSummary.reportProfileName } else { [string]$reportProfile.name })
   reportProfilePath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "reportProfilePath") { [string]$innerSummary.reportProfilePath } else { [string]$reportProfile.resolvedProfilePath })
   reportProfileDisplayName = $documentLabel
