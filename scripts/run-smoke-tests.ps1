@@ -2937,6 +2937,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.学生姓名 -eq '李四') -Message 'Course-design field-map generator did not fill the student name.'
   Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.设计目标.mode -eq 'after') -Message 'Course-design field-map generator should preserve the target heading and fill after it.'
   Assert-True -Condition ([string]$courseDesignFieldMapRoot.fieldMap.方案设计与实现.mode -eq 'after') -Message 'Course-design field-map generator should preserve the implementation heading and fill after it.'
+  $courseDesignFieldMapText = Get-Content -LiteralPath $courseDesignFieldMapPath -Raw -Encoding UTF8
+  Assert-True -Condition ($courseDesignFieldMapText -match '4\.1\s+系统总体设计') -Message 'Course-design field-map generator should add fixed text subsection numbering for implementation content.'
+  Assert-True -Condition ($courseDesignFieldMapText -match '4\.2\s+功能模块设计') -Message 'Course-design field-map generator should add multiple implementation subsections.'
   Assert-True -Condition ($courseDesignFieldMapRoot.summary.diagnosticCount -eq 0) -Message 'Course-design field-map generator should not emit diagnostics for the built-in course-design profile fixture.'
 
   $courseDesignFilledDocx = Join-Path $tempRoot 'course-design-template.filled.docx'
@@ -2948,6 +2951,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($courseDesignFilledOutline -match '课题名称：校园导览小程序设计') -Message 'Course-design field-map fill did not update the project title.'
   Assert-True -Condition ($courseDesignFilledOutline -match '学生姓名：李四|T1R1C2: 李四') -Message 'Course-design field-map fill did not update the student name.'
   Assert-True -Condition ($courseDesignFilledOutline -match '整体方案采用前后端分层结构') -Message 'Course-design field-map fill did not write the implementation section.'
+  Assert-True -Condition ($courseDesignFilledOutline -match '4\.1\s+系统总体设计') -Message 'Course-design field-map fill did not preserve generated subsection numbering.'
 
   $courseDesignStyledDocx = Join-Path $tempRoot 'course-design-template.styled.docx'
   $courseDesignStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') `
@@ -2959,6 +2963,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath $courseDesignStyledDocx) -Message 'Course-design style formatter did not create the styled docx.'
   Assert-True -Condition ([string]$courseDesignStyleResult.reportProfileName -eq 'course-design-report') -Message 'Course-design style formatter is missing the expected report profile name.'
   Assert-True -Condition ([string]$courseDesignStyleResult.resolvedProfile -eq 'school') -Message 'Course-design style formatter should resolve auto to the course-design default style profile.'
+  Assert-True -Condition ([int]$courseDesignStyleResult.styledSubheadingCount -ge 1) -Message 'Course-design style formatter should style generated decimal subsection headings.'
 
   $courseDesignImageSpecsPath = Join-Path $tempRoot 'course-design-image-specs.json'
   @"

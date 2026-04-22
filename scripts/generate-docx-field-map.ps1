@@ -779,6 +779,170 @@ function Resolve-SectionRule {
   return $null
 }
 
+function Test-IsDecimalSubheading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return [bool]((Normalize-OpenXmlText -Text $Text) -match '^\d+\.\d+(?:\.\d+)?\s+\S+')
+}
+
+function Split-ToSentenceList {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return @()
+  }
+
+  $sentences = @(
+    [regex]::Split($normalizedText, '(?<=[。！？；])\s*') |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  )
+
+  if ($sentences.Count -eq 0) {
+    return @($normalizedText)
+  }
+
+  return @($sentences)
+}
+
+function Get-CourseDesignSubheadingTitles {
+  param(
+    [AllowNull()]
+    [string]$SectionId
+  )
+
+  $normalizedSectionId = if ([string]::IsNullOrWhiteSpace($SectionId)) { '' } else { ([string]$SectionId).ToLowerInvariant() }
+  switch ($normalizedSectionId) {
+    'purpose' {
+      return @(
+        '1.1 课程设计目标',
+        '1.2 基本要求与约束'
+      )
+    }
+    'theory' {
+      return @(
+        '2.1 业务需求分析',
+        '2.2 可行性分析'
+      )
+    }
+    'environment' {
+      return @(
+        '3.1 开发工具与运行环境',
+        '3.2 数据与调试配置'
+      )
+    }
+    'steps' {
+      return @(
+        '4.1 系统总体设计',
+        '4.2 功能模块设计',
+        '4.3 业务流程设计',
+        '4.4 关键实现要点'
+      )
+    }
+    'result' {
+      return @(
+        '5.1 核心功能结果',
+        '5.2 演示与测试情况'
+      )
+    }
+    'analysis' {
+      return @(
+        '6.1 现存问题分析',
+        '6.2 后续改进方向'
+      )
+    }
+    'summary' {
+      return @(
+        '7.1 课程设计收获',
+        '7.2 后续优化展望'
+      )
+    }
+    default {
+      return @()
+    }
+  }
+}
+
+function Expand-CourseDesignSectionParagraphs {
+  param(
+    [AllowNull()]
+    [string]$SectionId,
+
+    [AllowNull()]
+    [object]$SectionInfo
+  )
+
+  if ($null -eq $SectionInfo) {
+    return $SectionInfo
+  }
+
+  $titles = @(Get-CourseDesignSubheadingTitles -SectionId $SectionId)
+  if ($titles.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  $existingParagraphs = @($SectionInfo.paragraphs)
+  if ($existingParagraphs.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  if (@($existingParagraphs | Where-Object { Test-IsDecimalSubheading -Text ([string]$_) }).Count -gt 0) {
+    return $SectionInfo
+  }
+
+  $sentenceList = New-Object System.Collections.Generic.List[string]
+  foreach ($paragraph in $existingParagraphs) {
+    foreach ($sentence in @(Split-ToSentenceList -Text ([string]$paragraph))) {
+      [void]$sentenceList.Add($sentence)
+    }
+  }
+
+  if ($sentenceList.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  $groupCount = [Math]::Min($titles.Count, $sentenceList.Count)
+  if ($groupCount -le 0) {
+    return $SectionInfo
+  }
+
+  $expandedParagraphs = New-Object System.Collections.Generic.List[string]
+  $cursor = 0
+  for ($index = 0; $index -lt $groupCount; $index++) {
+    [void]$expandedParagraphs.Add([string]$titles[$index])
+
+    $remainingSentenceCount = $sentenceList.Count - $cursor
+    $remainingGroupCount = $groupCount - $index
+    $takeCount = [Math]::Ceiling($remainingSentenceCount / [double]$remainingGroupCount)
+    $groupSentences = New-Object System.Collections.Generic.List[string]
+    for ($offset = 0; $offset -lt $takeCount -and $cursor -lt $sentenceList.Count; $offset++) {
+      [void]$groupSentences.Add([string]$sentenceList[$cursor])
+      $cursor++
+    }
+
+    $groupText = Normalize-OpenXmlText -Text ($groupSentences -join '')
+    if (-not [string]::IsNullOrWhiteSpace($groupText)) {
+      [void]$expandedParagraphs.Add($groupText)
+    }
+  }
+
+  return [pscustomobject]@{
+    headingText = $SectionInfo.headingText
+    text = $SectionInfo.text
+    paragraphs = @($expandedParagraphs.ToArray())
+  }
+}
+
 function Convert-ToParagraphList {
   param(
     [AllowNull()]
@@ -912,6 +1076,12 @@ function Get-ReportAnalysis {
       headingText = $current.headingText
       text = $contentText
       paragraphs = @(Convert-ToParagraphList -Text $contentText)
+    }
+  }
+
+  if ([string]::Equals([string]$reportProfile.name, 'course-design-report', [System.StringComparison]::OrdinalIgnoreCase)) {
+    foreach ($sectionId in @($sectionsById.Keys)) {
+      $sectionsById[$sectionId] = Expand-CourseDesignSectionParagraphs -SectionId ([string]$sectionId) -SectionInfo $sectionsById[$sectionId]
     }
   }
 

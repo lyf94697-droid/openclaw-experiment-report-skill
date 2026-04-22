@@ -498,6 +498,19 @@ function Test-IsSectionHeading {
   return $false
 }
 
+function Test-IsDecimalSubheading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return [bool]((Normalize-OpenXmlText -Text $Text) -match '^\d+\.\d+(?:\.\d+)?\s+\S+')
+}
+
 function Test-IsMetadataParagraph {
   param(
     [AllowNull()]
@@ -766,6 +779,32 @@ function Set-ParagraphSpacing {
     Set-WordAttribute -Element $spacing -LocalName "line" -Value ([string]$Line)
     Set-WordAttribute -Element $spacing -LocalName "lineRule" -Value "auto"
   }
+}
+
+function Set-ParagraphOutlineLevel {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [AllowNull()]
+    [int]$Level
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $outlineLvl = $pPr.SelectSingleNode("./w:outlineLvl", $script:namespaceManager)
+
+  if ($null -eq $Level) {
+    if ($null -ne $outlineLvl) {
+      [void]$pPr.RemoveChild($outlineLvl)
+    }
+    return
+  }
+
+  if ($null -eq $outlineLvl) {
+    $outlineLvl = $Paragraph.OwnerDocument.CreateElement("w", "outlineLvl", $wordNamespace)
+    [void]$pPr.AppendChild($outlineLvl)
+  }
+  Set-WordAttribute -Element $outlineLvl -LocalName "val" -Value ([string]$Level)
 }
 
 function Set-ParagraphPagination {
@@ -1544,6 +1583,7 @@ try {
   $paragraphs = @($documentXml.SelectNodes("//w:p", $script:namespaceManager))
   $styledTitleCount = 0
   $styledHeadingCount = 0
+  $styledSubheadingCount = 0
   $styledBodyCount = 0
   $styledCaptionCount = 0
   $styledImageCount = 0
@@ -1604,12 +1644,28 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.HeadingBeforeTwips -After $styleSettings.HeadingAfterTwips -Line $styleSettings.BodyLineTwips
+      Set-ParagraphOutlineLevel -Paragraph $paragraph -Level 0
       Set-ParagraphBold -Paragraph $paragraph
       if (-not $useTemplateLikeCompactStyle) {
         Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
       }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledHeadingCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
+      continue
+    }
+
+    if ($isCourseDesignReport -and (Test-IsDecimalSubheading -Text $text)) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 60 -After 20 -Line $styleSettings.BodyLineTwips
+      Set-ParagraphOutlineLevel -Paragraph $paragraph -Level 1
+      Set-ParagraphBold -Paragraph $paragraph
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints ([Math]::Max(20, [int]$styleSettings.HeadingFontHalfPoints - 2))
+      }
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
+      $styledSubheadingCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
@@ -1716,6 +1772,7 @@ try {
     appliedSettings = $styleSettings
     styledTitleCount = $styledTitleCount
     styledHeadingCount = $styledHeadingCount
+    styledSubheadingCount = $styledSubheadingCount
     styledBodyCount = $styledBodyCount
     styledCaptionCount = $styledCaptionCount
     styledImageCount = $styledImageCount
