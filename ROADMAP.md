@@ -25,7 +25,7 @@ That makes this repository best suited to structured Chinese documents that:
 - usually have a fixed chapter outline
 - often come with a school or team template
 - benefit from screenshot or evidence insertion
-- need a submit-ready `docx` result
+- need a reviewable `docx` result that follows a known template
 
 ## Phase 0: Stabilize The Experiment-Report Pipeline
 
@@ -260,7 +260,7 @@ Implemented baseline:
 ## Non-Goals For Now
 
 - turning the repository into a general-purpose office suite
-- supporting arbitrary unstructured documents with one giant universal prompt
+- supporting arbitrary unstructured documents with one giant catch-all prompt
 - expanding to unrelated document types before the profile model is stable
 - shipping a GUI before the profile-driven pipeline is mature
 

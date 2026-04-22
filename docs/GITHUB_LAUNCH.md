@@ -7,7 +7,7 @@ Use this file when preparing the repository page, first release, and social prev
 Recommended repository description:
 
 ```text
-OpenClaw skill and PowerShell pipeline for generating Chinese university lab reports, filling docx templates, embedding screenshots, and producing polished final documents.
+OpenClaw skill and PowerShell pipeline for Chinese lab reports and course-design reports: docx template filling, screenshot insertion, captions, and layout checks.
 ```
 
 Recommended topics:
@@ -19,7 +19,7 @@ powershell
 docx
 report-generation
 template-filling
-document-automation
+layout-check
 lab-report
 openxml
 university
@@ -42,7 +42,7 @@ Suggested overlay text for a preview image:
 
 ```text
 OpenClaw Experiment Report Skill
-Generate Chinese lab reports, fill docx templates, and insert grouped screenshots.
+Draft Chinese lab reports, fill docx templates, and insert grouped screenshots.
 ```
 
 ## First Release
@@ -64,11 +64,12 @@ Recommended release notes:
 ```markdown
 ## Highlights
 
-- Generate Chinese university experiment report bodies from topics, screenshots, tutorial URLs, and structured requirements.
+- Draft Chinese university experiment report bodies from topics, screenshots, tutorial URLs, and structured requirements.
 - Fill blank Word or docx templates through deterministic field mapping.
 - Insert grouped screenshots with captions, including 2x2 layout blocks anchored under one section.
-- Apply final formatting for headings, metadata rows, body text, captions, and image groups.
+- Apply formatting for headings, metadata rows, body text, captions, and image groups.
 - Support chat-friendly local wrappers for Feishu-style direct use.
+- Keep course-design reports on an explicit opt-in fastline so normal experiment reports stay stable.
 
 ## Included
 
@@ -82,7 +83,10 @@ Recommended release notes:
 
 - Designed for OpenClaw-based local workflows
 - Best tested on Windows and PowerShell
-- Focused on experiment-report pipelines, with future expansion planned through document profiles
+- Stable path is focused on experiment reports; course-design support is opt-in
+- Other report profiles are sample/regression assets until verified against real templates
+- `.doc` conversion depends on local Word/WPS automation support
+- Complex school templates may still need template diagnostics or manual mapping review
 ```
 
 ## Post-Publish Checklist

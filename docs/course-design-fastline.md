@@ -4,9 +4,9 @@ This document keeps the course-design report path usable without pulling it into
 
 ## Status
 
-`course-design-report` is a candidate stable line, not the default line.
+`course-design-report` is an explicit opt-in fastline, not the default experiment-report line.
 
-Use it explicitly when the target is a school course-design report. Do not make it run by default for normal lab reports.
+Use it when the target is a school course-design report. Keep normal lab reports on `experiment-report`.
 
 ## Existing Assets
 
@@ -23,6 +23,9 @@ The existing profile already covers:
 - image placement defaults for implementation screenshots and result screenshots
 - profile-specific prompt, requirements, field-map, image-map, style, and wrapper summaries
 - paragraph composite filling for the short school template: the four body placeholders can now carry the richer Attachment 6 style section pack without changing the normal experiment-report path
+- fixed text subsection numbering for course-design body sections, such as `3.1`, `4.1`, and `4.2`
+- black-and-white generated PNG flowcharts for reports that need a simple process diagram
+- course-design table insertion for common module, database, and test-result tables when the report content provides enough structure
 
 ## Default Command
 
@@ -55,7 +58,7 @@ Use `build-report-from-feishu.ps1` when the report body already exists or when d
 - Always pass `-ReportProfileName course-design-report`.
 - Keep `-PipelineMode fast` unless the fast output is visibly wrong.
 - `.doc` school templates are accepted on Windows when Word COM is available; the build step converts them into `converted-templates/*.docx` inside the output directory before filling.
-- Do not run full validation, template diagnostics, or layout checking by default.
+- Do not run full validation, template diagnostics, or layout checking by default; run them only when adapting a new template or when the output is visibly wrong.
 - Do not change `experiment-report` defaults while working on course-design reports.
 - Treat `附件6` as a visual and structural reference, not as a committed source artifact.
 
@@ -89,14 +92,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check-report-profile-template
 
 ## Gap To Attachment 6 Quality
 
-The current fastline is still explicit opt-in, but it now carries the main `附件6` structure:
+The current fastline is still explicit opt-in, but it now carries the main `附件6`-style structure:
 
 - abstract
 - keywords
 - reference list
 - deeper numbered subsections
 - database-design tables
-- flowchart and screenshot-heavy sections
+- black-and-white PNG flowchart and screenshot-heavy sections
 - longer full-mode body generation
 
-The remaining gap is the grading/evaluation table: if the provided school template has that table, it is preserved and filled where fields exist; if the blank template does not include it, the fastline does not synthesize a new grading page by default.
+Known limits:
+
+- Generated flowcharts are PNG images, not editable Word-native shapes.
+- The current flowchart style is closer to the school examples than the original simple version, but still needs real-topic tuning for complex multi-branch designs.
+- If the provided school template has a grading/evaluation table, it is preserved and filled where fields exist; if the blank template does not include it, the fastline does not synthesize a new grading page by default.
+- `.doc` conversion still depends on local Word/WPS COM support.
