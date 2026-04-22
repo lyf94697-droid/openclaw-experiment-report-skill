@@ -1,0 +1,19 @@
+{
+  "images": [
+    {
+      "path": "images/deploy-env.png",
+      "section": "部署环境",
+      "caption": "图1 部署环境与容器编排概览"
+    },
+    {
+      "path": "images/deploy-verify.png",
+      "section": "验证结果",
+      "caption": "图2 健康检查与服务验证结果"
+    },
+    {
+      "path": "images/deploy-rollback.png",
+      "section": "问题处理与回滚预案",
+      "caption": "图3 回滚日志与恢复验证记录"
+    }
+  ]
+}

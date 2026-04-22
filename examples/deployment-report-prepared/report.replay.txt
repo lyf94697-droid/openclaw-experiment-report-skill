@@ -1,0 +1,52 @@
+部署运维报告
+
+课程名称：OpenClaw 实验报告技能仓库
+部署项目：prepared replay 部署回放链路测试
+学生姓名：仓库维护者
+学号：maintainer-202604
+班级：自动化维护组
+指导教师：GitHub Reviewer
+部署类型：系统部署
+部署时间：2026-04-19
+部署环境：GitHub Actions + PowerShell + 本地回放环境
+
+一、部署目标
+本次部署运维回放测试的目标，是把 OpenClaw 实验报告技能仓库当前的 prepared replay 机制当作被部署链路进行验证，确认它在 `deployment-report` 这一类更偏工程交付的文档上，是否也已经具备长期可复用、可验证和可安装复制的能力。测试关注的不是某台真实服务器能否成功启动，而是部署运维报告这一 profile 能否通过 checked-in fixture 稳定进入 repo-level replay 基线。
+
+为了让结论具有实际维护意义，本次还要求所有验证都沿用仓库现有主流程完成。也就是说，必须通过 `PreparedInputsSummaryPath` 和 `PreGeneratedReportPath` 驱动 `build-report-from-url.ps1`，并把 prompt、metadata、requirements、defaults、reference text 和 replay 正文都固化在仓库目录下。只有这样，测试结果才能证明部署运维报告已经真正加入长期 regression，而不是依赖一次性的临时 seed 输出。
+
+二、部署环境
+本次测试环境由 GitHub 仓库当前分支、Windows PowerShell、本地工作目录以及仓库现有脚本组成。核心脚本包括 `scripts/build-report-from-url.ps1`、`scripts/validate-report-draft.ps1`、`scripts/validate-report-profiles.ps1` 和 `scripts/run-smoke-tests.ps1`，其中 wrapper 负责读取 prepared summary、回放已有正文、生成 summary 与 trace，smoke 则把关键行为固化成长期断言。
+
+部署输入环境中同时包含 `profiles/deployment-report.json` 对元数据、章节标题、分页阈值和 remediation 的正式定义，以及新加入的 `examples/deployment-report-prepared/` 目录。该目录集中提供 prompt、metadata、requirements、defaults、reference text 与 replay report 七类固定文件，保证不同机器、不同安装目录和不同维护者接手时，都能得到同一组可移植的部署回放输入。
+
+三、部署方案与架构
+本次部署回放链路的方案并不引入新脚本分支，而是直接复用现有的 URL wrapper 架构。输入层由 `report-inputs-summary.json` 统一描述所有相对路径；profile 层由 `deployment-report` 负责提供 display name、章节规则和 remediation；执行层由 `build-report-from-url.ps1` 负责在 replay 模式下解析路径、继承 profile、串起 validation、trace 和 docx 生成；安装层则继续通过 `install-skill.ps1` 复制整仓库内容，让 prepared fixture 进入用户的本地技能目录。
+
+这种架构的关键优势，是把“部署运维报告的支持能力”拆成几块可以分别检查的产物，而不是只盯着最终 docx。测试需要确认 summary 是否写出正确的 profile 与 input modes，trace 是否记录 replay 模式和 validation 状态，cleaned report 是否仍包含“验证结果”等关键章节，install 后目标目录是否还能找到最核心的 replay fixture 文件。只要这些部件都稳定存在，就说明部署文档族已经进入统一流水线，而不是停留在 profile JSON 的静态定义阶段。
+
+四、部署步骤与配置
+部署步骤按四组动作展开。第一组先检查 `examples/deployment-report-prepared/` 下的 summary、prompt、metadata、requirements、defaults、reference text 和 replay report 是否全部存在，并对 replay report 独立运行 `validate-report-draft.ps1`，确认部署目标、部署环境、部署方案与架构、部署步骤与配置、验证结果、问题处理与回滚预案、部署总结七个章节都满足 profile 要求。
+
+第二组调用 `build-report-from-url.ps1`，输入最小 `deployment-report` 模板夹具、prepared summary 和 replay report，重点观察 wrapper summary 是否写出 `generationMode=replay`、`buildReportInputMode=path`、`buildMetadataInputMode=path`、`buildRequirementsInputMode=path` 和 `buildImageInputMode=none`。同时检查 resolved prompt、metadata、requirements、defaults 与 reference text 路径是否都稳定回指到仓库内 fixture，而不是落回临时目录。
+
+第三组检查执行产物是否完整。测试读取 `pipeline-trace.json` 和 `pipeline-trace.md`，确认 trace 中同时记录了 wrapper mode、build input modes、validationPassed 和零 pagination risk；随后读取 cleaned report，检查其中包含“验证结果”这样的关键章节标题，证明 replay 正文在清洗和后处理后依然保持部署运维报告的结构。
+
+第四组把 install 行为纳入回放链路。具体做法是在 install smoke 中验证 `examples/deployment-report-prepared\report-inputs-summary.json` 与 `report.replay.txt` 是否会随着仓库一起复制到目标目录，确保这套部署样例不仅能在当前工作树中通过，还能在用户安装后的环境里继续被发现和复用。
+
+五、验证结果
+本轮部署回放测试结果表明，`deployment-report` prepared fixture 已经能够稳定通过独立 validation，并顺利穿过 URL wrapper 的 replay 模式。wrapper summary 中成功保留了 `deployment-report` 对应的 profile name 与 display name，resolved `promptPath`、`metadataPath`、`requirementsPath`、`defaultsPath` 与 `referenceTextPaths` 也都能准确指向仓库内的 checked-in fixture，说明相对路径解析在更偏部署运维的文档族上没有退化。
+
+在产物层，`url-build-summary.json`、`pipeline-trace.json`、`pipeline-trace.md`、raw report、cleaned report 和 final docx 都能被正常生成，且 validationPassed 为真，warning、pagination risk 与 structural issue 计数均保持为零。cleaned report 中继续命中“验证结果”等关键标题，说明 replay 正文经过 wrapper 清洗后仍保有部署运维报告的结构约束。
+
+安装层面的结果同样符合预期。`install-skill.ps1` 复制后的目标目录里，仍然能够看到 `deployment-report-prepared` 下的 summary 与 replay report 文件。这一点证明这套部署样例不是只对当前维护者有效，而是已经具备被后续用户、后续维护者和后续 smoke 直接复用的条件。
+
+六、问题处理与回滚预案
+本次测试没有发现阻断部署回放链路的严重缺陷，但也暴露出一个很明确的后续方向：虽然 `deployment-report` 已经进入 checked-in replay 基线，当前 fixture 仍以纯文本回放为主，还没有把真正的命令截图、日志截图和回滚证据组织方式纳入 repo-level 样例。也就是说，仓库已经证明“部署运维报告可以稳定 replay”，但还没有完全证明“高密度部署证据也能在同一模式下被长期维护”。
+
+另一个需要继续推进的点，是模板敏感性。现在的最小模板夹具已经足够验证路径解析、profile 继承、validation 和 trace 行为，但它离真实 Word/WPS 部署报告模板还有距离。后续如果继续加强 layout heuristics 或 template-fit diagnostics，就应该基于当前 prepared fixture 再补更接近真实发布记录的模板与截图输入，而不是始终停留在轻量夹具层。
+
+七、部署总结
+通过本次回放测试，可以确认 OpenClaw 实验报告技能仓库已经把 `deployment-report` 从“只有 profile 与 remediation 定义”推进到了“拥有 checked-in prepared replay fixture、可被 smoke 覆盖、可被 install 复制”的阶段。这意味着仓库的 realistic end-to-end fixtures 不再只覆盖周报、会议纪要、月报等过程性文档，也开始在部署运维这类更偏工程执行和回滚管理的报告上形成长期基线。
+
+从维护价值上看，这项升级和上一轮的 `software-test-report` replay fixture 组合起来，已经让两类带 profile-specific pagination remediation 的工程报告同时进入 repo-level replay 范围。后续如果继续补真实模板、截图和更复杂的布局风险样本，仓库就能在“工程报告是否真正可解释、可回归、可维护”这件事上给出更有力的证据，而不只是继续增加 profile 数量。

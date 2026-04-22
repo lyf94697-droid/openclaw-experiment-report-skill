@@ -1,0 +1,59 @@
+{
+  "courseName": "OpenClaw 实验报告技能仓库",
+  "experimentName": "2026 年 4 月第 3 周维护周报",
+  "minChars": 1400,
+  "sections": [
+    {
+      "name": "工作目标",
+      "aliases": ["工作目标", "本周目标", "目标与里程碑"],
+      "minChars": 70
+    },
+    {
+      "name": "协作环境",
+      "aliases": ["协作环境", "项目背景与协作环境", "开发与协作环境"],
+      "minChars": 90
+    },
+    {
+      "name": "本周任务与输入",
+      "aliases": ["本周任务与输入", "需求来源与优先级", "输入事项"],
+      "minChars": 100
+    },
+    {
+      "name": "本周完成事项",
+      "aliases": ["本周完成事项", "已完成工作", "推进过程与执行"],
+      "minChars": 180
+    },
+    {
+      "name": "阶段成果",
+      "aliases": ["阶段成果", "当前产出", "交付物与数据"],
+      "minChars": 140
+    },
+    {
+      "name": "风险与改进",
+      "aliases": ["风险与改进", "问题与阻塞", "问题与优化"],
+      "minChars": 100
+    },
+    {
+      "name": "下周计划",
+      "aliases": ["下周计划", "下阶段安排", "后续计划"],
+      "minChars": 100
+    }
+  ],
+  "requiredKeywords": [
+    "OpenClaw 实验报告技能仓库",
+    "2026 年 4 月第 3 周维护周报"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "TBD",
+    "待补充",
+    "自行填写",
+    "会后补充"
+  ],
+  "paginationRiskThresholds": {
+    "longSectionChars": 1200,
+    "denseSectionChars": 750,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  }
+}

@@ -1,0 +1,60 @@
+﻿{
+    "outputDir":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates",
+    "generatedCount":  9,
+    "generated":  [
+                      {
+                          "reportProfileName":  "course-design-report",
+                          "reportProfileDisplayName":  "课程设计报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\course-design-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\course-design-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "deployment-report",
+                          "reportProfileDisplayName":  "部署运维报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\deployment-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\deployment-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "experiment-report",
+                          "reportProfileDisplayName":  "实验报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\experiment-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\experiment-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "internship-report",
+                          "reportProfileDisplayName":  "专业实习报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\internship-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\internship-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "meeting-minutes",
+                          "reportProfileDisplayName":  "会议纪要",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\meeting-minutes.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\meeting-minutes-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "monthly-report",
+                          "reportProfileDisplayName":  "月报",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\monthly-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\monthly-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "os-process-scheduling-school-template",
+                          "reportProfileDisplayName":  "操作系统实验报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\os-process-scheduling-school-template.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\os-process-scheduling-school-template-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "software-test-report",
+                          "reportProfileDisplayName":  "软件测试报告",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\software-test-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\software-test-report-template.docx"
+                      },
+                      {
+                          "reportProfileName":  "weekly-report",
+                          "reportProfileDisplayName":  "周报",
+                          "profilePath":  "E:\\游戏\\openclaw-experiment-report-skill\\profiles\\weekly-report.json",
+                          "outputPath":  "E:\\游戏\\openclaw-experiment-report-skill\\examples\\report-templates\\weekly-report-template.docx"
+                      }
+                  ]
+}

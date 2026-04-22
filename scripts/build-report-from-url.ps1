@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [string[]]$ReferenceUrls,
 
@@ -32,6 +32,10 @@ param(
 
   [string]$ExperimentLocation,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [string]$RequirementsPath,
 
   [string]$RequirementsJson,
@@ -44,17 +48,28 @@ param(
 
   [string]$ImageSpecsJson,
 
+  [string]$ImagePlanOutPath,
+
   [string]$OutputDir,
 
   [string]$FinalDocxPath,
+
+  [string]$TemplateFrameDocxPath,
+
+  [switch]$CreateTemplateFrameDocx,
 
   [string]$OpenClawCmd = $env:OPENCLAW_CMD,
 
   [string]$BrowserProfile = $env:OPENCLAW_BROWSER_PROFILE,
 
+  [string]$PreGeneratedReportPath,
+
   [string]$SessionKey = "agent:gpt:main",
 
   [switch]$SkipSessionReset,
+
+  [ValidateSet("fast", "full")]
+  [string]$PipelineMode = "fast",
 
   [ValidateSet("auto", "default", "compact", "school")]
   [string]$StyleProfile = "auto",
@@ -64,250 +79,16 @@ param(
   [int]$ReferenceMaxChars = 30000,
 
   [ValidateSet("standard", "full")]
-  [string]$DetailLevel = "full"
+  [string]$DetailLevel = "full",
+
+  [string]$PreparedInputsSummaryPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "report-defaults.ps1")
-
-function New-TextFromCodePoints {
-  param(
-    [Parameter(Mandatory = $true)]
-    [int[]]$CodePoints
-  )
-
-  $builder = New-Object System.Text.StringBuilder
-  foreach ($codePoint in $CodePoints) {
-    [void]$builder.Append([char]$codePoint)
-  }
-
-  return $builder.ToString()
-}
-
-function Get-ReportLabels {
-  return [ordered]@{
-    Name = (New-TextFromCodePoints -CodePoints @(0x59D3, 0x540D))
-    StudentId = (New-TextFromCodePoints -CodePoints @(0x5B66, 0x53F7))
-    ClassName = (New-TextFromCodePoints -CodePoints @(0x73ED, 0x7EA7))
-    TeacherName = (New-TextFromCodePoints -CodePoints @(0x6307, 0x5BFC, 0x6559, 0x5E08))
-    CourseName = (New-TextFromCodePoints -CodePoints @(0x8BFE, 0x7A0B, 0x540D, 0x79F0))
-    ExperimentName = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x540D, 0x79F0))
-    ExperimentProperty = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x6027, 0x8D28))
-    ExperimentDate = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x65F6, 0x95F4))
-    ExperimentLocation = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x5730, 0x70B9))
-    Date = (New-TextFromCodePoints -CodePoints @(0x65E5, 0x671F))
-    Purpose = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x76EE, 0x7684))
-    Environment = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x73AF, 0x5883))
-    EnvAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x8BBE, 0x5907, 0x4E0E, 0x73AF, 0x5883))
-    Theory = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x539F, 0x7406, 0x6216, 0x4EFB, 0x52A1, 0x8981, 0x6C42))
-    TheoryAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x539F, 0x7406))
-    TaskAlias = (New-TextFromCodePoints -CodePoints @(0x4EFB, 0x52A1, 0x8981, 0x6C42))
-    Steps = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x6B65, 0x9AA4))
-    StepsAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x8FC7, 0x7A0B))
-    Results = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x7ED3, 0x679C))
-    ResultsAlias = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x73B0, 0x8C61, 0x4E0E, 0x7ED3, 0x679C, 0x8BB0, 0x5F55))
-    Analysis = (New-TextFromCodePoints -CodePoints @(0x95EE, 0x9898, 0x5206, 0x6790))
-    AnalysisAlias = (New-TextFromCodePoints -CodePoints @(0x7ED3, 0x679C, 0x5206, 0x6790))
-    Summary = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x603B, 0x7ED3))
-    SummaryAlias = (New-TextFromCodePoints -CodePoints @(0x603B, 0x7ED3, 0x4E0E, 0x601D, 0x8003))
-    SummaryAlias2 = (New-TextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x5C0F, 0x7ED3))
-    FinalEdition = (New-TextFromCodePoints -CodePoints @(0x6700, 0x7EC8, 0x7248))
-  }
-}
-
-function Get-DefaultExperimentProperty {
-  return (New-TextFromCodePoints -CodePoints @(0x2462, 0x9A8C, 0x8BC1, 0x6027, 0x5B9E, 0x9A8C))
-}
-
-function Get-DefaultForbiddenPatterns {
-  return @(
-    "TODO",
-    (New-TextFromCodePoints -CodePoints @(0x5F85, 0x8865, 0x5145)),
-    (New-TextFromCodePoints -CodePoints @(0x81EA, 0x884C, 0x586B, 0x5199)),
-    (New-TextFromCodePoints -CodePoints @(0x53EF, 0x6839, 0x636E, 0x5B9E, 0x9645, 0x60C5, 0x51B5, 0x4FEE, 0x6539)),
-    (New-TextFromCodePoints -CodePoints @(0x4EE5, 0x4E0B, 0x662F, 0x4E00, 0x4EFD)),
-    (New-TextFromCodePoints -CodePoints @(0x6559, 0x5E08, 0x70B9, 0x8BC4)),
-    (New-TextFromCodePoints -CodePoints @(0x6293, 0x5305, 0x7ED3, 0x679C))
-  )
-}
-
-function New-AutoPromptText {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string]$ResolvedCourseName,
-
-    [Parameter(Mandatory = $true)]
-    [string]$ResolvedExperimentName,
-
-    [Parameter(Mandatory = $true)]
-    [hashtable]$Labels,
-
-    [ValidateSet("standard", "full")]
-    [string]$DetailLevel = "full"
-  )
-
-  $requiredHeadings = @(
-    $Labels.Purpose,
-    $Labels.Environment,
-    $Labels.Theory,
-    $Labels.Steps,
-    $Labels.Results,
-    $Labels.Analysis,
-    $Labels.Summary
-  ) -join ", "
-
-  $detailRequirements = if ($DetailLevel -eq "full") {
-@"
-- Prefer a submit-ready report with substantial section content instead of a terse outline.
-- Unless the reference material is very sparse, aim for roughly 1200 to 1800 Chinese characters.
-- The purpose, environment, theory, analysis, and summary sections should each contain multiple complete sentences rather than a single short statement.
-- The steps and results sections should be the most detailed parts. Explain the setup order, key operations, command or configuration intent, observed outcomes, and why those outcomes support completion of the experiment.
-- If the webpages do not provide screenshots or exact measured values, keep the language concrete and validation-oriented instead of filling space with generic filler.
-"@
-  } else {
-@"
-- Prefer a complete submit-ready report instead of a terse outline.
-- Keep each required section concrete and useful, especially the steps and results sections.
-"@
-  }
-
-  return @"
-Write a formal Chinese university lab report body based on the reference webpages.
-
-Course name: $ResolvedCourseName
-Experiment name: $ResolvedExperimentName
-
-Requirements:
-- The report must begin by explicitly writing the course name and experiment name in Chinese.
-- The report must include these Chinese headings: $requiredHeadings.
-- Use the webpages as procedural reference for background, theory, steps, and verification ideas, but do not copy them verbatim.
-- If the webpages are tutorial pages or lab guides, rewrite them into a submit-ready lab report in natural Chinese.
-- If the webpages do not provide real screenshots, exact measured values, packet captures, teacher comments, or error logs, do not fabricate them. Write the result section as validation-oriented results instead.
-$($detailRequirements.Trim())
-- Return only the final Chinese report body.
-"@
-}
-
-function New-AutoRequirementsJson {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string]$ResolvedCourseName,
-
-    [Parameter(Mandatory = $true)]
-    [string]$ResolvedExperimentName,
-
-    [Parameter(Mandatory = $true)]
-    [hashtable]$Labels,
-
-    [string[]]$ExtraKeywords,
-
-    [ValidateSet("standard", "full")]
-    [string]$DetailLevel = "full"
-  )
-
-  $keywordList = New-Object System.Collections.Generic.List[string]
-  [void]$keywordList.Add($ResolvedCourseName)
-  [void]$keywordList.Add($ResolvedExperimentName)
-
-  foreach ($keyword in @($ExtraKeywords)) {
-    if (-not [string]::IsNullOrWhiteSpace($keyword) -and -not $keywordList.Contains($keyword)) {
-      [void]$keywordList.Add($keyword)
-    }
-  }
-
-  $requirementProfile = if ($DetailLevel -eq "full") {
-    [ordered]@{
-      MinChars = 1100
-      PurposeMinChars = 60
-      EnvironmentMinChars = 60
-      TheoryMinChars = 80
-      StepsMinChars = 140
-      ResultsMinChars = 120
-      AnalysisMinChars = 80
-      SummaryMinChars = 80
-    }
-  } else {
-    [ordered]@{
-      MinChars = 700
-      PurposeMinChars = 30
-      EnvironmentMinChars = 30
-      TheoryMinChars = 30
-      StepsMinChars = 60
-      ResultsMinChars = 50
-      AnalysisMinChars = 30
-      SummaryMinChars = 30
-    }
-  }
-
-  $requirements = [pscustomobject]@{
-    courseName = $ResolvedCourseName
-    experimentName = $ResolvedExperimentName
-    minChars = $requirementProfile.MinChars
-    sections = @(
-      [pscustomobject]@{ name = $Labels.Purpose; aliases = @($Labels.Purpose); minChars = $requirementProfile.PurposeMinChars },
-      [pscustomobject]@{ name = $Labels.Environment; aliases = @($Labels.Environment, $Labels.EnvAlias); minChars = $requirementProfile.EnvironmentMinChars },
-      [pscustomobject]@{ name = $Labels.Theory; aliases = @($Labels.Theory, $Labels.TheoryAlias, $Labels.TaskAlias); minChars = $requirementProfile.TheoryMinChars },
-      [pscustomobject]@{ name = $Labels.Steps; aliases = @($Labels.Steps, $Labels.StepsAlias); minChars = $requirementProfile.StepsMinChars },
-      [pscustomobject]@{ name = $Labels.Results; aliases = @($Labels.Results, $Labels.ResultsAlias); minChars = $requirementProfile.ResultsMinChars },
-      [pscustomobject]@{ name = $Labels.Analysis; aliases = @($Labels.Analysis, $Labels.AnalysisAlias); minChars = $requirementProfile.AnalysisMinChars },
-      [pscustomobject]@{ name = $Labels.Summary; aliases = @($Labels.Summary, $Labels.SummaryAlias, $Labels.SummaryAlias2); minChars = $requirementProfile.SummaryMinChars }
-    )
-    requiredKeywords = @($keywordList)
-    forbiddenPatterns = @(Get-DefaultForbiddenPatterns)
-  }
-
-  return ($requirements | ConvertTo-Json -Depth 6)
-}
-
-function New-AutoMetadataJson {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string]$ResolvedCourseName,
-
-    [Parameter(Mandatory = $true)]
-    [string]$ResolvedExperimentName,
-
-    [Parameter(Mandatory = $true)]
-    [hashtable]$Labels,
-
-    [AllowNull()]
-    [string]$ResolvedStudentName,
-
-    [AllowNull()]
-    [string]$ResolvedStudentId,
-
-    [AllowNull()]
-    [string]$ResolvedClassName,
-
-    [AllowNull()]
-    [string]$ResolvedTeacherName,
-
-    [AllowNull()]
-    [string]$ResolvedExperimentProperty,
-
-    [AllowNull()]
-    [string]$ResolvedExperimentDate,
-
-    [AllowNull()]
-    [string]$ResolvedExperimentLocation
-  )
-
-  $metadata = [ordered]@{}
-  $metadata[$Labels.Name] = $ResolvedStudentName
-  $metadata[$Labels.StudentId] = $ResolvedStudentId
-  $metadata[$Labels.ClassName] = $ResolvedClassName
-  $metadata[$Labels.TeacherName] = $ResolvedTeacherName
-  $metadata[$Labels.CourseName] = $ResolvedCourseName
-  $metadata[$Labels.ExperimentName] = $ResolvedExperimentName
-  $metadata[$Labels.ExperimentProperty] = $ResolvedExperimentProperty
-  $metadata[$Labels.ExperimentDate] = $ResolvedExperimentDate
-  $metadata[$Labels.ExperimentLocation] = $ResolvedExperimentLocation
-  $metadata[$Labels.Date] = $ResolvedExperimentDate
-
-  return ($metadata | ConvertTo-Json -Depth 4)
-}
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
 
 function Read-MetadataDocument {
   param(
@@ -420,12 +201,44 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath) -and -not [string]::IsN
   throw "Provide at most one of -RequirementsPath or -RequirementsJson."
 }
 
-$labels = Get-ReportLabels
-if ([string]::IsNullOrWhiteSpace($ExperimentProperty)) {
-  $ExperimentProperty = Get-DefaultExperimentProperty
+$generationInputsProvided = (-not [string]::IsNullOrWhiteSpace($PromptText)) -or `
+  (-not [string]::IsNullOrWhiteSpace($PromptPath)) -or `
+  (@($ReferenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) -or `
+  (@($ReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) -or `
+  (-not [string]::IsNullOrWhiteSpace($CourseName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($StudentName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($StudentId)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ClassName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($TeacherName)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentProperty)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentDate)) -or `
+  (-not [string]::IsNullOrWhiteSpace($ExperimentLocation)) -or `
+  (@($RequiredKeywords | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0)
+
+if (-not [string]::IsNullOrWhiteSpace($PreparedInputsSummaryPath) -and $generationInputsProvided) {
+  throw "Provide either -PreparedInputsSummaryPath or generation inputs such as -ReferenceUrls / -PromptText / -CourseName, but not both."
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$preparedInputsContext = Resolve-PreparedInputsSummaryContext `
+  -PreparedInputsSummaryPath $PreparedInputsSummaryPath `
+  -ReportProfileName $ReportProfileName `
+  -ReportProfilePath $ReportProfilePath `
+  -ReportProfileNameProvided:$PSBoundParameters.ContainsKey("ReportProfileName") `
+  -ReportProfilePathProvided:$PSBoundParameters.ContainsKey("ReportProfilePath") `
+  -DetailLevel $DetailLevel `
+  -DetailLevelProvided:$PSBoundParameters.ContainsKey("DetailLevel")
+$resolvedPreparedInputsSummaryPath = [string]$preparedInputsContext.resolvedPreparedInputsSummaryPath
+$reportProfile = Get-ReportProfile -ProfileName ([string]$preparedInputsContext.reportProfileName) -ProfilePath ([string]$preparedInputsContext.reportProfilePath) -RepoRoot $repoRoot
+$labels = Get-ReportProfileLabels -Profile $reportProfile
+$documentLabel = Get-ReportProfileDisplayName -Profile $reportProfile -Fallback "报告"
+$courseNameLabel = if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" }
+$titleNameLabel = if ($labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["ExperimentName"])) { [string]$labels["ExperimentName"] } else { "题目名称" }
+if ([string]::IsNullOrWhiteSpace($ExperimentProperty)) {
+  $ExperimentProperty = [string]$reportProfile.defaultExperimentProperty
+}
+
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $OutputDir = Join-Path $repoRoot ("tests-output\url-build-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
@@ -433,94 +246,78 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 
-$resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
-$referenceUrlList = @($ReferenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-$referenceTextPathList = @($ReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-$inferredExperimentName = Resolve-InferredExperimentName `
-  -PromptText $PromptText `
-  -PromptPath $resolvedPromptPath `
-  -ReferenceTextPaths $referenceTextPathList `
-  -ReferenceUrls $referenceUrlList
-
-$fetchedReferenceTextPathList = @()
-$effectiveReferenceUrlList = $referenceUrlList
-$effectiveReferenceTextPathList = $referenceTextPathList
-if ([string]::IsNullOrWhiteSpace($ExperimentName) -and [string]::IsNullOrWhiteSpace($inferredExperimentName) -and $referenceUrlList.Count -gt 0) {
-  $fetchedReferenceDir = Join-Path $resolvedOutputDir "references"
-  New-Item -ItemType Directory -Path $fetchedReferenceDir -Force | Out-Null
-
-  for ($referenceIndex = 0; $referenceIndex -lt $referenceUrlList.Count; $referenceIndex++) {
-    $referenceUrl = [string]$referenceUrlList[$referenceIndex]
-    $fetchedReferencePath = Join-Path $fetchedReferenceDir ("reference-{0:D2}.txt" -f ($referenceIndex + 1))
-    $fetchedReference = & (Join-Path $repoRoot "scripts\fetch-web-article.ps1") `
-      -Url $referenceUrl `
-      -BrowserProfile $BrowserProfile `
-      -OpenClawCmd $OpenClawCmd `
-      -MaxChars $ReferenceMaxChars
-    $fetchedReferenceText = (($fetchedReference | Out-String).Trim() + [Environment]::NewLine)
-    [System.IO.File]::WriteAllText($fetchedReferencePath, $fetchedReferenceText, (New-Object System.Text.UTF8Encoding($true)))
-    $fetchedReferenceTextPathList += $fetchedReferencePath
-
-    if ([string]::IsNullOrWhiteSpace($inferredExperimentName)) {
-      $inferredExperimentName = Get-ExperimentNameCandidateFromText -Text $fetchedReferenceText
-    }
-  }
-
-  $effectiveReferenceUrlList = @()
-  $effectiveReferenceTextPathList = @($referenceTextPathList + $fetchedReferenceTextPathList)
-}
-
-$resolvedNames = Resolve-ExperimentReportNames -CourseName $CourseName -ExperimentName $ExperimentName -InferredExperimentName $inferredExperimentName
-$resolvedCourseName = [string]$resolvedNames.courseName
-$resolvedExperimentName = [string]$resolvedNames.experimentName
-if ([string]::IsNullOrWhiteSpace($resolvedCourseName) -or [string]::IsNullOrWhiteSpace($resolvedExperimentName)) {
-  throw "CourseName and ExperimentName are required unless ExperimentName can be inferred from PromptText / PromptPath / ReferenceTextPaths / ReferenceUrls. After you set them once, later runs can omit them."
-}
-
 $resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
+$resolvedPreGeneratedReportPath = Resolve-AbsolutePathIfProvided -Path $PreGeneratedReportPath
+$resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
-
-$basePromptText = if (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) {
-  Get-Content -LiteralPath $resolvedPromptPath -Raw -Encoding UTF8
-} elseif (-not [string]::IsNullOrWhiteSpace($PromptText)) {
-  $PromptText
+$resolvedTemplateFrameDocxPath = if ([string]::IsNullOrWhiteSpace($TemplateFrameDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($TemplateFrameDocxPath) }
+$inputSummaryPath = if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
+  Join-Path $resolvedOutputDir "report-inputs-summary.json"
 } else {
-  New-AutoPromptText -ResolvedCourseName $resolvedCourseName -ResolvedExperimentName $resolvedExperimentName -Labels $labels -DetailLevel $DetailLevel
+  $resolvedPreparedInputsSummaryPath
 }
 
-$promptPathOut = Join-Path $resolvedOutputDir "prompt.txt"
-[System.IO.File]::WriteAllText($promptPathOut, $basePromptText, (New-Object System.Text.UTF8Encoding($true)))
+if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
+  $inputParams = @{
+    OutputDir = $resolvedOutputDir
+    SummaryPath = $inputSummaryPath
+    OpenClawCmd = $OpenClawCmd
+    BrowserProfile = $BrowserProfile
+    ReferenceMaxChars = $ReferenceMaxChars
+    DetailLevel = $DetailLevel
+    ReportProfileName = [string]$reportProfile.name
+    ReportProfilePath = [string]$reportProfile.resolvedProfilePath
+  }
 
-$effectiveMetadataPath = $resolvedMetadataPath
-if ([string]::IsNullOrWhiteSpace($effectiveMetadataPath) -and [string]::IsNullOrWhiteSpace($MetadataJson)) {
-  $effectiveMetadataPath = Join-Path $resolvedOutputDir "metadata.auto.json"
-  $autoMetadataJson = New-AutoMetadataJson `
-    -ResolvedCourseName $resolvedCourseName `
-    -ResolvedExperimentName $resolvedExperimentName `
-    -Labels $labels `
-    -ResolvedStudentName $StudentName `
-    -ResolvedStudentId $StudentId `
-    -ResolvedClassName $ClassName `
-    -ResolvedTeacherName $TeacherName `
-    -ResolvedExperimentProperty $ExperimentProperty `
-    -ResolvedExperimentDate $ExperimentDate `
-    -ResolvedExperimentLocation $ExperimentLocation
-  [System.IO.File]::WriteAllText($effectiveMetadataPath, $autoMetadataJson, (New-Object System.Text.UTF8Encoding($true)))
+  if (-not [string]::IsNullOrWhiteSpace($PromptPath)) { $inputParams.PromptPath = $PromptPath }
+  if (-not [string]::IsNullOrWhiteSpace($PromptText)) { $inputParams.PromptText = $PromptText }
+  if ($null -ne $ReferenceUrls -and @($ReferenceUrls).Count -gt 0) { $inputParams.ReferenceUrls = $ReferenceUrls }
+  if ($null -ne $ReferenceTextPaths -and @($ReferenceTextPaths).Count -gt 0) { $inputParams.ReferenceTextPaths = $ReferenceTextPaths }
+  if (-not [string]::IsNullOrWhiteSpace($CourseName)) { $inputParams.CourseName = $CourseName }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentName)) { $inputParams.ExperimentName = $ExperimentName }
+  if (-not [string]::IsNullOrWhiteSpace($StudentName)) { $inputParams.StudentName = $StudentName }
+  if (-not [string]::IsNullOrWhiteSpace($StudentId)) { $inputParams.StudentId = $StudentId }
+  if (-not [string]::IsNullOrWhiteSpace($ClassName)) { $inputParams.ClassName = $ClassName }
+  if (-not [string]::IsNullOrWhiteSpace($TeacherName)) { $inputParams.TeacherName = $TeacherName }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentProperty)) { $inputParams.ExperimentProperty = $ExperimentProperty }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentDate)) { $inputParams.ExperimentDate = $ExperimentDate }
+  if (-not [string]::IsNullOrWhiteSpace($ExperimentLocation)) { $inputParams.ExperimentLocation = $ExperimentLocation }
+  if ($null -ne $RequiredKeywords -and @($RequiredKeywords).Count -gt 0) { $inputParams.RequiredKeywords = $RequiredKeywords }
+
+  & (Join-Path $repoRoot "scripts\generate-report-inputs.ps1") @inputParams | Out-Null
 }
 
-$effectiveRequirementsPath = $resolvedRequirementsPath
-if ([string]::IsNullOrWhiteSpace($effectiveRequirementsPath) -and [string]::IsNullOrWhiteSpace($RequirementsJson)) {
-  $effectiveRequirementsPath = Join-Path $resolvedOutputDir "requirements.auto.json"
-  $autoRequirementsJson = New-AutoRequirementsJson `
-    -ResolvedCourseName $resolvedCourseName `
-    -ResolvedExperimentName $resolvedExperimentName `
-    -Labels $labels `
-    -ExtraKeywords $RequiredKeywords `
-    -DetailLevel $DetailLevel
-  [System.IO.File]::WriteAllText($effectiveRequirementsPath, $autoRequirementsJson, (New-Object System.Text.UTF8Encoding($true)))
+$inputSummary = if ($null -ne $preparedInputsContext.summary) {
+  $preparedInputsContext.summary
+} else {
+  (Get-Content -LiteralPath $inputSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+}
+$resolvedCourseName = [string]$inputSummary.courseName
+$resolvedExperimentName = [string]$inputSummary.experimentName
+$effectiveDetailLevel = [string]$preparedInputsContext.detailLevel
+$promptPathOut = [string]$inputSummary.promptPath
+$effectiveReferenceUrlList = @($inputSummary.referenceUrls | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+$effectiveReferenceTextPathList = @($inputSummary.referenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+$fetchedReferenceTextPathList = @($inputSummary.fetchedReferenceTextPaths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+$savedDefaultsPath = [string]$inputSummary.defaultsPath
+
+$effectiveMetadataPath = if (-not [string]::IsNullOrWhiteSpace($resolvedMetadataPath)) {
+  $resolvedMetadataPath
+} elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
+  $null
+} else {
+  [string]$inputSummary.metadataPath
+}
+
+$effectiveRequirementsPath = if (-not [string]::IsNullOrWhiteSpace($resolvedRequirementsPath)) {
+  $resolvedRequirementsPath
+} elseif (-not [string]::IsNullOrWhiteSpace($RequirementsJson)) {
+  $null
+} else {
+  [string]$inputSummary.requirementsPath
 }
 
 $metadataDocument = Read-MetadataDocument -ResolvedMetadataPath $effectiveMetadataPath -InlineMetadataJson $MetadataJson
@@ -541,16 +338,23 @@ $studentNameForFilename = if (-not [string]::IsNullOrWhiteSpace($StudentName)) {
 
 $rawReportPath = Join-Path $resolvedOutputDir "report.raw.txt"
 $cleanedReportPath = Join-Path $resolvedOutputDir "report.cleaned.txt"
-& (Join-Path $repoRoot "scripts\generate-report-chat.ps1") `
-  -PromptPath $promptPathOut `
-  -ReferenceTextPaths $effectiveReferenceTextPathList `
-  -ReferenceUrls $effectiveReferenceUrlList `
-  -BrowserProfile $BrowserProfile `
-  -OpenClawCmd $OpenClawCmd `
-  -ReferenceMaxChars $ReferenceMaxChars `
-  -SessionKey $SessionKey `
-  -OutFile $rawReportPath `
-  $(if ($SkipSessionReset) { "-SkipSessionReset" }) | Out-Null
+$generateChatParams = @{
+  PromptPath = $promptPathOut
+  ReferenceTextPaths = $effectiveReferenceTextPathList
+  ReferenceUrls = $effectiveReferenceUrlList
+  BrowserProfile = $BrowserProfile
+  OpenClawCmd = $OpenClawCmd
+  ReferenceMaxChars = $ReferenceMaxChars
+  SessionKey = $SessionKey
+  OutFile = $rawReportPath
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+  $generateChatParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
+}
+if ($SkipSessionReset) {
+  $generateChatParams.SkipSessionReset = $true
+}
+& (Join-Path $repoRoot "scripts\generate-report-chat.ps1") @generateChatParams | Out-Null
 
 $rawReportText = Get-Content -LiteralPath $rawReportPath -Raw -Encoding UTF8
 $cleanedReportText = Normalize-GeneratedReportText -Text $rawReportText -Labels $labels
@@ -565,6 +369,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
     ReportPath = $cleanedReportPath
     OutputDir = $resolvedOutputDir
     StyleFinalDocx = $true
+    PipelineMode = $PipelineMode
     StyleProfile = $StyleProfile
   }
 
@@ -590,6 +395,18 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
 
   if (-not [string]::IsNullOrWhiteSpace($resolvedStyleProfilePath)) {
     $buildParams.StyleProfilePath = $resolvedStyleProfilePath
+  }
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.name)) {
+    $buildParams.ReportProfileName = [string]$reportProfile.name
+  }
+  if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
+    $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
+  }
+  if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
+    $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
+  }
+  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+    $buildParams.CreateTemplateFrameDocx = $true
   }
 
   & (Join-Path $repoRoot "scripts\build-report.ps1") @buildParams | Out-Null
@@ -627,40 +444,197 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   }
 }
 
-$savedDefaultsPath = Save-ExperimentReportDefaults -CourseName $resolvedCourseName -ExperimentName $resolvedExperimentName -DefaultsPath ([string]$resolvedNames.defaultsPath)
+$buildTemplateFrameDocxPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "templateFrameDocxPath") { [string]$buildSummary.templateFrameDocxPath } else { $null })
+$templateFrameDocxPath = $null
+if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+  if ([string]::IsNullOrWhiteSpace($buildTemplateFrameDocxPath) -or -not (Test-Path -LiteralPath $buildTemplateFrameDocxPath -PathType Leaf)) {
+    throw "Template-frame docx was requested, but build-report.ps1 did not produce templateFrameDocxPath."
+  }
 
+  $templateFrameDocxPath = if (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath)) {
+    $resolvedTemplateFrameDocxPath
+  } elseif (-not [string]::IsNullOrWhiteSpace($finalDocxPath)) {
+    Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalDocxPath)) + ".template-frame.docx")
+  } else {
+    throw "Template-frame docx was requested, but no final docx path is available."
+  }
+
+  $templateFrameParent = Split-Path -Parent $templateFrameDocxPath
+  if (-not [string]::IsNullOrWhiteSpace($templateFrameParent)) {
+    New-Item -ItemType Directory -Path $templateFrameParent -Force | Out-Null
+  }
+
+  if (-not [string]::Equals($buildTemplateFrameDocxPath, $templateFrameDocxPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Copy-Item -LiteralPath $buildTemplateFrameDocxPath -Destination $templateFrameDocxPath -Force
+  } else {
+    $templateFrameDocxPath = $buildTemplateFrameDocxPath
+  }
+}
+
+$generationMode = if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) { "replay" } else { "live" }
+$buildReportInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "reportInputMode") { [string]$buildSummary.reportInputMode } else { $null })
+$buildMetadataInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "metadataInputMode") { [string]$buildSummary.metadataInputMode } else { $null })
+$buildRequirementsInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "requirementsInputMode") { [string]$buildSummary.requirementsInputMode } else { $null })
+$buildImageInputMode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imageInputMode") { [string]$buildSummary.imageInputMode } else { $null })
+$buildValidationErrorCodes = @()
+$buildValidationWarningCodes = @()
+$buildValidationWarningSummary = @()
+if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationErrorCodes") {
+  $buildValidationErrorCodes = @($buildSummary.validationErrorCodes)
+}
+if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationWarningCodes") {
+  $buildValidationWarningCodes = @($buildSummary.validationWarningCodes)
+}
+if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationWarningSummary") {
+  $buildValidationWarningSummary = @($buildSummary.validationWarningSummary)
+}
+$pipelineTracePath = Join-Path $resolvedOutputDir "pipeline-trace.json"
+$pipelineTraceMarkdownPath = Join-Path $resolvedOutputDir "pipeline-trace.md"
+$pipelineTrace = [pscustomobject]@{
+  wrapper = [pscustomobject]@{
+    script = "build-report-from-url.ps1"
+    mode = "generated-report"
+    generationMode = $generationMode
+    pipelineMode = $PipelineMode
+    reportProfileName = [string]$reportProfile.name
+    reportProfileDisplayName = $documentLabel
+    detailLevel = $effectiveDetailLevel
+  }
+  build = [pscustomobject]@{
+    summaryPath = $buildSummaryPath
+    reportInputMode = $buildReportInputMode
+    metadataInputMode = $buildMetadataInputMode
+    requirementsInputMode = $buildRequirementsInputMode
+    imageInputMode = $buildImageInputMode
+    imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
+    templateFrameDocxPath = $buildTemplateFrameDocxPath
+    layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
+    layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
+    validationPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPath") { [string]$buildSummary.validationPath } else { $null })
+    validationPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPassed") { $buildSummary.validationPassed } else { $null })
+    validationErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationErrorCount") { $buildSummary.validationErrorCount } else { $null })
+    validationWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationWarningCount") { $buildSummary.validationWarningCount } else { $null })
+    validationPaginationRiskCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskCount") { $buildSummary.validationPaginationRiskCount } else { $null })
+    validationPaginationRiskThresholds = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskThresholds") { $buildSummary.validationPaginationRiskThresholds } else { $null })
+    validationPaginationRiskRemediations = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskRemediations") { $buildSummary.validationPaginationRiskRemediations } else { $null })
+    validationStructuralIssueCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $buildSummary.validationStructuralIssueCount } else { $null })
+    validationWarningCodes = $buildValidationWarningCodes
+    validationWarningSummary = $buildValidationWarningSummary
+  }
+  artifacts = [pscustomobject]@{
+    reportInputsSummaryPath = $inputSummaryPath
+    promptPath = $promptPathOut
+    rawReportPath = $rawReportPath
+    cleanedReportPath = $cleanedReportPath
+    finalDocxPath = $finalDocxPath
+    templateFrameDocxPath = $templateFrameDocxPath
+    preGeneratedReportPath = $resolvedPreGeneratedReportPath
+  }
+}
+[System.IO.File]::WriteAllText($pipelineTracePath, ($pipelineTrace | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
+$pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
+[void]$pipelineTraceMarkdownLines.Add("# Pipeline Trace")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("## Wrapper")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("- Script: build-report-from-url.ps1")
+[void]$pipelineTraceMarkdownLines.Add("- Mode: generated-report")
+[void]$pipelineTraceMarkdownLines.Add("- Generation mode: $generationMode")
+[void]$pipelineTraceMarkdownLines.Add("- Pipeline mode: $PipelineMode")
+[void]$pipelineTraceMarkdownLines.Add("- Report profile: $([string]$reportProfile.name)")
+[void]$pipelineTraceMarkdownLines.Add("- Display name: $documentLabel")
+[void]$pipelineTraceMarkdownLines.Add("- Detail level: $effectiveDetailLevel")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("## Build")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("- Summary path: $buildSummaryPath")
+[void]$pipelineTraceMarkdownLines.Add("- Report input mode: $buildReportInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Metadata input mode: $buildMetadataInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Requirements input mode: $buildRequirementsInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Image input mode: $buildImageInputMode")
+[void]$pipelineTraceMarkdownLines.Add("- Image plan path: $($pipelineTrace.build.imagePlanPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $buildTemplateFrameDocxPath")
+[void]$pipelineTraceMarkdownLines.Add("- Layout check path: $($pipelineTrace.build.layoutCheckPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Layout check passed: $($pipelineTrace.build.layoutCheckPassed)")
+[void]$pipelineTraceMarkdownLines.Add("- Validation path: $($pipelineTrace.build.validationPath)")
+[void]$pipelineTraceMarkdownLines.Add("- Validation passed: $($pipelineTrace.build.validationPassed)")
+[void]$pipelineTraceMarkdownLines.Add("- Validation warnings: $($pipelineTrace.build.validationWarningCount)")
+[void]$pipelineTraceMarkdownLines.Add("- Pagination risks: $($pipelineTrace.build.validationPaginationRiskCount)")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("## Artifacts")
+[void]$pipelineTraceMarkdownLines.Add("")
+[void]$pipelineTraceMarkdownLines.Add("- Report inputs summary: $inputSummaryPath")
+[void]$pipelineTraceMarkdownLines.Add("- Prompt path: $promptPathOut")
+[void]$pipelineTraceMarkdownLines.Add("- Raw report path: $rawReportPath")
+[void]$pipelineTraceMarkdownLines.Add("- Cleaned report path: $cleanedReportPath")
+[void]$pipelineTraceMarkdownLines.Add("- Final docx path: $finalDocxPath")
+[void]$pipelineTraceMarkdownLines.Add("- Template-frame docx path: $templateFrameDocxPath")
+[void]$pipelineTraceMarkdownLines.Add("- Pre-generated report path: $resolvedPreGeneratedReportPath")
+[System.IO.File]::WriteAllText($pipelineTraceMarkdownPath, ($pipelineTraceMarkdownLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($true)))
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
+  reportProfileName = [string]$reportProfile.name
+  reportProfilePath = [string]$reportProfile.resolvedProfilePath
+  reportProfileDisplayName = $documentLabel
   courseName = $resolvedCourseName
   experimentName = $resolvedExperimentName
-  requestedCourseName = $CourseName
-  requestedExperimentName = $ExperimentName
-  inferredExperimentName = [string]$resolvedNames.inferredExperimentName
+  requestedCourseName = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedCourseName") { [string]$inputSummary.requestedCourseName } else { $CourseName })
+  requestedExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedExperimentName") { [string]$inputSummary.requestedExperimentName } else { $ExperimentName })
+  inferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "inferredExperimentName") { [string]$inputSummary.inferredExperimentName } else { $null })
   defaultsPath = $savedDefaultsPath
-  usedStoredCourseName = [bool]$resolvedNames.usedStoredCourseName
-  usedStoredExperimentName = [bool]$resolvedNames.usedStoredExperimentName
-  usedInferredExperimentName = [bool]$resolvedNames.usedInferredExperimentName
-  detailLevel = $DetailLevel
+  usedStoredCourseName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredCourseName") { [bool]$inputSummary.usedStoredCourseName } else { $false })
+  usedStoredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedStoredExperimentName") { [bool]$inputSummary.usedStoredExperimentName } else { $false })
+  usedInferredExperimentName = $(if ($inputSummary.PSObject.Properties.Name -contains "usedInferredExperimentName") { [bool]$inputSummary.usedInferredExperimentName } else { $false })
+  detailLevel = $effectiveDetailLevel
+  generationMode = $generationMode
+  pipelineMode = $PipelineMode
   promptPath = $promptPathOut
-  referenceUrls = $referenceUrlList
+  requestedReferenceUrls = $(if ($inputSummary.PSObject.Properties.Name -contains "requestedReferenceUrls") { @($inputSummary.requestedReferenceUrls) } else { @() })
+  referenceUrls = $effectiveReferenceUrlList
   referenceTextPaths = $effectiveReferenceTextPathList
   fetchedReferenceTextPaths = $fetchedReferenceTextPathList
+  reportInputsSummaryPath = $inputSummaryPath
   rawReportPath = $rawReportPath
   cleanedReportPath = $cleanedReportPath
   metadataPath = $effectiveMetadataPath
   requirementsPath = $effectiveRequirementsPath
   styleProfile = $StyleProfile
   styleProfilePath = $resolvedStyleProfilePath
+  preGeneratedReportPath = $resolvedPreGeneratedReportPath
+  pipelineTracePath = $pipelineTracePath
+  pipelineTraceMarkdownPath = $pipelineTraceMarkdownPath
   buildSummaryPath = $buildSummaryPath
+  buildReportInputMode = $buildReportInputMode
+  buildMetadataInputMode = $buildMetadataInputMode
+  buildRequirementsInputMode = $buildRequirementsInputMode
+  buildImageInputMode = $buildImageInputMode
+  buildTemplateFrameDocxPath = $buildTemplateFrameDocxPath
+  imagePlanPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanPath") { [string]$buildSummary.imagePlanPath } else { $null })
+  imagePlanLowConfidenceCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanLowConfidenceCount") { $buildSummary.imagePlanLowConfidenceCount } else { $null })
+  imagePlanNeedsReview = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "imagePlanNeedsReview") { $buildSummary.imagePlanNeedsReview } else { $null })
   layoutCheckPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPath") { [string]$buildSummary.layoutCheckPath } else { $null })
   layoutCheckPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckPassed") { $buildSummary.layoutCheckPassed } else { $null })
   layoutCheckMessage = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckMessage") { [string]$buildSummary.layoutCheckMessage } else { $null })
   layoutCheckErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckErrorCount") { $buildSummary.layoutCheckErrorCount } else { $null })
   layoutCheckWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "layoutCheckWarningCount") { $buildSummary.layoutCheckWarningCount } else { $null })
+  validationPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPath") { [string]$buildSummary.validationPath } else { $null })
+  validationPassed = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPassed") { $buildSummary.validationPassed } else { $null })
+  validationErrorCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationErrorCount") { $buildSummary.validationErrorCount } else { $null })
+  validationWarningCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationWarningCount") { $buildSummary.validationWarningCount } else { $null })
+  validationPaginationRiskCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskCount") { $buildSummary.validationPaginationRiskCount } else { $null })
+  validationPaginationRiskThresholds = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskThresholds") { $buildSummary.validationPaginationRiskThresholds } else { $null })
+  validationPaginationRiskRemediations = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationPaginationRiskRemediations") { $buildSummary.validationPaginationRiskRemediations } else { $null })
+  validationStructuralIssueCount = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationStructuralIssueCount") { $buildSummary.validationStructuralIssueCount } else { $null })
+  validationFindingCountsByCode = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationFindingCountsByCode") { $buildSummary.validationFindingCountsByCode } else { $null })
+  validationFindingCountsByCategory = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "validationFindingCountsByCategory") { $buildSummary.validationFindingCountsByCategory } else { $null })
+  validationErrorCodes = $buildValidationErrorCodes
+  validationWarningCodes = $buildValidationWarningCodes
+  validationWarningSummary = $buildValidationWarningSummary
   finalDocxPath = $finalDocxPath
+  templateFrameDocxPath = $templateFrameDocxPath
 }
-[System.IO.File]::WriteAllText($wrapperSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($true)))
+[System.IO.File]::WriteAllText($wrapperSummaryPath, ($wrapperSummary | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
 
 Write-Output ("Prompt path: {0}" -f $promptPathOut)
 Write-Output ("Raw report path: {0}" -f $rawReportPath)
@@ -673,5 +647,8 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveRequirementsPath)) {
 }
 if (-not [string]::IsNullOrWhiteSpace($finalDocxPath)) {
   Write-Output ("Final docx path: {0}" -f $finalDocxPath)
+}
+if (-not [string]::IsNullOrWhiteSpace($templateFrameDocxPath)) {
+  Write-Output ("Template-frame docx path: {0}" -f $templateFrameDocxPath)
 }
 Write-Output ("Wrapper summary path: {0}" -f $wrapperSummaryPath)

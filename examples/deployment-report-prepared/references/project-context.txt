@@ -1,0 +1,7 @@
+本次 prepared replay 部署回放链路测试的背景，是仓库已经先后为 `weekly-report`、`meeting-minutes`、`monthly-report` 和 `software-test-report` 提交了 checked-in prepared replay fixture，并证明 `build-report-from-url.ps1` 在 replay 模式下可以稳定解析相对路径、继承 profile、输出 validation summary、生成 pipeline trace，并把这些 fixture 随安装流程一起复制出去。也就是说，仓库已经在多个文档族上形成了 repo-level replay 基线，但工程报告里的“部署运维报告”仍然缺少同级样例。
+
+`deployment-report` 与前面几类文档的不同之处，在于它不仅结构更强调环境、架构、部署步骤、验证和回滚，还已经在 profile 中携带了 profile-specific paginationRiskRemediations。这些 remediation 明确要求把前置条件、配置命令、日志观察、健康检查和回滚步骤拆开记录，说明该文档族在 Word/WPS 分页和证据组织上具有更高的复杂度。如果没有 checked-in replay fixture，就很难证明这些 remediation 只是定义在 JSON 里，还是已经能在真实回放链路中被长期维护和验证。
+
+因此，本次测试的任务，是把 `deployment-report` 也推进成一套可直接提交到仓库、可被 smoke 覆盖、可被 install 复制，并且能在 README 中被用户直接发现和复用的 prepared replay bundle。需要提交的产物包括 `report-inputs-summary.json`、`prompt.txt`、`metadata.auto.json`、`requirements.auto.json`、`defaults.snapshot.json`、参考文本和 `report.replay.txt`，同时在 `scripts/run-smoke-tests.ps1` 中补一个最小 `New-DeploymentTemplateDocx` 模板夹具，让部署运维报告的 replay 不依赖外部模板也能穿过 wrapper、validation、trace 和 final docx 产物链路。
+
+如果这一项落地，仓库的 realistic end-to-end fixtures 将同时覆盖 `software-test-report` 和 `deployment-report` 两类带 profile-specific pagination remediation 的工程报告，这会比继续补轻量过程文档样例更有价值。后续无论是继续强化 layout heuristics，还是补更真实的 Word/WPS 模板，都可以在更完整的工程文档基线之上推进。

@@ -11,6 +11,8 @@
 - 本地 WPS 桌面自动化不是主路径，先完成内容，再尝试填写。
 - 如果模板是本地 docx，优先先跑 `scripts/extract-docx-template.ps1 -Path <template.docx>`，用提取出的段落顺序、表格单元格和疑似字段做映射。
 - 如果正文已经写完且需要机器生成字段映射，优先跑 `scripts/generate-docx-field-map.ps1`，不要手工拼大段 JSON。
+- `scripts/generate-docx-field-map.ps1` 返回的 JSON 里如果有 `diagnostics`，优先根据 `code`、`message` 和 `suggestion` 判断是缺 metadata、缺章节内容，还是模板需要补 `fieldMapCompositeRules` / `sectionFields` alias。
+- 如果你是在给一个新模板做 profile onboarding，优先改跑 `scripts/check-report-profile-template-fit.ps1`，它会把 field-map diagnostics 归并成 profile change suggestions 和 input gaps，方便直接补 profile JSON。
 - 如果用户明确需要机器生成一个已填内容的 docx 副本，再用 `scripts/apply-docx-field-map.ps1` 执行回填。
 - 标签键映射适合保守填空，只会填充空白位或占位符。
 - 如果模板里是固定章节标题加空白正文段，优先给出 `paragraphs` 数组。

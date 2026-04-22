@@ -1,0 +1,203 @@
+{
+  "name": "course-design-report",
+  "displayName": "课程设计报告",
+  "defaultStyleProfile": "school",
+  "defaultExperimentProperty": "课程设计",
+  "metadataFields": [
+    { "key": "Name", "label": "学生姓名", "aliases": ["姓名"] },
+    { "key": "StudentId", "label": "学号", "aliases": ["学生学号"] },
+    { "key": "ClassName", "label": "班级" },
+    { "key": "TeacherName", "label": "指导教师", "aliases": ["指导老师"] },
+    { "key": "CourseName", "label": "课程名称", "aliases": ["课程名"] },
+    { "key": "ExperimentName", "label": "课题名称", "aliases": ["设计题目", "题目"] },
+    { "key": "ExperimentProperty", "label": "设计类别", "aliases": ["课程设计类型"] },
+    { "key": "ExperimentDate", "label": "完成时间", "aliases": ["设计时间", "日期"] },
+    { "key": "ExperimentLocation", "label": "设计地点", "aliases": ["开发地点"] }
+  ],
+  "extraLabels": [
+    { "key": "Major", "label": "专业" },
+    { "key": "College", "label": "学院" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Abstract",
+      "heading": "摘要",
+      "aliases": ["摘要", "摘要："],
+      "minChars": { "standard": 80, "full": 180 }
+    },
+    {
+      "key": "Keywords",
+      "heading": "关键词",
+      "aliases": ["关键词", "关键词："],
+      "minChars": { "standard": 8, "full": 12 }
+    },
+    {
+      "key": "Purpose",
+      "heading": "设计目标",
+      "aliases": ["设计目标", "课程设计目的", "课程设计目的与要求", "课程设计的目的与要求", "设计目的"],
+      "minChars": { "standard": 50, "full": 90 }
+    },
+    {
+      "key": "Environment",
+      "heading": "开发环境",
+      "aliases": ["开发环境", "运行环境", "设计环境", "系统的开发环境及运行环境", "开发环境及运行环境"],
+      "minChars": { "standard": 40, "full": 80 }
+    },
+    {
+      "key": "Theory",
+      "heading": "需求分析",
+      "aliases": ["需求分析", "设计需求", "任务分析", "问题分析", "问题分析（需求分析、可行性分析）", "可行性分析", "系统需求分析"],
+      "minChars": { "standard": 80, "full": 160 }
+    },
+    {
+      "key": "Steps",
+      "heading": "方案设计与实现",
+      "aliases": ["方案设计与实现", "方案设计", "系统设计", "总体设计", "详细设计", "实现过程", "设计与实现", "设计正文", "数据库设计", "模块设计", "流程图设计"],
+      "minChars": { "standard": 140, "full": 320 }
+    },
+    {
+      "key": "Results",
+      "heading": "实现结果",
+      "aliases": ["运行结果", "测试结果", "结果展示", "实现结果", "系统测试", "测试结果与分析"],
+      "minChars": { "standard": 80, "full": 180 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题与改进",
+      "aliases": ["问题与改进", "问题分析与改进", "不足与改进", "问题及解决", "问题分析", "测试分析", "改进思路"],
+      "minChars": { "standard": 50, "full": 110 }
+    },
+    {
+      "key": "Summary",
+      "heading": "设计总结",
+      "aliases": ["设计总结", "课程设计总结", "总结体会", "总结"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "References",
+      "heading": "参考文献",
+      "aliases": ["参考文献", "参考资料"],
+      "minChars": { "standard": 10, "full": 20 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "课程设计的目的与要求",
+    "设计正文",
+    "概述",
+    "系统需求分析",
+    "系统设计",
+    "系统总体设计",
+    "总体设计",
+    "详细设计",
+    "数据库设计",
+    "详细设计与实现",
+    "系统测试",
+    "测试结果",
+    "参考文献"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "开发环境截图",
+      "steps": "实现过程截图",
+      "result": "运行结果截图",
+      "analysis": "问题与改进截图",
+      "summary": "课程设计总结截图",
+      "default": "课程设计截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "ui|page|screen|界面|页面", "caption": "运行结果截图" },
+      { "pattern": "deploy|config|setup|环境|database|后端|前端", "caption": "开发环境截图" },
+      { "pattern": "flow|design|module|步骤|过程|实现", "caption": "实现过程截图" },
+      { "pattern": "analysis|bug|error|异常|问题", "caption": "问题与改进截图" }
+    ]
+  },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 650,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["设计目标", "需求分析"],
+      "blocks": [
+        { "heading": "摘要：", "sectionIds": ["abstract"] },
+        { "heading": "关键词：", "sectionIds": ["keywords"] },
+        { "heading": "一. 设计目标", "sectionIds": ["purpose"] },
+        { "heading": "二. 需求分析", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["方案设计", "设计总结"],
+      "blocks": [
+        { "heading": "三. 方案设计与实现", "sectionIds": ["steps"] },
+        { "heading": "四. 运行结果", "sectionIds": ["result"] },
+        { "heading": "五. 问题与改进", "sectionIds": ["analysis"] },
+        { "heading": "六. 设计总结", "sectionIds": ["summary"] },
+        { "heading": "参考文献", "sectionIds": ["references"] }
+      ]
+    }
+  ],
+  "paragraphCompositeRules": [
+    {
+      "matchAll": ["问题分析"],
+      "blocks": [
+        { "heading": "摘要：", "sectionIds": ["abstract"] },
+        { "heading": "关键词：", "sectionIds": ["keywords"] },
+        { "heading": "一. 课程设计的目的与要求", "sectionIds": ["purpose"] },
+        { "heading": "二. 问题分析（需求分析、可行性分析）", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["系统设计"],
+      "blocks": [
+        { "heading": "三. 开发环境", "sectionIds": ["environment"] },
+        { "heading": "四. 方案设计与实现", "sectionIds": ["steps"] }
+      ]
+    },
+    {
+      "matchAll": ["实现结果"],
+      "blocks": [
+        { "heading": "五. 实现结果", "sectionIds": ["result"] },
+        { "heading": "六. 问题与改进", "sectionIds": ["analysis"] }
+      ]
+    },
+    {
+      "matchAll": ["总结"],
+      "blocks": [
+        { "heading": "七. 设计总结", "sectionIds": ["summary"] },
+        { "heading": "参考文献", "sectionIds": ["references"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 1200,
+      "promptGuidance": [
+        "Prefer a submit-ready course design report instead of a short outline.",
+        "Include abstract and keywords when the template or course-design reference expects them.",
+        "The design and implementation section should explain both the chosen solution and the concrete execution process."
+      ]
+    },
+    "full": {
+      "minChars": 2200,
+      "promptGuidance": [
+        "Prefer a submit-ready course design report with substantial detail instead of a short outline.",
+        "Unless source material is very sparse, aim for roughly 2200 to 3200 Chinese characters.",
+        "Write in the style of a school course-design example: abstract, keywords, purpose and requirements, design body, tables or structured module/database descriptions, test results, summary, and references.",
+        "The demand analysis, design and implementation, and results sections should be the most detailed parts.",
+        "When describing the implementation, explain the module split, key design decisions, flowchart logic, test cases, and why the final result matches the original goal."
+      ]
+    }
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评"
+  ]
+}

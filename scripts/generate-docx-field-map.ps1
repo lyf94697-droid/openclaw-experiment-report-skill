@@ -11,6 +11,10 @@ param(
 
   [string]$MetadataJson,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [ValidateSet("json", "markdown")]
   [string]$Format = "json",
 
@@ -19,6 +23,13 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$fieldMapCompositeRules = @(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile)
+$paragraphCompositeRules = @(Get-ReportProfileParagraphCompositeRules -Profile $reportProfile)
 
 $labelPattern = '^(?<label>[^:\uFF1A]{1,60})[:\uFF1A]\s*(?<rest>.*)$'
 $placeholderPattern = '[_\uFF3F]{2,}|\.{3,}|\uFF08\s*\uFF09|\(\s*\)|\u25A1|\u25A0'
@@ -54,6 +65,59 @@ function Normalize-FieldKey {
   return $normalized
 }
 
+function Test-LooksLikeCommandLine {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 180) {
+    return $false
+  }
+
+  return (
+    $trimmed -match '^(?:PS\s+[^>]+>|[A-Za-z]:\\[^>]*>|>\s*)\s*\S+' -or
+    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b|gcc\b|g\+\+\b|clang\b|clang\+\+\b|make\b|cmake\b|\.\/\S+)(?:\s|$)' -or
+    $trimmed -match '(?i)^(?:reply from|pinging|packets:|minimum =|maximum =|ipv4 address|subnet mask|default gateway|physical address|ethernet adapter)\b'
+  )
+}
+
+function Test-LooksLikeCodeLine {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 240 -or (Test-LooksLikeCommandLine -Text $trimmed)) {
+    return $false
+  }
+
+  $matchesExplicitCodePattern = (
+    $trimmed -match '^(?:#\s*(?:define|include)\b|if\s*\(|else(?:\s+if\b.*)?\s*\{?|while\s*\(|for\s*\(|switch\s*\(|return\b.*;|break;|continue;|\{|\}|}\s*else(?:\s+if\b.*)?\s*\{?)' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\->\.\[\]]*\s*=\s*.+;$' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\s\*\->\.\[\]\(\)]*\([^)]*\)\s*\{?$'
+  )
+  if ($matchesExplicitCodePattern) {
+    return $true
+  }
+
+  return (
+    $trimmed -notmatch '[一-龥]' -and
+    ($trimmed -match ';$' -or $trimmed -match '\->') -and
+    $trimmed -match '[A-Za-z_]'
+  )
+}
+
 function Is-PlaceholderLike {
   param(
     [AllowNull()]
@@ -65,6 +129,46 @@ function Is-PlaceholderLike {
   }
 
   return [bool]($Text -match $placeholderPattern)
+}
+
+function Is-FillableInstructionLike {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $true
+  }
+
+  if ($normalizedText -match $labelPattern) {
+    return $false
+  }
+
+  if (Is-PlaceholderLike -Text $normalizedText) {
+    return $true
+  }
+
+  return [bool]($normalizedText -match '^[（(].*(针对|描述|给出|总结|明确|采用|验证|说明).*[）)]$')
+}
+
+function Is-ExplicitFillTargetInstructionLike {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $false
+  }
+
+  if ($normalizedText -match $labelPattern) {
+    return $false
+  }
+
+  return [bool]($normalizedText -match '^[（(].*(针对|描述|给出|总结|明确|采用|验证|说明).*[）)]$')
 }
 
 function Get-OptionFieldInfo {
@@ -230,6 +334,195 @@ function Add-Note {
   $Target.Add($Message) | Out-Null
 }
 
+function Add-Diagnostic {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Diagnostics,
+
+    [AllowNull()]
+    [object]$Notes,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Code,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Message,
+
+    [ValidateSet("info", "warning", "error")]
+    [string]$Severity = "warning",
+
+    [AllowNull()]
+    [string]$Suggestion,
+
+    [AllowNull()]
+    [object]$Context
+  )
+
+  $diagnostic = [ordered]@{
+    code = $Code
+    severity = $Severity
+    message = $Message
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($Suggestion)) {
+    $diagnostic["suggestion"] = $Suggestion
+  }
+
+  if ($null -ne $Context) {
+    $diagnostic["context"] = $Context
+  }
+
+  $Diagnostics.Add([pscustomobject]$diagnostic) | Out-Null
+  if ($null -ne $Notes) {
+    Add-Note -Target $Notes -Message $Message
+  }
+}
+
+function Get-DiagnosticCountsByProperty {
+  param(
+    [AllowNull()]
+    [object[]]$Diagnostics,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PropertyName
+  )
+
+  $counts = [ordered]@{}
+  foreach ($diagnostic in @($Diagnostics)) {
+    if ($null -eq $diagnostic) {
+      continue
+    }
+
+    $value = if ($diagnostic.PSObject.Properties.Name -contains $PropertyName) {
+      [string]$diagnostic.$PropertyName
+    } else {
+      ""
+    }
+
+    if ([string]::IsNullOrWhiteSpace($value)) {
+      continue
+    }
+
+    if (-not $counts.Contains($value)) {
+      $counts[$value] = 0
+    }
+
+    $counts[$value]++
+  }
+
+  return $counts
+}
+
+function Test-LooksLikeSectionHeading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $false
+  }
+
+  if ($normalizedText -match $labelPattern -or (Is-PlaceholderLike -Text $normalizedText)) {
+    return $false
+  }
+
+  if ($normalizedText -match '报告$') {
+    return $false
+  }
+
+  if ($normalizedText.Length -gt 40) {
+    return $false
+  }
+
+  return [bool]($normalizedText -match '^(?:#{1,6}\s*)?(?:第?[0-9一二三四五六七八九十]+(?:章|节)?[.\)\u3001]?\s*)?.*(实验|设计|原理|目的|目标|内容|环境|开发|需求|步骤|过程|实现|运行|结果|分析|总结|小结|器材|设备|任务|要求).*$')
+}
+
+function Get-CompositeCandidateSectionIds {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return @()
+  }
+
+  $matchedSectionIds = New-Object System.Collections.Generic.List[string]
+  foreach ($rule in $sectionRules) {
+    foreach ($alias in @($rule.aliases)) {
+      $aliasText = Normalize-OpenXmlText -Text ([string]$alias)
+      if ([string]::IsNullOrWhiteSpace($aliasText)) {
+        continue
+      }
+
+      if ($normalizedText -match [regex]::Escape($aliasText)) {
+        [void]$matchedSectionIds.Add([string]$rule.id)
+        break
+      }
+    }
+  }
+
+  return @($matchedSectionIds | Select-Object -Unique)
+}
+
+function Add-MetadataDiagnostic {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Diagnostics,
+
+    [Parameter(Mandatory = $true)]
+    [object]$Notes,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Label,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Location,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("paragraph", "table-cell")]
+    [string]$Source,
+
+    [bool]$IsOptionField = $false
+  )
+
+  $recognizedMetadataId = Resolve-KnownMetadataId -Key $Label
+  if ([string]::IsNullOrWhiteSpace($recognizedMetadataId)) {
+    Add-Diagnostic `
+      -Diagnostics $Diagnostics `
+      -Notes $Notes `
+      -Code "unrecognized_template_metadata_label" `
+      -Severity "warning" `
+      -Message ("Template label was detected but the profile does not recognize it: {0}" -f $Label) `
+      -Suggestion "Add a matching metadata alias to metadataFields in the report profile, or rename the template label to an existing metadata field." `
+      -Context ([ordered]@{
+          label = $Label
+          location = $Location
+          source = $Source
+          optionField = [bool]$IsOptionField
+        })
+    return
+  }
+
+  Add-Diagnostic `
+    -Diagnostics $Diagnostics `
+    -Notes $Notes `
+    -Code "missing_metadata_value" `
+    -Severity "warning" `
+    -Message ("Template label was detected but no value was available: {0}" -f $Label) `
+    -Suggestion "Provide this value in metadata JSON, or include the same metadata label and value in the report header." `
+    -Context ([ordered]@{
+        label = $Label
+        metadataId = $recognizedMetadataId
+        location = $Location
+        source = $Source
+        optionField = [bool]$IsOptionField
+      })
+}
+
 function New-MetadataRule {
   param(
     [Parameter(Mandatory = $true)]
@@ -260,29 +553,40 @@ function New-SectionRule {
   }
 }
 
+function Get-ProfileSectionFieldMapId {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$SectionField
+  )
+
+  if ($SectionField.PSObject.Properties.Name -contains "fieldMapId" -and -not [string]::IsNullOrWhiteSpace([string]$SectionField.fieldMapId)) {
+    return [string]$SectionField.fieldMapId
+  }
+
+  $sectionKey = if ($SectionField.PSObject.Properties.Name -contains "key") { [string]$SectionField.key } else { "" }
+  $resolvedSectionId = Get-ReportProfileSectionIdFromKey -Key $sectionKey
+  if (-not [string]::IsNullOrWhiteSpace($resolvedSectionId)) {
+    return $resolvedSectionId
+  }
+
+  throw "Profile section field is missing both fieldMapId and key."
+}
+
 $metadataRules = @(
-  (New-MetadataRule -Id "course_name" -Aliases @("课程名称", "课程名", "课程", "course", "coursename")),
-  (New-MetadataRule -Id "experiment_name" -Aliases @("实验名称", "实验名", "实验题目", "题目", "experiment", "experimentname", "experimenttitle", "labreporttitle")),
-  (New-MetadataRule -Id "experiment_property" -Aliases @("实验性质", "实验类型", "experimentproperty", "experimenttype", "labtype")),
-  (New-MetadataRule -Id "student_name" -Aliases @("姓名", "name", "studentname")),
-  (New-MetadataRule -Id "student_id" -Aliases @("学号", "studentid", "studentnumber", "id")),
-  (New-MetadataRule -Id "class_name" -Aliases @("班级", "classname", "class")),
-  (New-MetadataRule -Id "teacher_name" -Aliases @("指导教师", "教师", "老师", "teacher", "teachername")),
-  (New-MetadataRule -Id "experiment_date" -Aliases @("实验时间", "实验日期", "实验日期时间", "experimentdate", "experimenttime")),
-  (New-MetadataRule -Id "experiment_location" -Aliases @("实验地点", "实验位置", "experimentlocation")),
-  (New-MetadataRule -Id "date" -Aliases @("日期", "实验日期", "date")),
-  (New-MetadataRule -Id "college" -Aliases @("学院", "college")),
-  (New-MetadataRule -Id "major" -Aliases @("专业", "major"))
+  foreach ($metadataRule in @(Get-ReportProfileMetadataRules -Profile $reportProfile)) {
+    New-MetadataRule -Id ([string]$metadataRule.id) -Aliases @($metadataRule.inputAliases)
+  }
 )
 
 $sectionRules = @(
-  (New-SectionRule -Id "purpose" -Aliases @("实验目的")),
-  (New-SectionRule -Id "environment" -Aliases @("实验环境", "实验设备与环境")),
-  (New-SectionRule -Id "theory" -Aliases @("实验原理或任务要求", "实验原理", "任务要求")),
-  (New-SectionRule -Id "steps" -Aliases @("实验步骤", "实验过程", "关键代码说明")),
-  (New-SectionRule -Id "result" -Aliases @("实验结果", "实验现象与结果记录")),
-  (New-SectionRule -Id "analysis" -Aliases @("问题分析", "结果分析")),
-  (New-SectionRule -Id "summary" -Aliases @("实验总结", "总结与思考"))
+  foreach ($sectionField in @($reportProfile.sectionFields)) {
+    $aliases = @($sectionField.aliases)
+    if ($aliases.Count -eq 0 -and $sectionField.PSObject.Properties.Name -contains "heading") {
+      $aliases = @([string]$sectionField.heading)
+    }
+
+    New-SectionRule -Id (Get-ProfileSectionFieldMapId -SectionField $sectionField) -Aliases $aliases
+  }
 )
 
 $metadataAliasLookup = @{}
@@ -293,6 +597,24 @@ foreach ($rule in $metadataRules) {
       $metadataAliasLookup[$normalizedAlias] = $rule.id
     }
   }
+}
+
+function Resolve-KnownMetadataId {
+  param(
+    [AllowNull()]
+    [string]$Key
+  )
+
+  $normalized = Normalize-FieldKey -Text $Key
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return $null
+  }
+
+  if ($metadataAliasLookup.ContainsKey($normalized)) {
+    return [string]$metadataAliasLookup[$normalized]
+  }
+
+  return $null
 }
 
 function Resolve-MetadataId {
@@ -457,6 +779,170 @@ function Resolve-SectionRule {
   return $null
 }
 
+function Test-IsDecimalSubheading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return [bool]((Normalize-OpenXmlText -Text $Text) -match '^\d+\.\d+(?:\.\d+)?\s+\S+')
+}
+
+function Split-ToSentenceList {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return @()
+  }
+
+  $sentences = @(
+    [regex]::Split($normalizedText, '(?<=[。！？；])\s*') |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  )
+
+  if ($sentences.Count -eq 0) {
+    return @($normalizedText)
+  }
+
+  return @($sentences)
+}
+
+function Get-CourseDesignSubheadingTitles {
+  param(
+    [AllowNull()]
+    [string]$SectionId
+  )
+
+  $normalizedSectionId = if ([string]::IsNullOrWhiteSpace($SectionId)) { '' } else { ([string]$SectionId).ToLowerInvariant() }
+  switch ($normalizedSectionId) {
+    'purpose' {
+      return @(
+        '1.1 课程设计目标',
+        '1.2 基本要求与约束'
+      )
+    }
+    'theory' {
+      return @(
+        '2.1 业务需求分析',
+        '2.2 可行性分析'
+      )
+    }
+    'environment' {
+      return @(
+        '3.1 开发工具与运行环境',
+        '3.2 数据与调试配置'
+      )
+    }
+    'steps' {
+      return @(
+        '4.1 系统总体设计',
+        '4.2 功能模块设计',
+        '4.3 业务流程设计',
+        '4.4 关键实现要点'
+      )
+    }
+    'result' {
+      return @(
+        '5.1 核心功能结果',
+        '5.2 演示与测试情况'
+      )
+    }
+    'analysis' {
+      return @(
+        '6.1 现存问题分析',
+        '6.2 后续改进方向'
+      )
+    }
+    'summary' {
+      return @(
+        '7.1 课程设计收获',
+        '7.2 后续优化展望'
+      )
+    }
+    default {
+      return @()
+    }
+  }
+}
+
+function Expand-CourseDesignSectionParagraphs {
+  param(
+    [AllowNull()]
+    [string]$SectionId,
+
+    [AllowNull()]
+    [object]$SectionInfo
+  )
+
+  if ($null -eq $SectionInfo) {
+    return $SectionInfo
+  }
+
+  $titles = @(Get-CourseDesignSubheadingTitles -SectionId $SectionId)
+  if ($titles.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  $existingParagraphs = @($SectionInfo.paragraphs)
+  if ($existingParagraphs.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  if (@($existingParagraphs | Where-Object { Test-IsDecimalSubheading -Text ([string]$_) }).Count -gt 0) {
+    return $SectionInfo
+  }
+
+  $sentenceList = New-Object System.Collections.Generic.List[string]
+  foreach ($paragraph in $existingParagraphs) {
+    foreach ($sentence in @(Split-ToSentenceList -Text ([string]$paragraph))) {
+      [void]$sentenceList.Add($sentence)
+    }
+  }
+
+  if ($sentenceList.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  $groupCount = [Math]::Min($titles.Count, $sentenceList.Count)
+  if ($groupCount -le 0) {
+    return $SectionInfo
+  }
+
+  $expandedParagraphs = New-Object System.Collections.Generic.List[string]
+  $cursor = 0
+  for ($index = 0; $index -lt $groupCount; $index++) {
+    [void]$expandedParagraphs.Add([string]$titles[$index])
+
+    $remainingSentenceCount = $sentenceList.Count - $cursor
+    $remainingGroupCount = $groupCount - $index
+    $takeCount = [Math]::Ceiling($remainingSentenceCount / [double]$remainingGroupCount)
+    $groupSentences = New-Object System.Collections.Generic.List[string]
+    for ($offset = 0; $offset -lt $takeCount -and $cursor -lt $sentenceList.Count; $offset++) {
+      [void]$groupSentences.Add([string]$sentenceList[$cursor])
+      $cursor++
+    }
+
+    $groupText = Normalize-OpenXmlText -Text ($groupSentences -join '')
+    if (-not [string]::IsNullOrWhiteSpace($groupText)) {
+      [void]$expandedParagraphs.Add($groupText)
+    }
+  }
+
+  return [pscustomobject]@{
+    headingText = $SectionInfo.headingText
+    text = $SectionInfo.text
+    paragraphs = @($expandedParagraphs.ToArray())
+  }
+}
+
 function Convert-ToParagraphList {
   param(
     [AllowNull()]
@@ -476,6 +962,17 @@ function Convert-ToParagraphList {
         [void]$paragraphs.Add((Normalize-OpenXmlText -Text ($buffer -join ' ')))
         $buffer.Clear()
       }
+      continue
+    }
+
+    $preserveStandaloneLine = (Test-LooksLikeCommandLine -Text $trimmedLine) -or (Test-LooksLikeCodeLine -Text $trimmedLine)
+    if ($preserveStandaloneLine) {
+      if ($buffer.Count -gt 0) {
+        [void]$paragraphs.Add((Normalize-OpenXmlText -Text ($buffer -join ' ')))
+        $buffer.Clear()
+      }
+
+      [void]$paragraphs.Add((Normalize-OpenXmlText -Text $trimmedLine))
       continue
     }
 
@@ -582,6 +1079,12 @@ function Get-ReportAnalysis {
     }
   }
 
+  if ([string]::Equals([string]$reportProfile.name, 'course-design-report', [System.StringComparison]::OrdinalIgnoreCase)) {
+    foreach ($sectionId in @($sectionsById.Keys)) {
+      $sectionsById[$sectionId] = Expand-CourseDesignSectionParagraphs -SectionId ([string]$sectionId) -SectionInfo $sectionsById[$sectionId]
+    }
+  }
+
   return @{
     SectionsById = $sectionsById
   }
@@ -593,7 +1096,6 @@ function Get-TemplateAnalysis {
     [string]$DocxPath
   )
 
-  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
   $analysisText = & (Join-Path $repoRoot "scripts\extract-docx-template.ps1") -Path $DocxPath -Format json | Out-String
   $analysis = $analysisText | ConvertFrom-Json
   if ($null -eq $analysis) {
@@ -629,6 +1131,86 @@ function Add-SectionParagraphBlock {
   return $true
 }
 
+function Get-CompositeFillSpec {
+  param(
+    [AllowNull()]
+    [string]$Text,
+
+    [AllowNull()]
+    [object[]]$Rules,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$SectionsById
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $null
+  }
+
+  $paragraphs = New-Object System.Collections.Generic.List[string]
+  $mappedSectionIds = New-Object System.Collections.Generic.List[string]
+
+  foreach ($compositeRule in @($Rules)) {
+    $matchesRule = $true
+    foreach ($pattern in @($compositeRule.matchAll)) {
+      if ([string]::IsNullOrWhiteSpace([string]$pattern) -or $normalizedText -notmatch [string]$pattern) {
+        $matchesRule = $false
+        break
+      }
+    }
+
+    if (-not $matchesRule) {
+      continue
+    }
+
+    foreach ($block in @($compositeRule.blocks)) {
+      $blockAdded = $false
+      foreach ($sectionId in @($block.sectionIds)) {
+        if (-not $SectionsById.ContainsKey([string]$sectionId)) {
+          continue
+        }
+
+        $sectionInfo = $SectionsById[[string]$sectionId]
+        if ($null -eq $sectionInfo -or @($sectionInfo.paragraphs).Count -eq 0) {
+          continue
+        }
+
+        if (-not $blockAdded -and -not [string]::IsNullOrWhiteSpace([string]$block.heading)) {
+          [void]$paragraphs.Add([string]$block.heading)
+          $blockAdded = $true
+        }
+
+        foreach ($paragraph in @($sectionInfo.paragraphs)) {
+          if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
+            [void]$paragraphs.Add([string]$paragraph)
+          }
+        }
+        [void]$mappedSectionIds.Add([string]$sectionId)
+      }
+    }
+
+    if ($paragraphs.Count -gt 0 -and $mappedSectionIds.Count -gt 0) {
+      $throughRowOffset = 0
+      if ($compositeRule.PSObject.Properties.Name -contains "throughRowOffset" -and $null -ne $compositeRule.throughRowOffset) {
+        try {
+          $throughRowOffset = [Math]::Max(0, [int]$compositeRule.throughRowOffset)
+        } catch {
+          $throughRowOffset = 0
+        }
+      }
+
+      return [pscustomobject]@{
+        Paragraphs = @($paragraphs)
+        MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
+        ThroughRowOffset = $throughRowOffset
+      }
+    }
+  }
+
+  return $null
+}
+
 function Get-CompositeCellFillSpec {
   param(
     [AllowNull()]
@@ -638,68 +1220,19 @@ function Get-CompositeCellFillSpec {
     [hashtable]$SectionsById
   )
 
-  $normalizedCellText = Normalize-OpenXmlText -Text $CellText
-  if ([string]::IsNullOrWhiteSpace($normalizedCellText)) {
-    return $null
-  }
+  return Get-CompositeFillSpec -Text $CellText -Rules $fieldMapCompositeRules -SectionsById $SectionsById
+}
 
-  $paragraphs = New-Object System.Collections.Generic.List[string]
-  $mappedSectionIds = New-Object System.Collections.Generic.List[string]
+function Get-CompositeParagraphFillSpec {
+  param(
+    [AllowNull()]
+    [string]$ParagraphText,
 
-  if (($normalizedCellText -match '实验目的') -and ($normalizedCellText -match '实验内容')) {
-    if (Add-SectionParagraphBlock -Target $paragraphs -Heading '一. 实验目的' -SectionInfo $SectionsById["purpose"]) {
-      [void]$mappedSectionIds.Add("purpose")
-    }
+    [Parameter(Mandatory = $true)]
+    [hashtable]$SectionsById
+  )
 
-    $contentAdded = $false
-    if ($SectionsById.ContainsKey("environment") -and @($SectionsById["environment"].paragraphs).Count -gt 0) {
-      if (-not $contentAdded) {
-        [void]$paragraphs.Add('二. 实验内容')
-        $contentAdded = $true
-      }
-      foreach ($paragraph in @($SectionsById["environment"].paragraphs)) {
-        if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
-          [void]$paragraphs.Add([string]$paragraph)
-        }
-      }
-      [void]$mappedSectionIds.Add("environment")
-    }
-
-    if ($SectionsById.ContainsKey("theory") -and @($SectionsById["theory"].paragraphs).Count -gt 0) {
-      if (-not $contentAdded) {
-        [void]$paragraphs.Add('二. 实验内容')
-        $contentAdded = $true
-      }
-      foreach ($paragraph in @($SectionsById["theory"].paragraphs)) {
-        if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
-          [void]$paragraphs.Add([string]$paragraph)
-        }
-      }
-      [void]$mappedSectionIds.Add("theory")
-    }
-  }
-
-  if (($normalizedCellText -match '实验步骤') -and ($normalizedCellText -match '实验小结')) {
-    foreach ($entry in @(
-        @{ id = "steps"; heading = "三. 实验步骤" },
-        @{ id = "result"; heading = "四. 实验结果" },
-        @{ id = "analysis"; heading = "五. 问题分析" },
-        @{ id = "summary"; heading = "六.实验小结" }
-      )) {
-      if (Add-SectionParagraphBlock -Target $paragraphs -Heading $entry.heading -SectionInfo $SectionsById[$entry.id]) {
-        [void]$mappedSectionIds.Add($entry.id)
-      }
-    }
-  }
-
-  if ($paragraphs.Count -eq 0 -or $mappedSectionIds.Count -eq 0) {
-    return $null
-  }
-
-  return [pscustomobject]@{
-    Paragraphs = @($paragraphs)
-    MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
-  }
+  return Get-CompositeFillSpec -Text $ParagraphText -Rules $paragraphCompositeRules -SectionsById $SectionsById
 }
 
 function Get-CompositeTableBodyFillSpec {
@@ -732,6 +1265,29 @@ function Get-CompositeTableBodyFillSpec {
     }
   }
 
+  $maxThroughRowOffset = 0
+  foreach ($entry in $orderedEntries) {
+    $entryThroughRowOffset = 0
+    if ($entry.PSObject.Properties.Name -contains "ThroughRowOffset" -and $null -ne $entry.ThroughRowOffset) {
+      try {
+        $entryThroughRowOffset = [Math]::Max(0, [int]$entry.ThroughRowOffset)
+      } catch {
+        $entryThroughRowOffset = 0
+      }
+    }
+
+    if ($entryThroughRowOffset -gt $maxThroughRowOffset) {
+      $maxThroughRowOffset = $entryThroughRowOffset
+    }
+  }
+
+  $expandedThroughRowIndex = [Math]::Min($tableRowCount, ($throughRowIndex + $maxThroughRowOffset))
+  $expandedThroughLocation = if ($expandedThroughRowIndex -eq $throughRowIndex) {
+    [string]$orderedEntries[-1].Location
+  } else {
+    [string]$TableBlock.rows[$expandedThroughRowIndex - 1].cells[0].location
+  }
+
   $paragraphs = New-Object System.Collections.Generic.List[string]
   $mappedSectionIds = New-Object System.Collections.Generic.List[string]
 
@@ -755,7 +1311,7 @@ function Get-CompositeTableBodyFillSpec {
 
   return [pscustomobject]@{
     StartLocation = [string]$orderedEntries[0].Location
-    ThroughLocation = [string]$orderedEntries[-1].Location
+    ThroughLocation = $expandedThroughLocation
     Paragraphs = @($paragraphs)
     MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
   }
@@ -786,7 +1342,10 @@ function Add-FieldMapEntry {
     [object]$Value,
 
     [Parameter(Mandatory = $true)]
-    [object]$Notes
+    [object]$Notes,
+
+    [AllowNull()]
+    [object]$Diagnostics
   )
 
   if ([string]::IsNullOrWhiteSpace($Key)) {
@@ -795,7 +1354,16 @@ function Add-FieldMapEntry {
 
   if ($FieldMap.Contains($Key)) {
     if ((ConvertTo-JsonComparable -Value $FieldMap[$Key]) -ne (ConvertTo-JsonComparable -Value $Value)) {
-      Add-Note -Target $Notes -Message ("Duplicate template field skipped because a different value was already selected: {0}" -f $Key)
+      Add-Diagnostic `
+        -Diagnostics $Diagnostics `
+        -Notes $Notes `
+        -Code "duplicate_template_field_conflict" `
+        -Severity "warning" `
+        -Message ("Duplicate template field skipped because a different value was already selected: {0}" -f $Key) `
+        -Suggestion "Make the target placeholder unique in the template, or remove the conflicting duplicate block." `
+        -Context ([ordered]@{
+            key = $Key
+          })
     }
     return $false
   }
@@ -806,6 +1374,14 @@ function Add-FieldMapEntry {
 
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $reportInfo = Get-ReportInput -TextPath $ReportPath -InlineText $ReportText
+$reportInputMode = if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { "path" } else { "inline" }
+$metadataInputMode = if (-not [string]::IsNullOrWhiteSpace($MetadataPath)) {
+  "path"
+} elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
+  "inline"
+} else {
+  "none"
+}
 $metadataValues = @{}
 Import-OptionalMetadata -PathToJson $MetadataPath -InlineJson $MetadataJson -MetadataValues $metadataValues
 $reportAnalysis = Get-ReportAnalysis -Text ([string]$reportInfo.Text) -MetadataValues $metadataValues
@@ -813,6 +1389,7 @@ $templateAnalysis = Get-TemplateAnalysis -DocxPath $resolvedTemplatePath
 
 $fieldMap = [ordered]@{}
 $notes = New-Object System.Collections.Generic.List[string]
+$diagnostics = New-Object System.Collections.Generic.List[object]
 $mappedMetadataCount = 0
 $mappedSectionCount = 0
 
@@ -825,14 +1402,49 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
       continue
     }
 
+    if (Is-FillableInstructionLike -Text $paragraphText) {
+      continue
+    }
+
+    $paragraphCompositeFill = Get-CompositeParagraphFillSpec -ParagraphText $paragraphText -SectionsById $reportAnalysis.SectionsById
+    if ($null -ne $paragraphCompositeFill) {
+      $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
+      $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
+      $fieldMapKey = if ($nextBlockIsFillTarget -and -not [string]::IsNullOrWhiteSpace([string]$nextBlock.location)) {
+        [string]$nextBlock.location
+      } else {
+        $paragraphText
+      }
+      $sectionValue = if ($nextBlockIsFillTarget) {
+        @($paragraphCompositeFill.Paragraphs)
+      } else {
+        [ordered]@{
+          mode = "after"
+          paragraphs = @($paragraphCompositeFill.Paragraphs)
+        }
+      }
+
+      if (Add-FieldMapEntry -FieldMap $fieldMap -Key $fieldMapKey -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
+        $mappedSectionCount += @($paragraphCompositeFill.MappedSectionIds).Count
+      }
+      continue
+    }
+
     $sectionRule = Resolve-SectionRule -HeadingText $paragraphText
     if ($null -ne $sectionRule) {
       if ($reportAnalysis.SectionsById.ContainsKey($sectionRule.id)) {
         $sectionInfo = $reportAnalysis.SectionsById[$sectionRule.id]
         if (@($sectionInfo.paragraphs).Count -gt 0) {
           $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
-          $useAfter = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-PlaceholderLike -Text ([string]$nextBlock.text))
-          $sectionValue = if ($useAfter) {
+          $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
+          $fieldMapKey = if ($nextBlockIsFillTarget -and -not [string]::IsNullOrWhiteSpace([string]$nextBlock.location)) {
+            [string]$nextBlock.location
+          } else {
+            $paragraphText
+          }
+          $sectionValue = if ($nextBlockIsFillTarget) {
+            @($sectionInfo.paragraphs)
+          } elseif (($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-PlaceholderLike -Text ([string]$nextBlock.text))) {
             [ordered]@{
               mode = "after"
               paragraphs = @($sectionInfo.paragraphs)
@@ -843,17 +1455,53 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
             @($sectionInfo.paragraphs)
           }
 
-          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $paragraphText -Value $sectionValue -Notes $notes) {
+          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $fieldMapKey -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
             $mappedSectionCount++
           }
         } else {
-          Add-Note -Target $notes -Message ("Report section is present but empty: {0}" -f $paragraphText)
+          Add-Diagnostic `
+            -Diagnostics $diagnostics `
+            -Notes $notes `
+            -Code "empty_report_section" `
+            -Severity "warning" `
+            -Message ("Report section is present but empty: {0}" -f $paragraphText) `
+            -Suggestion "Fill this section in the report draft, or remove the placeholder section from the template if it is optional." `
+            -Context ([ordered]@{
+                heading = $paragraphText
+                sectionId = [string]$sectionRule.id
+                location = [string]$block.location
+              })
         }
       } else {
-        Add-Note -Target $notes -Message ("Template section has no matching report section: {0}" -f $paragraphText)
+        Add-Diagnostic `
+          -Diagnostics $diagnostics `
+          -Notes $notes `
+          -Code "missing_report_section" `
+          -Severity "warning" `
+          -Message ("Template section has no matching report section: {0}" -f $paragraphText) `
+          -Suggestion "Add this section to the report draft, or extend sectionFields aliases in the report profile if the template uses a different heading name." `
+          -Context ([ordered]@{
+              heading = $paragraphText
+              sectionId = [string]$sectionRule.id
+              location = [string]$block.location
+            })
       }
 
       continue
+    }
+
+    if (Test-LooksLikeSectionHeading -Text $paragraphText) {
+      Add-Diagnostic `
+        -Diagnostics $diagnostics `
+        -Notes $notes `
+        -Code "unrecognized_template_section_heading" `
+        -Severity "warning" `
+        -Message ("Template heading looks like a report section, but no profile section rule matched it: {0}" -f $paragraphText) `
+        -Suggestion "Add this heading as a sectionFields alias in the report profile, or rename the template heading to an existing section heading." `
+        -Context ([ordered]@{
+            heading = $paragraphText
+            location = [string]$block.location
+          })
     }
 
     if ($paragraphText -match $labelPattern) {
@@ -862,20 +1510,25 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
       $optionFieldValue = Get-MetadataValue -MetadataValues $metadataValues -Key $label
       $resolvedOptionFieldText = Resolve-OptionFieldText -TemplateText $paragraphText -SelectionText $optionFieldValue
       if (-not [string]::IsNullOrWhiteSpace($resolvedOptionFieldText)) {
-        if (Add-FieldMapEntry -FieldMap $fieldMap -Key ([string]$block.location) -Value $resolvedOptionFieldText -Notes $notes) {
+        if (Add-FieldMapEntry -FieldMap $fieldMap -Key ([string]$block.location) -Value $resolvedOptionFieldText -Notes $notes -Diagnostics $diagnostics) {
           $mappedMetadataCount++
         }
+        continue
+      }
+
+      if ($null -ne (Get-OptionFieldInfo -Text $paragraphText)) {
+        Add-MetadataDiagnostic -Diagnostics $diagnostics -Notes $notes -Label $label -Location ([string]$block.location) -Source "paragraph" -IsOptionField $true
         continue
       }
 
       if ([string]::IsNullOrWhiteSpace($rest) -or (Is-PlaceholderLike -Text $rest)) {
         $value = Get-MetadataValue -MetadataValues $metadataValues -Key $label
         if (-not [string]::IsNullOrWhiteSpace($value)) {
-          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $label -Value $value -Notes $notes) {
+          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $label -Value $value -Notes $notes -Diagnostics $diagnostics) {
             $mappedMetadataCount++
           }
         } else {
-          Add-Note -Target $notes -Message ("Template label was detected but no value was available: {0}" -f $label)
+          Add-MetadataDiagnostic -Diagnostics $diagnostics -Notes $notes -Label $label -Location ([string]$block.location) -Source "paragraph"
         }
       }
     }
@@ -903,8 +1556,25 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
               CellIndex = $cellIndex + 1
               Paragraphs = @($compositeCellFill.Paragraphs)
               MappedSectionIds = @($compositeCellFill.MappedSectionIds)
+              ThroughRowOffset = $(if ($compositeCellFill.PSObject.Properties.Name -contains "ThroughRowOffset") { [int]$compositeCellFill.ThroughRowOffset } else { 0 })
             }) | Out-Null
           continue
+        }
+
+        $compositeCandidateSectionIds = @(Get-CompositeCandidateSectionIds -Text $cellText)
+        if ($compositeCandidateSectionIds.Count -ge 2) {
+          Add-Diagnostic `
+            -Diagnostics $diagnostics `
+            -Notes $notes `
+            -Code "unmatched_composite_template_cell" `
+            -Severity "warning" `
+            -Message ("Template cell looks like a composite body container, but no profile composite rule matched it: {0}" -f $cellText) `
+            -Suggestion "Add a matching fieldMapCompositeRules entry to the report profile, or split this cell into separate section placeholders." `
+            -Context ([ordered]@{
+                cellText = $cellText
+                location = [string]$cell.location
+                matchedSectionIds = @($compositeCandidateSectionIds)
+              })
         }
 
         if ($cellText -match $labelPattern) {
@@ -913,20 +1583,25 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
           $optionFieldValue = Get-MetadataValue -MetadataValues $metadataValues -Key $label
           $resolvedOptionFieldText = Resolve-OptionFieldText -TemplateText $cellText -SelectionText $optionFieldValue
           if (-not [string]::IsNullOrWhiteSpace($resolvedOptionFieldText)) {
-            if (Add-FieldMapEntry -FieldMap $fieldMap -Key ([string]$cell.location) -Value $resolvedOptionFieldText -Notes $notes) {
+            if (Add-FieldMapEntry -FieldMap $fieldMap -Key ([string]$cell.location) -Value $resolvedOptionFieldText -Notes $notes -Diagnostics $diagnostics) {
               $mappedMetadataCount++
             }
+            continue
+          }
+
+          if ($null -ne (Get-OptionFieldInfo -Text $cellText)) {
+            Add-MetadataDiagnostic -Diagnostics $diagnostics -Notes $notes -Label $label -Location ([string]$cell.location) -Source "table-cell" -IsOptionField $true
             continue
           }
 
           if ([string]::IsNullOrWhiteSpace($rest) -or (Is-PlaceholderLike -Text $rest)) {
             $value = Get-MetadataValue -MetadataValues $metadataValues -Key $label
             if (-not [string]::IsNullOrWhiteSpace($value)) {
-              if (Add-FieldMapEntry -FieldMap $fieldMap -Key $label -Value $value -Notes $notes) {
+              if (Add-FieldMapEntry -FieldMap $fieldMap -Key $label -Value $value -Notes $notes -Diagnostics $diagnostics) {
                 $mappedMetadataCount++
               }
             } else {
-              Add-Note -Target $notes -Message ("Table label was detected but no value was available: {0}" -f $label)
+              Add-MetadataDiagnostic -Diagnostics $diagnostics -Notes $notes -Label $label -Location ([string]$cell.location) -Source "table-cell"
             }
           }
           continue
@@ -938,11 +1613,37 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
           if (Is-PlaceholderLike -Text $nextText) {
             $value = Get-MetadataValue -MetadataValues $metadataValues -Key $cellText
             if (-not [string]::IsNullOrWhiteSpace($value)) {
-              if (Add-FieldMapEntry -FieldMap $fieldMap -Key $cellText -Value $value -Notes $notes) {
+              if (Add-FieldMapEntry -FieldMap $fieldMap -Key $cellText -Value $value -Notes $notes -Diagnostics $diagnostics) {
                 $mappedMetadataCount++
               }
+            } else {
+              Add-MetadataDiagnostic -Diagnostics $diagnostics -Notes $notes -Label $cellText -Location ([string]$nextCell.location) -Source "table-cell"
             }
+          } elseif (Test-LooksLikeSectionHeading -Text $cellText) {
+            Add-Diagnostic `
+              -Diagnostics $diagnostics `
+              -Notes $notes `
+              -Code "unrecognized_template_section_heading" `
+              -Severity "warning" `
+              -Message ("Template heading looks like a report section, but no profile section rule matched it: {0}" -f $cellText) `
+              -Suggestion "Add this heading as a sectionFields alias in the report profile, or rename the template heading to an existing section heading." `
+              -Context ([ordered]@{
+                  heading = $cellText
+                  location = [string]$cell.location
+                })
           }
+        } elseif (Test-LooksLikeSectionHeading -Text $cellText) {
+          Add-Diagnostic `
+            -Diagnostics $diagnostics `
+            -Notes $notes `
+            -Code "unrecognized_template_section_heading" `
+            -Severity "warning" `
+            -Message ("Template heading looks like a report section, but no profile section rule matched it: {0}" -f $cellText) `
+            -Suggestion "Add this heading as a sectionFields alias in the report profile, or rename the template heading to an existing section heading." `
+            -Context ([ordered]@{
+                heading = $cellText
+                location = [string]$cell.location
+              })
         }
       }
     }
@@ -958,13 +1659,24 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
         paragraphs = @($tableCompositeBodyFill.Paragraphs)
       }
 
-      if (Add-FieldMapEntry -FieldMap $fieldMap -Key $tableCompositeBodyFill.StartLocation -Value $tableBodyValue -Notes $notes) {
+      if (Add-FieldMapEntry -FieldMap $fieldMap -Key $tableCompositeBodyFill.StartLocation -Value $tableBodyValue -Notes $notes -Diagnostics $diagnostics) {
         $mappedSectionCount += @($tableCompositeBodyFill.MappedSectionIds).Count
-        Add-Note -Target $notes -Message ("Composite table body will be moved after the cover table: {0} -> {1}" -f $tableCompositeBodyFill.StartLocation, $tableCompositeBodyFill.ThroughLocation)
+        Add-Diagnostic `
+          -Diagnostics $diagnostics `
+          -Notes $notes `
+          -Code "composite_body_after_table" `
+          -Severity "info" `
+          -Message ("Composite table body will be moved after the cover table: {0} -> {1}" -f $tableCompositeBodyFill.StartLocation, $tableCompositeBodyFill.ThroughLocation) `
+          -Suggestion "This is expected for cover/body hybrid templates. If the placement is wrong, adjust the template rows or fieldMapCompositeRules." `
+          -Context ([ordered]@{
+              startLocation = [string]$tableCompositeBodyFill.StartLocation
+              throughLocation = [string]$tableCompositeBodyFill.ThroughLocation
+              mappedSectionIds = @($tableCompositeBodyFill.MappedSectionIds)
+            })
       }
     } else {
       foreach ($compositeEntry in $tableCompositeEntries) {
-        if (Add-FieldMapEntry -FieldMap $fieldMap -Key $compositeEntry.Location -Value @($compositeEntry.Paragraphs) -Notes $notes) {
+        if (Add-FieldMapEntry -FieldMap $fieldMap -Key $compositeEntry.Location -Value @($compositeEntry.Paragraphs) -Notes $notes -Diagnostics $diagnostics) {
           $mappedSectionCount += @($compositeEntry.MappedSectionIds).Count
         }
       }
@@ -975,15 +1687,23 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
 $result = [ordered]@{
   templatePath = $resolvedTemplatePath
   reportSource = $reportInfo.Source
+  reportProfileName = [string]$reportProfile.name
+  reportProfilePath = [string]$reportProfile.resolvedProfilePath
+  reportInputMode = $reportInputMode
+  metadataInputMode = $metadataInputMode
   summary = [ordered]@{
     metadataValueCount = $metadataValues.Count
     reportSectionCount = $reportAnalysis.SectionsById.Count
     fieldCount = $fieldMap.Count
     mappedMetadataCount = $mappedMetadataCount
     mappedSectionCount = $mappedSectionCount
+    diagnosticCount = $diagnostics.Count
+    diagnosticCountsByCode = (Get-DiagnosticCountsByProperty -Diagnostics ([object[]]$diagnostics) -PropertyName "code")
+    diagnosticCountsBySeverity = (Get-DiagnosticCountsByProperty -Diagnostics ([object[]]$diagnostics) -PropertyName "severity")
     noteCount = $notes.Count
   }
   fieldMap = $fieldMap
+  diagnostics = ([object[]]$diagnostics)
   notes = @($notes)
 }
 
@@ -998,6 +1718,7 @@ if ($Format -eq "json") {
   [void]$lines.Add("- Metadata values: $($result.summary.metadataValueCount)")
   [void]$lines.Add("- Report sections: $($result.summary.reportSectionCount)")
   [void]$lines.Add("- Generated fields: $($result.summary.fieldCount)")
+  [void]$lines.Add("- Diagnostics: $($result.summary.diagnosticCount)")
   [void]$lines.Add("- Notes: $($result.summary.noteCount)")
   [void]$lines.Add("")
   [void]$lines.Add("## Field Map JSON")
@@ -1005,6 +1726,19 @@ if ($Format -eq "json") {
   $fieldMapJson = $result.fieldMap | ConvertTo-Json -Depth 10
   [void]$lines.Add($fieldMapJson)
   [void]$lines.Add('```')
+  [void]$lines.Add("")
+  [void]$lines.Add("## Diagnostics")
+  if ($diagnostics.Count -eq 0) {
+    [void]$lines.Add("- None")
+  } else {
+    foreach ($diagnostic in $diagnostics) {
+      $line = "- [$($diagnostic.severity)] [$($diagnostic.code)] $($diagnostic.message)"
+      if ($diagnostic.PSObject.Properties.Name -contains "suggestion" -and -not [string]::IsNullOrWhiteSpace([string]$diagnostic.suggestion)) {
+        $line = "$line Suggestion: $([string]$diagnostic.suggestion)"
+      }
+      [void]$lines.Add($line)
+    }
+  }
   [void]$lines.Add("")
   [void]$lines.Add("## Notes")
   if ($notes.Count -eq 0) {

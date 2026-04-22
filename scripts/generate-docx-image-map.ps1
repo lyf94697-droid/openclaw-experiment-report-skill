@@ -9,8 +9,14 @@ param(
 
   [string[]]$ImagePaths,
 
+  [string]$ReportProfileName = "experiment-report",
+
+  [string]$ReportProfilePath,
+
   [ValidateSet("json", "markdown")]
   [string]$Format = "json",
+
+  [switch]$PlanOnly,
 
   [string]$OutFile
 )
@@ -21,18 +27,13 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+. (Join-Path $PSScriptRoot "report-profiles.ps1")
+
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $script:RepoRoot
 $wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 $defaultImageWidthCm = 10.5
-$sectionRules = @(
-  [pscustomobject]@{ id = "purpose"; canonicalLabel = "实验目的"; headingAliases = @("实验目的"); inputAliases = @("purpose", "实验目的") },
-  [pscustomobject]@{ id = "environment"; canonicalLabel = "实验环境"; headingAliases = @("实验环境", "实验设备与环境"); inputAliases = @("environment", "实验环境", "实验设备与环境") },
-  [pscustomobject]@{ id = "theory"; canonicalLabel = "实验原理或任务要求"; headingAliases = @("实验原理或任务要求", "实验原理", "任务要求"); inputAliases = @("theory", "实验原理或任务要求", "实验原理", "任务要求") },
-  [pscustomobject]@{ id = "steps"; canonicalLabel = "实验步骤"; headingAliases = @("实验步骤", "实验过程"); inputAliases = @("steps", "step", "实验步骤", "实验过程") },
-  [pscustomobject]@{ id = "result"; canonicalLabel = "实验结果"; headingAliases = @("实验结果", "实验现象与结果记录"); inputAliases = @("result", "results", "实验结果", "实验现象与结果记录") },
-  [pscustomobject]@{ id = "analysis"; canonicalLabel = "问题分析"; headingAliases = @("问题分析", "结果分析"); inputAliases = @("analysis", "问题分析", "结果分析") },
-  [pscustomobject]@{ id = "summary"; canonicalLabel = "实验总结"; headingAliases = @("实验总结", "总结与思考", "实验小结"); inputAliases = @("summary", "实验总结", "总结与思考", "实验小结") }
-)
+$sectionRules = @()
 $sectionInputAliasLookup = @{}
 $sectionRuleLookup = @{}
 $script:ImagePathProbeRoots = @()
@@ -207,6 +208,8 @@ function Normalize-TargetSelector {
 
   return $trimmed
 }
+
+$sectionRules = @(Get-ReportProfileSectionRules -Profile $reportProfile)
 
 foreach ($rule in $sectionRules) {
   $sectionRuleLookup[$rule.id] = $rule
@@ -410,6 +413,40 @@ function Resolve-SectionId {
   return $null
 }
 
+function Resolve-AvailableSectionId {
+  param(
+    [AllowNull()]
+    [string]$RequestedSectionId,
+
+    [AllowEmptyCollection()]
+    [string[]]$AvailableSectionIds
+  )
+
+  $resolvedAvailableSectionIds = @($AvailableSectionIds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+  if ([string]::IsNullOrWhiteSpace($RequestedSectionId) -or $resolvedAvailableSectionIds.Count -eq 0) {
+    return $null
+  }
+
+  if ($resolvedAvailableSectionIds -contains $RequestedSectionId) {
+    return $RequestedSectionId
+  }
+
+  $preferredOrder = New-Object System.Collections.Generic.List[string]
+  foreach ($candidate in @($RequestedSectionId) + @(Get-ReportProfileImageFallbackSectionOrder -Profile $reportProfile)) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and -not $preferredOrder.Contains($candidate)) {
+      $preferredOrder.Add($candidate) | Out-Null
+    }
+  }
+
+  foreach ($candidate in $preferredOrder) {
+    if ($resolvedAvailableSectionIds -contains $candidate) {
+      return $candidate
+    }
+  }
+
+  return $resolvedAvailableSectionIds[0]
+}
+
 function Get-ZipEntryText {
   param(
     [Parameter(Mandatory = $true)]
@@ -582,6 +619,27 @@ function Resolve-ImageInputSpec {
     AnchorProvided = (-not [string]::IsNullOrWhiteSpace($anchor))
     Layout = $layout
   }
+}
+
+function Test-IsCourseDesignFlowchartImageSpec {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$ImageSpec
+  )
+
+  $signals = @(
+    [string]$ImageSpec.Caption,
+    [string]$ImageSpec.SectionName,
+    [string]$ImageSpec.BaseName
+  )
+
+  foreach ($signal in $signals) {
+    if (-not [string]::IsNullOrWhiteSpace($signal) -and $signal -match '(?i)(流程图|flowchart|flow-chart)') {
+      return $true
+    }
+  }
+
+  return $false
 }
 
 function New-ImageLayoutOutput {
@@ -866,18 +924,26 @@ function Get-FallbackSectionId {
   )
 
   $stepResultSplitIndex = [int][Math]::Ceiling($Total / 2.0)
+  $fallbackSectionOrder = @(Get-ReportProfileImageFallbackSectionOrder -Profile $reportProfile)
+  $preferredOrder = New-Object System.Collections.Generic.List[string]
 
   foreach ($preferred in @(
       $(if ($Total -eq 1) { "steps" } else { $null }),
       $(if ($Total -gt 1 -and $Index -le $stepResultSplitIndex) { "steps" } else { $null }),
-      $(if ($Total -gt 1 -and $Index -gt $stepResultSplitIndex) { "result" } else { $null }),
-      "steps",
-      "result",
-      "environment",
-      "analysis",
-      "summary",
-      "purpose"
+      $(if ($Total -gt 1 -and $Index -gt $stepResultSplitIndex) { "result" } else { $null })
     )) {
+    if (-not [string]::IsNullOrWhiteSpace($preferred) -and -not $preferredOrder.Contains($preferred)) {
+      $preferredOrder.Add($preferred) | Out-Null
+    }
+  }
+
+  foreach ($preferred in $fallbackSectionOrder) {
+    if (-not [string]::IsNullOrWhiteSpace($preferred) -and -not $preferredOrder.Contains($preferred)) {
+      $preferredOrder.Add($preferred) | Out-Null
+    }
+  }
+
+  foreach ($preferred in $preferredOrder) {
     if (-not [string]::IsNullOrWhiteSpace($preferred) -and ($AvailableSectionIds -contains $preferred)) {
       return $preferred
     }
@@ -898,26 +964,7 @@ function Get-DefaultCaption {
     [string]$BaseName
   )
 
-  $normalized = Normalize-FieldKey -Text $BaseName
-  $body = switch -Regex ($normalized) {
-    'ping' { "ping 连通性测试结果"; break }
-    'arp' { "arp 邻居缓存查看结果"; break }
-    'ipconfig' { "ipconfig 网络参数结果"; break }
-    'config|setup|install|步骤|command|cmd|命令' { "实验步骤截图"; break }
-    '拓扑|environment|vmware|server|环境|network' { "实验环境截图"; break }
-    'analysis|error|problem|异常' { "问题分析截图"; break }
-    default {
-      switch ($SectionId) {
-        "environment" { "实验环境截图" }
-        "steps" { "实验步骤截图" }
-        "result" { "实验结果截图" }
-        "analysis" { "问题分析截图" }
-        "summary" { "实验总结截图" }
-        default { "实验过程截图" }
-      }
-    }
-  }
-
+  $body = Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId $SectionId -BaseName $BaseName
   return ("图{0} {1}" -f $Index, $body)
 }
 
@@ -931,6 +978,13 @@ if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
   $resolvedSpecsPathForProbe = (Resolve-Path -LiteralPath $ImageSpecsPath).Path
 }
 $script:ImagePathProbeRoots = Get-ImagePathProbeRoots -DocxPath $resolvedDocxPath -SpecsPath $resolvedSpecsPathForProbe
+$imageInputMode = if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
+  "specs-path"
+} elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
+  "specs-json"
+} else {
+  "image-paths"
+}
 
 $rawItems = Get-ImageInputItems -SpecsPath $ImageSpecsPath -SpecsJson $ImageSpecsJson -Paths $ImagePaths
 $imageSpecs = @($rawItems | ForEach-Object { Resolve-ImageInputSpec -Item $_ })
@@ -950,6 +1004,9 @@ $notes = New-Object System.Collections.Generic.List[string]
 for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
   $spec = $imageSpecs[$index]
   $resolvedSectionId = $null
+  $sectionSource = $null
+  $sectionReason = $null
+  $sectionConfidence = $null
 
   if ($spec.SectionProvided) {
     $resolvedSectionId = Resolve-SectionId -SectionName $spec.SectionName
@@ -957,12 +1014,31 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
       throw "Image section was not recognized: $($spec.SectionName)"
     }
     if ($availableSectionIds -notcontains $resolvedSectionId) {
-      throw "Image section is not available in the target docx: $($spec.SectionName)"
+      $fallbackSectionId = Resolve-AvailableSectionId -RequestedSectionId $resolvedSectionId -AvailableSectionIds $availableSectionIds
+      if ([string]::IsNullOrWhiteSpace($fallbackSectionId)) {
+        throw "Image section is not available in the target docx: $($spec.SectionName)"
+      }
+      $notes.Add(("Image {0} requested section {1}, but the target docx does not contain it. Falling back to {2}." -f ($index + 1), $spec.SectionName, $fallbackSectionId)) | Out-Null
+      $resolvedSectionId = $fallbackSectionId
+      $sectionSource = "explicit-fallback"
+      $sectionReason = "Requested section was not present in the target docx, so the nearest available section was used."
+      $sectionConfidence = "medium"
+    } else {
+      $sectionSource = "explicit"
+      $sectionReason = "Section was provided in the image spec."
+      $sectionConfidence = "high"
     }
   } else {
     $resolvedSectionId = Infer-SectionIdFromBaseName -BaseName $spec.BaseName
-    if ([string]::IsNullOrWhiteSpace($resolvedSectionId) -or ($availableSectionIds -notcontains $resolvedSectionId)) {
+    if (-not [string]::IsNullOrWhiteSpace($resolvedSectionId) -and ($availableSectionIds -contains $resolvedSectionId)) {
+      $sectionSource = "filename"
+      $sectionReason = "Section was inferred from the image file name."
+      $sectionConfidence = "medium"
+    } else {
       $resolvedSectionId = Get-FallbackSectionId -Index ($index + 1) -Total $imageSpecs.Count -AvailableSectionIds $availableSectionIds
+      $sectionSource = "fallback-order"
+      $sectionReason = "Section was assigned from image order because no file-name hint matched."
+      $sectionConfidence = "low"
     }
     $notes.Add(("Image {0} section inferred as {1} from file name or fallback order." -f ($index + 1), $resolvedSectionId)) | Out-Null
   }
@@ -970,6 +1046,14 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
   $resolvedRule = $sectionRuleLookup[$resolvedSectionId]
   $caption = if ($spec.CaptionProvided) { $spec.Caption } else { Get-DefaultCaption -Index ($index + 1) -SectionId $resolvedSectionId -BaseName $spec.BaseName }
   $widthCm = if ($null -ne $spec.WidthCm) { $spec.WidthCm } else { $defaultImageWidthCm }
+  $isRowLayout = ($null -ne $spec.Layout -and [string]::Equals([string]$spec.Layout.mode, "row", [System.StringComparison]::OrdinalIgnoreCase))
+  if (
+    [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+    (-not $isRowLayout) -and
+    (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $spec)
+  ) {
+    $widthCm = [Math]::Max([double]$widthCm, 14.8)
+  }
 
   $sectionHeading = ($discoveredSections | Where-Object { $_.id -eq $resolvedSectionId } | Select-Object -First 1 -ExpandProperty headingText)
 
@@ -993,6 +1077,9 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
       Layout = $layoutOutput
       Anchor = $spec.Anchor
       ResolvedSectionId = $resolvedSectionId
+      SectionSource = $sectionSource
+      SectionReason = $sectionReason
+      SectionConfidence = $sectionConfidence
     }) | Out-Null
 }
 
@@ -1004,43 +1091,115 @@ foreach ($resolvedEntry in $resolvedImageEntries) {
   $resultImages.Add([pscustomobject]$resolvedEntry.OutputEntry) | Out-Null
 }
 
+$planEntries = New-Object System.Collections.Generic.List[object]
+for ($planIndex = 0; $planIndex -lt $resolvedImageEntries.Count; $planIndex++) {
+  $resolvedEntry = $resolvedImageEntries[$planIndex]
+  $item = [pscustomobject]$resolvedEntry.OutputEntry
+  $layoutText = "none"
+  if ($item.PSObject.Properties.Name -contains 'layout' -and $null -ne $item.layout) {
+    $layoutTable = ConvertTo-PlainHashtable -InputObject $item.layout
+    $layoutParts = New-Object System.Collections.Generic.List[string]
+    [void]$layoutParts.Add([string]$layoutTable["mode"])
+    if ($layoutTable.ContainsKey("columns") -and $null -ne $layoutTable["columns"]) {
+      [void]$layoutParts.Add(("columns={0}" -f $layoutTable["columns"]))
+    }
+    if ($layoutTable.ContainsKey("group") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["group"])) {
+      [void]$layoutParts.Add(("group={0}" -f $layoutTable["group"]))
+    }
+    if ($layoutTable.ContainsKey("groupAnchor") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["groupAnchor"])) {
+      [void]$layoutParts.Add(("groupAnchor={0}" -f $layoutTable["groupAnchor"]))
+    }
+    $layoutText = $layoutParts -join ", "
+  }
+
+  $planEntries.Add([pscustomobject]@{
+      index = $planIndex + 1
+      fileName = [System.IO.Path]::GetFileName([string]$item.path)
+      path = [string]$item.path
+      proposedSection = [string]$item.section
+      resolvedHeading = [string]$item.resolvedHeading
+      proposedCaption = [string]$item.caption
+      widthCm = $item.widthCm
+      layout = $layoutText
+      sectionSource = [string]$resolvedEntry.SectionSource
+      confidence = [string]$resolvedEntry.SectionConfidence
+      reason = [string]$resolvedEntry.SectionReason
+    }) | Out-Null
+}
+
 $result = [pscustomobject]@{
   summary = [pscustomobject]@{
     docxPath = $resolvedDocxPath
+    reportProfileName = [string]$reportProfile.name
+    reportProfilePath = [string]$reportProfile.resolvedProfilePath
+    imageInputMode = $imageInputMode
     imageCount = $resultImages.Count
     availableSections = @($discoveredSections | ForEach-Object { $_.headingText } | Select-Object -Unique)
+    planOnly = [bool]$PlanOnly
   }
   images = $resultImages
+  plan = $planEntries
   notes = $notes
 }
 
 if ($Format -eq "json") {
-  $output = $result | ConvertTo-Json -Depth 6
+  if ($PlanOnly) {
+    $output = ([pscustomobject]@{
+        summary = $result.summary
+        plan = $planEntries
+        notes = $notes
+      }) | ConvertTo-Json -Depth 6
+  } else {
+    $output = $result | ConvertTo-Json -Depth 6
+  }
 } else {
   $lines = New-Object System.Collections.Generic.List[string]
-  [void]$lines.Add("# DOCX Image Map")
+  [void]$lines.Add($(if ($PlanOnly) { "# DOCX Image Plan" } else { "# DOCX Image Map" }))
   [void]$lines.Add("")
   [void]$lines.Add("- Docx: $resolvedDocxPath")
   [void]$lines.Add("- Image count: $($resultImages.Count)")
   [void]$lines.Add("- Available sections: $((@($result.summary.availableSections) -join ', '))")
   [void]$lines.Add("")
-  [void]$lines.Add("## Images")
-  foreach ($item in $resultImages) {
-    $layoutSuffix = ""
-    if ($item.PSObject.Properties.Name -contains 'layout' -and $null -ne $item.layout) {
-      $layoutSuffix = " [layout: {0}" -f $item.layout.mode
-      if ($null -ne $item.layout.columns) {
-        $layoutSuffix += ", columns=$($item.layout.columns)"
-      }
-      if (-not [string]::IsNullOrWhiteSpace([string]$item.layout.group)) {
-        $layoutSuffix += ", group=$($item.layout.group)"
-      }
-      if (-not [string]::IsNullOrWhiteSpace([string]$item.layout.groupAnchor)) {
-        $layoutSuffix += ", groupAnchor=$($item.layout.groupAnchor)"
-      }
-      $layoutSuffix += "]"
+  if ($PlanOnly) {
+    [void]$lines.Add("## Proposed Image Placement")
+    [void]$lines.Add("")
+    [void]$lines.Add("| # | File | Proposed section | Caption | Layout | Source | Confidence | Reason |")
+    [void]$lines.Add("|---|---|---|---|---|---|---|---|")
+    foreach ($item in $planEntries) {
+      $rowValues = @(
+        [string]$item.index,
+        [string]$item.fileName,
+        [string]$item.proposedSection,
+        [string]$item.proposedCaption,
+        [string]$item.layout,
+        [string]$item.sectionSource,
+        [string]$item.confidence,
+        [string]$item.reason
+      ) | ForEach-Object { ($_ -replace '\|', '\|') }
+      [void]$lines.Add(("| {0} |" -f ($rowValues -join " | ")))
     }
-    [void]$lines.Add("- $([System.IO.Path]::GetFileName($item.path)) -> $($item.section) -> $($item.caption)$layoutSuffix")
+    [void]$lines.Add("")
+    [void]$lines.Add("> Review this plan before inserting images. Low-confidence rows came from fallback order and should be checked manually.")
+  } else {
+    [void]$lines.Add("## Images")
+    foreach ($item in $resultImages) {
+      $layoutSuffix = ""
+      if ($item.PSObject.Properties.Name -contains 'layout' -and $null -ne $item.layout) {
+        $layoutTable = ConvertTo-PlainHashtable -InputObject $item.layout
+        $layoutSuffix = " [layout: {0}" -f $layoutTable["mode"]
+        if ($layoutTable.ContainsKey("columns") -and $null -ne $layoutTable["columns"]) {
+          $layoutSuffix += ", columns=$($layoutTable["columns"])"
+        }
+        if ($layoutTable.ContainsKey("group") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["group"])) {
+          $layoutSuffix += ", group=$($layoutTable["group"])"
+        }
+        if ($layoutTable.ContainsKey("groupAnchor") -and -not [string]::IsNullOrWhiteSpace([string]$layoutTable["groupAnchor"])) {
+          $layoutSuffix += ", groupAnchor=$($layoutTable["groupAnchor"])"
+        }
+        $layoutSuffix += "]"
+      }
+      [void]$lines.Add("- $([System.IO.Path]::GetFileName($item.path)) -> $($item.section) -> $($item.caption)$layoutSuffix")
+    }
   }
   if ($notes.Count -gt 0) {
     [void]$lines.Add("")
@@ -1056,7 +1215,11 @@ if ([string]::IsNullOrWhiteSpace($OutFile)) {
   Write-Output $output
 } else {
   [System.IO.File]::WriteAllText($OutFile, $output, (New-Object System.Text.UTF8Encoding($true)))
-  Write-Output "Wrote image map to $OutFile"
+  if ($PlanOnly) {
+    Write-Output "Wrote image plan to $OutFile"
+  } else {
+    Write-Output "Wrote image map to $OutFile"
+  }
 }
 
 

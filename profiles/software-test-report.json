@@ -1,0 +1,143 @@
+{
+  "name": "software-test-report",
+  "displayName": "软件测试报告",
+  "defaultStyleProfile": "school",
+  "defaultExperimentProperty": "功能测试",
+  "metadataFields": [
+    { "key": "Name", "label": "学生姓名", "aliases": ["姓名"] },
+    { "key": "StudentId", "label": "学号", "aliases": ["学生学号"] },
+    { "key": "ClassName", "label": "班级" },
+    { "key": "TeacherName", "label": "指导教师", "aliases": ["指导老师"] },
+    { "key": "CourseName", "label": "课程名称", "aliases": ["测试课程", "所属课程"] },
+    { "key": "ExperimentName", "label": "测试项目", "aliases": ["被测系统", "项目名称", "测试对象"] },
+    { "key": "ExperimentProperty", "label": "测试类型", "aliases": ["测试类别"] },
+    { "key": "ExperimentDate", "label": "测试时间", "aliases": ["完成时间", "日期"] },
+    { "key": "ExperimentLocation", "label": "测试环境", "aliases": ["测试地点", "运行环境"] }
+  ],
+  "extraLabels": [
+    { "key": "Version", "label": "测试版本" },
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "测试目标",
+      "aliases": ["测试目标", "测试目的", "测试任务目标"],
+      "minChars": { "standard": 30, "full": 70 }
+    },
+    {
+      "key": "Environment",
+      "heading": "测试环境",
+      "aliases": ["测试环境", "运行环境", "测试工具与环境"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Theory",
+      "heading": "测试范围与依据",
+      "aliases": ["测试范围与依据", "测试范围", "测试依据", "需求与测试范围"],
+      "minChars": { "standard": 40, "full": 100 }
+    },
+    {
+      "key": "Steps",
+      "heading": "测试用例设计与执行",
+      "aliases": ["测试用例设计与执行", "测试用例", "测试执行过程", "测试步骤"],
+      "minChars": { "standard": 90, "full": 190 }
+    },
+    {
+      "key": "Results",
+      "heading": "测试结果",
+      "aliases": ["测试结果", "执行结果", "测试结果记录", "结果汇总"],
+      "minChars": { "standard": 70, "full": 150 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "缺陷分析与改进",
+      "aliases": ["缺陷分析与改进", "缺陷分析", "问题分析", "问题与改进"],
+      "minChars": { "standard": 50, "full": 110 }
+    },
+    {
+      "key": "Summary",
+      "heading": "测试总结",
+      "aliases": ["测试总结", "总结", "测试结论"],
+      "minChars": { "standard": 40, "full": 100 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "测试计划",
+    "测试数据",
+    "风险说明"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "测试环境截图",
+      "steps": "测试执行过程截图",
+      "result": "测试结果截图",
+      "analysis": "缺陷分析截图",
+      "summary": "测试总结截图",
+      "default": "软件测试截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "case|testcase|用例|步骤|执行", "caption": "测试执行过程截图" },
+      { "pattern": "pass|result|report|结果|通过|失败", "caption": "测试结果截图" },
+      { "pattern": "bug|defect|error|issue|异常|缺陷|问题", "caption": "缺陷分析截图" },
+      { "pattern": "env|config|setup|browser|database|环境|配置", "caption": "测试环境截图" }
+    ]
+  },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1000,
+    "denseSectionChars": 650,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
+  "paginationRiskRemediations": {
+    "pagination-risk-long-section": "Split long test execution content by module, feature, case group, or priority before building, or raise paginationRiskThresholds.longSectionChars if a compact test-matrix narrative is expected.",
+    "pagination-risk-dense-section-block": "Separate preconditions, input data, execution steps, expected results, actual results, and defect notes into distinct paragraphs or list items before layout.",
+    "pagination-risk-figure-cluster": "Spread evidence screenshots across '测试用例设计与执行', '测试结果', and '缺陷分析与改进', or group pass/fail screenshots by case group before layout."
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["测试目标", "测试范围"],
+      "blocks": [
+        { "heading": "一、测试目标", "sectionIds": ["purpose"] },
+        { "heading": "二、测试范围与依据", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["测试用例", "测试总结"],
+      "blocks": [
+        { "heading": "三、测试环境", "sectionIds": ["environment"] },
+        { "heading": "四、测试用例设计与执行", "sectionIds": ["steps"] },
+        { "heading": "五、测试结果", "sectionIds": ["result"] },
+        { "heading": "六、缺陷分析与改进", "sectionIds": ["analysis"] },
+        { "heading": "七、测试总结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 1000,
+      "promptGuidance": [
+        "Prefer a submit-ready software test report instead of a short checklist.",
+        "The test case and result sections should describe concrete inputs, operations, expected results, actual results, and pass/fail conclusions."
+      ]
+    },
+    "full": {
+      "minChars": 1600,
+      "promptGuidance": [
+        "Prefer a submit-ready software test report with substantial evidence instead of a terse outline.",
+        "Unless source material is very sparse, aim for roughly 1600 to 2400 Chinese characters.",
+        "The test scope, test case execution, result summary, and defect-analysis sections should be the most detailed parts.",
+        "When describing test cases, explain the tested feature, preconditions, input data, execution steps, observed result, and whether the result matches expectations."
+      ]
+    }
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评"
+  ]
+}

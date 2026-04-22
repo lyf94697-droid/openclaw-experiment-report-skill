@@ -1,0 +1,54 @@
+软件测试报告
+
+课程名称：OpenClaw 实验报告技能仓库
+测试项目：prepared replay 回归链路测试
+学生姓名：仓库维护者
+学号：maintainer-202604
+班级：自动化维护组
+指导教师：GitHub Reviewer
+测试类型：功能测试
+测试时间：2026-04-19
+测试环境：GitHub Actions + PowerShell + 本地回放环境
+
+一、测试目标
+本次软件测试的目标，不是验证某个业务系统的登录或查询功能，而是把 OpenClaw 实验报告技能仓库当前的 prepared replay 能力当作被测对象，检查它在 `software-test-report` 这个工程文档族上是否已经具备稳定、可复用、可回归的表现。测试要求覆盖输入包相对路径解析、profile 继承、validation 汇总、pipeline trace 产物和 install packaging 这几类关键行为，而不是只验证脚本能否在本机偶然跑通一次。
+
+为了让测试具有实际维护价值，本次还要求把回归路径限制在仓库现有主流程之内。也就是说，测试必须通过 `PreparedInputsSummaryPath` 和 `PreGeneratedReportPath` 驱动 `build-report-from-url.ps1`，并使用 checked-in fixture 与最小模板夹具完成整条链路回放。这样得出的结论才能说明 `software-test-report` 是否真正进入了仓库的长期 regression 基线，而不是依赖临时目录或手工拼装输入的偶发成功。
+
+二、测试环境
+测试环境由 GitHub 仓库当前分支、Windows PowerShell、本地工作目录以及仓库自带脚本组成。被测脚本包括 `scripts/build-report-from-url.ps1`、`scripts/validate-report-draft.ps1`、`scripts/validate-report-profiles.ps1` 和 `scripts/run-smoke-tests.ps1`，其中 `build-report-from-url.ps1` 负责读取 prepared summary、回放已有正文、生成 wrapper summary 和 pipeline trace，`run-smoke-tests.ps1` 负责把这些行为固化为可重复的断言。
+
+输入环境中同时包含 `profiles/software-test-report.json` 对软件测试报告的结构约束、paginationRiskRemediations 和默认样式定义，以及新提交到仓库下的 `examples/software-test-report-prepared/` 目录。该目录提供 prompt、metadata、requirements、defaults、reference text 与 replay report 七类固定产物，确保测试在不同机器或不同安装目标下仍能解析到一致的输入源，而不是依赖 `tests-output` 中的一次性 seed 目录。
+
+三、测试范围与依据
+本次测试范围覆盖五类行为。第一，检查 `report-inputs-summary.json` 中的相对 `reportProfilePath`、`promptPath`、`metadataPath`、`requirementsPath`、`defaultsPath` 与 `referenceTextPaths` 是否都能按 summary 所在目录正确解析。第二，检查 wrapper summary 是否保留 `software-test-report` 的 profile name、display name、detail level、generation mode 和 build input modes。
+
+第三，检查 validation 是否通过，且 warning、pagination risk 与 structural issue 计数保持为零；同时确认 `pipeline-trace.json` 与 `pipeline-trace.md` 会一起生成，并写出 replay 模式、路径来源和 validation 状态。
+
+第四，检查 `install-skill.ps1` 在复制仓库内容时，是否会一并带上 `examples/software-test-report-prepared/` 中最关键的 summary 与 replay report 文件。测试依据来自现有 monthly、meeting 和 weekly replay fixture 的 smoke 模式、`software-test-report` profile 的约束字段，以及仓库 README 和 ROADMAP 中关于 realistic end-to-end fixtures 的既有承诺。
+
+四、测试用例设计与执行
+测试用例按照“输入完整性、链路执行、产物核对、安装复制”四组组织。第一组用例验证输入完整性，先检查 `examples/software-test-report-prepared/` 下的 summary、prompt、metadata、requirements、defaults、reference text 和 replay report 是否全部存在，再调用 `validate-report-draft.ps1` 对 replay report 做一次独立校验，确认标题、关键词、章节数量和分页阈值都命中 `software-test-report` profile 的要求。只有独立校验先通过，后续 wrapper 回放结论才有意义。
+
+第二组用例直接调用 `build-report-from-url.ps1`，输入最小 `software-test-report` 模板夹具、prepared summary 和 replay report。执行过程中重点观察 wrapper summary 是否写出 `generationMode=replay`、`buildReportInputMode=path`、`buildMetadataInputMode=path`、`buildRequirementsInputMode=path` 和 `buildImageInputMode=none`，并检查 resolved prompt、metadata、requirements、defaults 与 reference text 路径是否都回指到仓库内 fixture。
+
+第三组用例检查产物完整性和正文内容命中。测试读取 `pipeline-trace.json` 和 `pipeline-trace.md`，确认 trace 中同时记录了 wrapper mode、构建输入模式、validationPassed 和零 pagination risk；然后读取 cleaned report，检查其中包含“测试结果”这一关键章节标题，证明 replay 内容在清洗与后处理后仍保持 profile 结构。
+
+第四组用例在 install smoke 中检查 `examples/software-test-report-prepared\report-inputs-summary.json` 和 `report.replay.txt` 是否会随仓库一起复制，确保这套 fixture 对安装用户同样可见可用。
+
+五、测试结果
+本轮回归测试的结果表明，`software-test-report` prepared replay 夹具已经能够稳定通过独立 validation，并顺利穿过 URL wrapper 的 replay 模式。wrapper summary 中成功保留了 `software-test-report` 对应的 profile name 与 display name，resolved `promptPath`、`metadataPath`、`requirementsPath`、`defaultsPath` 与 `referenceTextPaths` 也都能够准确指向仓库内的 checked-in fixture。
+
+在产物层，`url-build-summary.json`、`pipeline-trace.json`、`pipeline-trace.md`、raw report、cleaned report 和 final docx 都能够被正常生成，且 validationPassed 为真，warning、pagination risk 与 structural issue 计数均为零。cleaned report 中还能继续命中“测试结果”等关键章节标题，说明 replay 正文在经过 wrapper 清洗后仍然保持软件测试报告要求的结构。
+
+安装层面，`install-skill.ps1` 复制后的目标目录中也能看到 `software-test-report-prepared` 下的 summary 与 replay report，符合“fixture 进入长期可复用基线”的预期。
+
+六、缺陷分析与改进
+本次测试没有发现阻断软件测试报告 replay 链路的严重缺陷，但也暴露出一个值得继续推进的改进方向：当前 prepared replay fixture 已经覆盖 weekly、meeting、monthly 和 software-test 四类文档，其中只有 software-test 属于明显带有 profile-specific pagination remediation 的工程报告。换句话说，仓库已经证明“复杂报告也能进入 repo-level replay 基线”，但覆盖范围仍然不够全面，特别是 `deployment-report` 这类对命令、日志和回滚预案更敏感的文档还没有对应的 checked-in fixture。
+
+另一个改进点是，目前 fixture 主要覆盖无图片的 prepared replay 路径，能够稳定验证路径解析、validation 和 wrapper trace，但还没有把 image-heavy 的证据组织方式真正纳入 checked-in replay 样例。如果后续要进一步检验 `software-test-report` 的 profile-specific remediation 是否在真实证据型报告中同样合理，就需要在现有 fixture 基础上逐步增加更接近实际测试截图密度的样本，而不是长期停留在文本回放层面。
+
+七、测试总结
+通过本次测试，可以确认 OpenClaw 实验报告技能仓库已经把 `software-test-report` 从“只有 profile 与 validation”推进到了“拥有 checked-in prepared replay fixture、可被 smoke 覆盖、可被 install 复制”的阶段。这项结果的意义在于，仓库的 realistic end-to-end fixtures 不再只覆盖项目周报、会议纪要、项目月报等过程性文档，而是开始进入更偏工程交付和证据组织的报告类型。
+
+从维护角度看，这项测试说明仓库继续沿着 profile-driven 路线扩展是可行的。后续如果按同样方式补齐 `deployment-report` 的 replay fixture，再逐步引入更真实的模板和截图输入，仓库就会在“结构不同、分页风险不同、但走同一条流水线”的多个文档家族上形成更扎实的对照样例集。这比单纯增加 profile 数量更有价值，因为它把可运行性、可解释性和可回归性同时落到了仓库里的真实产物上。

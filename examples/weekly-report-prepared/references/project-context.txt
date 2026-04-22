@@ -1,0 +1,7 @@
+本周的仓库维护工作继续围绕“每次升级都尽量落成一个最小、可 smoke 覆盖、可提交到仓库的具体产物”这条原则推进。上一轮已经把 `examples/monthly-report-prepared/` 和 `examples/meeting-minutes-prepared/` 两套 checked-in replay fixture 接进仓库，并验证 `report-inputs-summary.json` 中的相对路径可以解析到 prompt、metadata、requirements、defaults 和 referenceTextPaths，不再依赖一次性的临时生成目录。
+
+本周进入路线筛选时，ROADMAP 中仍然明显存在 “more realistic end-to-end fixtures” 这一类可继续推进的小步升级点。团队在看过现有示例后发现，`weekly-report` 虽然已经作为 built-in profile 进入 `profiles/weekly-report.json`，也有 `examples/profile-presets/weekly-report.json` 供 path-based preset 试跑，但仓库里还缺少一套 checked-in prepared replay bundle。这意味着周报文档目前只能在 profile loader、generated inputs 和 draft validation 层被覆盖，尚未像月报和会议纪要那样进入 repo-level replay fixture 的回放基线。
+
+本周的直接输入主要来自四处：一是 `scripts/run-smoke-tests.ps1` 中已经存在的 monthly 和 meeting replay smoke 模式；二是 `profiles/weekly-report.json` 中关于 metadata 标签、章节标题、分页阈值和默认图注的稳定定义；三是 `scripts/build-report-from-url.ps1` 现在已经支持通过 `PreparedInputsSummaryPath` + `PreGeneratedReportPath` 复用本地固化输入；四是 README、CHANGELOG、ROADMAP 中关于 prepared-summary 示例和 realistic fixture 的现有说明。围绕这些输入，本周工作的目标很明确，就是把 weekly-report 也推进成一套仓库内可直接回放、可安装复制、可文档化发现的 prepared fixture。
+
+如果这一项落地，仓库在周报、会议纪要、月报这三个相邻但结构并不完全相同的项目型文档家族上，都会同时具备 built-in profile、preset example 和 checked-in replay fixture 三层基线。这样后续继续扩充 realistic fixtures 或补更复杂的 template-fit 诊断时，就能基于更完整的对照样例推进，而不是总围绕单一文档族做回归。

@@ -1,0 +1,135 @@
+{
+  "name": "internship-report",
+  "displayName": "专业实习报告",
+  "defaultStyleProfile": "school",
+  "defaultExperimentProperty": "专业实习",
+  "metadataFields": [
+    { "key": "Name", "label": "学生姓名", "aliases": ["姓名"] },
+    { "key": "StudentId", "label": "学号", "aliases": ["学生学号"] },
+    { "key": "ClassName", "label": "班级" },
+    { "key": "TeacherName", "label": "校内指导教师", "aliases": ["指导教师", "指导老师"] },
+    { "key": "CourseName", "label": "专业名称", "aliases": ["所属专业"] },
+    { "key": "ExperimentName", "label": "实习项目", "aliases": ["实习主题", "实习岗位", "项目名称"] },
+    { "key": "ExperimentProperty", "label": "实习类别", "aliases": ["实习性质"] },
+    { "key": "ExperimentDate", "label": "实习时间", "aliases": ["起止时间", "实习日期"] },
+    { "key": "ExperimentLocation", "label": "实习单位", "aliases": ["实习地点", "实习单位与地点"] }
+  ],
+  "extraLabels": [
+    { "key": "FinalEdition", "label": "最终版" }
+  ],
+  "sectionFields": [
+    {
+      "key": "Purpose",
+      "heading": "实习目的",
+      "aliases": ["实习目的", "实习目标"],
+      "minChars": { "standard": 30, "full": 70 }
+    },
+    {
+      "key": "Environment",
+      "heading": "实习单位与环境",
+      "aliases": ["实习单位与环境", "实习单位", "实习环境"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Theory",
+      "heading": "实习任务与要求",
+      "aliases": ["实习任务与要求", "实习任务", "实习要求", "岗位职责"],
+      "minChars": { "standard": 40, "full": 90 }
+    },
+    {
+      "key": "Steps",
+      "heading": "实习过程与内容",
+      "aliases": ["实习过程与内容", "实习过程", "实习内容", "工作内容"],
+      "minChars": { "standard": 90, "full": 180 }
+    },
+    {
+      "key": "Results",
+      "heading": "实习成果",
+      "aliases": ["实习成果", "工作成果", "实习结果"],
+      "minChars": { "standard": 60, "full": 140 }
+    },
+    {
+      "key": "Analysis",
+      "heading": "问题分析与改进",
+      "aliases": ["问题分析与改进", "问题分析", "遇到的问题与改进"],
+      "minChars": { "standard": 40, "full": 100 }
+    },
+    {
+      "key": "Summary",
+      "heading": "实习总结",
+      "aliases": ["实习总结", "实习体会", "总结"],
+      "minChars": { "standard": 40, "full": 100 }
+    }
+  ],
+  "extraSectionHeadings": [
+    "岗位职责",
+    "工作内容"
+  ],
+  "imagePlacementDefaults": {
+    "fallbackSectionOrder": ["steps", "result", "analysis", "environment", "summary", "purpose"],
+    "defaultCaptions": {
+      "environment": "实习环境截图",
+      "steps": "实习过程截图",
+      "result": "实习成果截图",
+      "analysis": "问题分析截图",
+      "summary": "实习总结截图",
+      "default": "实习过程截图"
+    },
+    "filenameCaptionRules": [
+      { "pattern": "ui|page|screen|界面|页面|dashboard", "caption": "实习成果截图" },
+      { "pattern": "office|meeting|environment|desk|工位|环境", "caption": "实习环境截图" },
+      { "pattern": "task|work|flow|process|content|log|过程|内容|任务", "caption": "实习过程截图" },
+      { "pattern": "analysis|bug|error|problem|异常|问题", "caption": "问题分析截图" }
+    ]
+  },
+  "paginationRiskThresholds": {
+    "longSectionChars": 1100,
+    "denseSectionChars": 700,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 4
+  },
+  "fieldMapCompositeRules": [
+    {
+      "matchAll": ["实习目的", "实习任务"],
+      "blocks": [
+        { "heading": "一、实习目的", "sectionIds": ["purpose"] },
+        { "heading": "二、实习任务与要求", "sectionIds": ["theory"] }
+      ]
+    },
+    {
+      "matchAll": ["实习过程", "实习总结"],
+      "blocks": [
+        { "heading": "三、实习过程与内容", "sectionIds": ["steps"] },
+        { "heading": "四、实习成果", "sectionIds": ["result"] },
+        { "heading": "五、问题分析与改进", "sectionIds": ["analysis"] },
+        { "heading": "六、实习总结", "sectionIds": ["summary"] }
+      ]
+    }
+  ],
+  "detailProfiles": {
+    "standard": {
+      "minChars": 1000,
+      "promptGuidance": [
+        "Prefer a submit-ready internship report instead of a short outline.",
+        "The internship process and outcomes sections should describe concrete daily work rather than generic filler."
+      ]
+    },
+    "full": {
+      "minChars": 1600,
+      "promptGuidance": [
+        "Prefer a submit-ready internship report with substantial detail instead of a short outline.",
+        "Unless source material is very sparse, aim for roughly 1600 to 2400 Chinese characters.",
+        "The internship process, deliverables, and problem-analysis sections should be the most detailed parts.",
+        "When describing the internship process, explain the work context, concrete tasks, collaboration pattern, outputs, and what was learned from each stage."
+      ]
+    }
+  },
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "教师点评"
+  ]
+}

@@ -16,6 +16,8 @@ param(
 
   [string]$OpenClawCmd = $env:OPENCLAW_CMD,
 
+  [string]$PreGeneratedReportPath,
+
   [int]$ReferenceMaxChars = 30000,
 
   [switch]$SkipSessionReset
@@ -49,29 +51,6 @@ if ([string]::IsNullOrWhiteSpace($PromptPath) -eq [string]::IsNullOrWhiteSpace($
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$configPath = Join-Path (Join-Path $HOME ".openclaw") "openclaw.json"
-$resolvedConfigPath = (Resolve-Path -LiteralPath $configPath).Path
-$config = (Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8) | ConvertFrom-Json
-
-$gatewayHost = "127.0.0.1"
-$gatewayPort = 18789
-$gateway = Get-ConfigValue -Object $config -Name "gateway"
-if ($null -ne (Get-ConfigValue -Object $gateway -Name "bindHost")) {
-  $gatewayHost = [string](Get-ConfigValue -Object $gateway -Name "bindHost")
-}
-if ($null -ne (Get-ConfigValue -Object $gateway -Name "port") -and -not [string]::IsNullOrWhiteSpace([string](Get-ConfigValue -Object $gateway -Name "port"))) {
-  $gatewayPort = [int](Get-ConfigValue -Object $gateway -Name "port")
-}
-$gatewayAuth = Get-ConfigValue -Object $gateway -Name "auth"
-$gatewayToken = [string](Get-ConfigValue -Object $gatewayAuth -Name "token")
-if ([string]::IsNullOrWhiteSpace($gatewayToken)) {
-  throw "OpenClaw gateway token is missing in $resolvedConfigPath"
-}
-
-$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
-if ($null -eq $nodeCommand -or [string]::IsNullOrWhiteSpace($nodeCommand.Source)) {
-  throw "Node.js is required to send chat requests through the OpenClaw gateway."
-}
 
 $userPrompt = if (-not [string]::IsNullOrWhiteSpace($PromptPath)) {
   Get-Content -LiteralPath (Resolve-Path -LiteralPath $PromptPath).Path -Raw -Encoding UTF8
@@ -100,6 +79,44 @@ $preparedPromptResult = & (Join-Path $repoRoot "scripts\prepare-report-prompt.ps
   -ReferenceMaxChars $ReferenceMaxChars
 $userPrompt = Get-Content -LiteralPath $preparedPromptPath -Raw -Encoding UTF8
 
+$resolvedPreGeneratedReportPath = if (-not [string]::IsNullOrWhiteSpace($PreGeneratedReportPath)) {
+  (Resolve-Path -LiteralPath $PreGeneratedReportPath).Path
+} elseif (-not [string]::IsNullOrWhiteSpace($env:OPENCLAW_PREGENERATED_REPORT_PATH)) {
+  (Resolve-Path -LiteralPath $env:OPENCLAW_PREGENERATED_REPORT_PATH).Path
+} else {
+  $null
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
+  $preGeneratedReportText = Get-Content -LiteralPath $resolvedPreGeneratedReportPath -Raw -Encoding UTF8
+  [System.IO.File]::WriteAllText($resolvedOutFile, $preGeneratedReportText, (New-Object System.Text.UTF8Encoding($false)))
+  Write-Output $preGeneratedReportText
+  return
+}
+
+$configPath = Join-Path (Join-Path $HOME ".openclaw") "openclaw.json"
+$resolvedConfigPath = (Resolve-Path -LiteralPath $configPath).Path
+$config = (Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8) | ConvertFrom-Json
+
+$gatewayHost = "127.0.0.1"
+$gatewayPort = 18789
+$gateway = Get-ConfigValue -Object $config -Name "gateway"
+if ($null -ne (Get-ConfigValue -Object $gateway -Name "bindHost")) {
+  $gatewayHost = [string](Get-ConfigValue -Object $gateway -Name "bindHost")
+}
+if ($null -ne (Get-ConfigValue -Object $gateway -Name "port") -and -not [string]::IsNullOrWhiteSpace([string](Get-ConfigValue -Object $gateway -Name "port"))) {
+  $gatewayPort = [int](Get-ConfigValue -Object $gateway -Name "port")
+}
+$gatewayAuth = Get-ConfigValue -Object $gateway -Name "auth"
+$gatewayToken = [string](Get-ConfigValue -Object $gatewayAuth -Name "token")
+if ([string]::IsNullOrWhiteSpace($gatewayToken)) {
+  throw "OpenClaw gateway token is missing in $resolvedConfigPath"
+}
+
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+if ($null -eq $nodeCommand -or [string]::IsNullOrWhiteSpace($nodeCommand.Source)) {
+  throw "Node.js is required to send chat requests through the OpenClaw gateway."
+}
+
 $skillMarkdown = Get-Content -LiteralPath (Join-Path $repoRoot "SKILL.md") -Raw -Encoding UTF8
 $skillBody = [regex]::Replace($skillMarkdown, '^(?s)---\s*.*?\s*---\s*', '')
 $messageText = @(
@@ -110,7 +127,7 @@ $messageText = @(
   "User request:"
   $userPrompt.Trim()
   ""
-  "Return only the final Chinese experiment report body. Prefer a complete, moderately detailed, submission-ready report instead of a terse outline. Do not ask follow-up questions. Do not output explanations or meta commentary."
+  "Return only the final Chinese report body. Prefer a complete, moderately detailed, submission-ready report instead of a terse outline. Do not ask follow-up questions. Do not output explanations or meta commentary."
 ) -join [Environment]::NewLine
 
 $messageFile = Join-Path $outDir (([System.IO.Path]::GetFileNameWithoutExtension($resolvedOutFile)) + ".prompt.txt")
