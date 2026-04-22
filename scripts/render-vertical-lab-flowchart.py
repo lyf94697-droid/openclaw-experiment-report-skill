@@ -203,8 +203,8 @@ def crop_to_ink(img: Image.Image, pad: int = 28) -> Image.Image:
 
 
 def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> None:
-    width = 1300
-    height = 1560
+    width = 1350
+    height = 1500
     img = Image.new("RGB", (width, height), (255, 255, 255))
     draw = ImageDraw.Draw(img)
     ink = (20, 20, 20)
@@ -220,13 +220,13 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
         draw.text(((width - title_width) / 2, 16), title, font=title_font, fill=ink)
         top = 70
 
-    node_w = 420
+    node_w = 430
     node_h = 58
-    term_w = 120
+    term_w = 130
     term_h = 42
-    gap = 36
-    decision_w = 390
-    decision_h = 122
+    gap = 34
+    decision_w = 405
+    decision_h = 118
 
     decision_index = next((i for i, step in enumerate(steps) if "是否" in step or "?" in step or "？" in step), -1)
     if decision_index < 1 or len(steps) < decision_index + 3:
@@ -235,6 +235,9 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
 
     def centered_box(y: int, w: int = node_w, h: int = node_h) -> tuple[int, int, int, int]:
         return (center_x - w // 2, y, center_x + w // 2, y + h)
+
+    def box_center(box: tuple[int, int, int, int]) -> tuple[int, int]:
+        return ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
 
     y = top
     start_box = centered_box(y, term_w, term_h)
@@ -257,12 +260,12 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
     draw_decision(draw, decision_box, steps[decision_index], node_font, ink)
     decision_center_y = (decision_box[1] + decision_box[3]) // 2
 
-    no_box = (900, decision_center_y - 29, 1215, decision_center_y + 29)
+    no_box = (920, decision_center_y - 29, 1242, decision_center_y + 29)
     draw_polyline_arrow(draw, [(decision_box[2], decision_center_y), (no_box[0], decision_center_y)], ink)
-    draw_connector_label(draw, (decision_box[2] + 24, decision_center_y - 34), "否", label_font, ink)
+    draw_connector_label(draw, (decision_box[2] + 10, decision_center_y - 34), "否", label_font, ink)
     draw_process(draw, no_box, "提示无结果", node_font, ink)
 
-    retry_box = (900, decision_center_y + 88, 1215, decision_center_y + 146)
+    retry_box = (920, decision_center_y + 88, 1242, decision_center_y + 146)
     draw_arrow(draw, ((no_box[0] + no_box[2]) // 2, no_box[3]), ((retry_box[0] + retry_box[2]) // 2, retry_box[1]), ink)
     draw_process(draw, retry_box, "调整关键词重新查询", node_font, ink)
     if search_box is not None:
@@ -270,8 +273,8 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
             draw,
             [
                 (retry_box[2], (retry_box[1] + retry_box[3]) // 2),
-                (1240, (retry_box[1] + retry_box[3]) // 2),
-                (1240, (search_box[1] + search_box[3]) // 2),
+                (1280, (retry_box[1] + retry_box[3]) // 2),
+                (1280, (search_box[1] + search_box[3]) // 2),
                 (search_box[2], (search_box[1] + search_box[3]) // 2),
             ],
             ink,
@@ -280,40 +283,78 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
     y = decision_box[3] + gap
     draw_connector_label(draw, (center_x + 18, decision_box[3] + 6), "是", label_font, ink)
     after = steps[decision_index + 1 :]
-    end_text = after[-1]
+    end_text = after[-1] if after else "完成任务"
     body = after[:-1]
 
     first_after = body[0] if body else "执行下一步操作"
     first_box = centered_box(y)
     draw_arrow(draw, (center_x, decision_box[3]), (center_x, first_box[1]), ink)
     draw_process(draw, first_box, first_after, node_font, ink)
-    y = first_box[3] + 56
 
     remaining = body[1:]
-    merge_start = (center_x, first_box[3])
     if len(remaining) >= 2:
-        left_box = (70, y, 490, y + node_h)
-        right_box = (760, y, 1180, y + node_h)
-        split_y = y - 24
-        draw_polyline_arrow(draw, [merge_start, (center_x, split_y), ((left_box[0] + left_box[2]) // 2, split_y), ((left_box[0] + left_box[2]) // 2, left_box[1])], ink)
-        draw_polyline_arrow(draw, [(center_x, split_y), ((right_box[0] + right_box[2]) // 2, split_y), ((right_box[0] + right_box[2]) // 2, right_box[1])], ink)
-        draw_process(draw, left_box, remaining[0], node_font, ink)
-        draw_process(draw, right_box, remaining[1], node_font, ink)
-        merge_y = left_box[3] + 52
-        join_left = (center_x - 52, merge_y)
-        join_right = (center_x + 52, merge_y)
-        draw_polyline_arrow(draw, [((left_box[0] + left_box[2]) // 2, left_box[3]), ((left_box[0] + left_box[2]) // 2, merge_y), join_left], ink)
-        draw_polyline_arrow(draw, [((right_box[0] + right_box[2]) // 2, right_box[3]), ((right_box[0] + right_box[2]) // 2, merge_y), join_right], ink)
-        draw.line((join_left, join_right), fill=ink, width=3)
-        draw_arrow(draw, (center_x, merge_y), (center_x, merge_y + 26), ink)
-        y = merge_y + 34
-        previous_bottom = (center_x, merge_y + 26)
-        for step in remaining[2:]:
-            box = centered_box(y)
-            draw_arrow(draw, previous_bottom, (center_x, box[1]), ink)
-            draw_process(draw, box, step, node_font, ink)
-            previous_bottom = (center_x, box[3])
-            y = box[3] + gap
+        route_step = next((step for step in remaining if "路线" in step or "路径" in step or "导航" in step), remaining[0])
+        collect_step = next((step for step in remaining if "收藏" in step or "保存" in step), remaining[-1])
+
+        route_decision = centered_box(first_box[3] + 44, decision_w, decision_h)
+        draw_arrow(draw, (center_x, first_box[3]), (center_x, route_decision[1]), ink)
+        draw_decision(draw, route_decision, "是否需要路线提示", node_font, ink)
+        route_decision_center_y = box_center(route_decision)[1]
+
+        no_route_box = (920, route_decision_center_y - 29, 1242, route_decision_center_y + 29)
+        draw_polyline_arrow(draw, [(route_decision[2], route_decision_center_y), (no_route_box[0], route_decision_center_y)], ink)
+        draw_connector_label(draw, (route_decision[2] + 10, route_decision_center_y - 34), "否", label_font, ink)
+        draw_process(draw, no_route_box, "继续查看地点信息", node_font, ink)
+
+        route_box = centered_box(route_decision[3] + 48)
+        draw_connector_label(draw, (center_x + 18, route_decision[3] + 6), "是", label_font, ink)
+        draw_arrow(draw, (center_x, route_decision[3]), (center_x, route_box[1]), ink)
+        draw_process(draw, route_box, route_step, node_font, ink)
+
+        merge_y = route_box[3] + 40
+        draw_polyline_arrow(draw, [(center_x, route_box[3]), (center_x, merge_y)], ink)
+        draw_polyline_arrow(
+            draw,
+            [
+                (no_route_box[2], route_decision_center_y),
+                (1280, route_decision_center_y),
+                (1280, merge_y),
+                (center_x + 44, merge_y),
+            ],
+            ink,
+        )
+        draw.line((center_x - 44, merge_y, center_x + 44, merge_y), fill=ink, width=3)
+
+        collect_decision = centered_box(merge_y + 36, decision_w, decision_h)
+        draw_arrow(draw, (center_x, merge_y), (center_x, collect_decision[1]), ink)
+        draw_decision(draw, collect_decision, "是否收藏常用地点", node_font, ink)
+        collect_decision_center_y = box_center(collect_decision)[1]
+
+        no_collect_box = (920, collect_decision_center_y - 29, 1242, collect_decision_center_y + 29)
+        draw_polyline_arrow(draw, [(collect_decision[2], collect_decision_center_y), (no_collect_box[0], collect_decision_center_y)], ink)
+        draw_connector_label(draw, (collect_decision[2] + 10, collect_decision_center_y - 34), "否", label_font, ink)
+        draw_process(draw, no_collect_box, "不收藏，继续浏览", node_font, ink)
+
+        collect_box = centered_box(collect_decision[3] + 40)
+        draw_connector_label(draw, (center_x + 18, collect_decision[3] + 6), "是", label_font, ink)
+        draw_arrow(draw, (center_x, collect_decision[3]), (center_x, collect_box[1]), ink)
+        draw_process(draw, collect_box, collect_step, node_font, ink)
+
+        complete_box = centered_box(collect_box[3] + gap)
+        draw_arrow(draw, (center_x, collect_box[3]), (center_x, complete_box[1]), ink)
+        draw_process(draw, complete_box, end_text, node_font, ink)
+        draw_polyline_arrow(
+            draw,
+            [
+                (no_collect_box[2], collect_decision_center_y),
+                (1280, collect_decision_center_y),
+                (1280, box_center(complete_box)[1]),
+                (complete_box[2], box_center(complete_box)[1]),
+            ],
+            ink,
+        )
+        previous_bottom = (center_x, complete_box[3])
+        y = complete_box[3] + gap
     else:
         previous_bottom = (center_x, first_box[3])
         for step in remaining:
