@@ -754,10 +754,12 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
 
     if right_boxes and loop_target_box is not None:
         target_y = (loop_target_box[1] + loop_target_box[3]) // 2
-        loop_start = previous_right_bottom or ((right_boxes[-1][0] + right_boxes[-1][2]) // 2, right_boxes[-1][3])
+        last_branch_box = right_boxes[-1]
+        loop_start = (last_branch_box[0], (last_branch_box[1] + last_branch_box[3]) // 2)
         loop_points = [
             loop_start,
-            (loop_start[0], target_y + 124),
+            (loop_start[0] - 64, loop_start[1]),
+            (loop_start[0] - 64, target_y + 124),
             (loop_target_box[0] - 64, target_y + 124),
             (loop_target_box[0] - 64, target_y),
             (loop_target_box[0], target_y),
