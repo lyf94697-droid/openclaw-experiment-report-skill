@@ -1,5 +1,5 @@
 ﻿# OpenClaw Experiment Report Skill
-> Generate Chinese lab reports with OpenClaw: drafting, docx template filling, screenshot insertion, and final formatting.
+> Local OpenClaw workflow for Chinese lab reports: draft report content, fill docx templates, insert screenshots, and run layout checks.
 
 [![Quality Checks](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml)
 [![Smoke Tests](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml)
@@ -7,11 +7,11 @@
 
 ## 项目简介
 
-这是一个基于 OpenClaw 的实验报告 skill 和 PowerShell 文档流水线。
+这是一个基于 OpenClaw 的实验报告 skill 和 PowerShell 本地流水线。
 
-它的目标不是只生成一段“实验报告正文”，而是把实验主题、要求、教程链接、代码、截图、数据、空白 `docx`/WPS/Word 模板这些材料串成一条更完整的本地工作流：先生成结构化中文实验报告，再填充模板、插入截图、生成图注，最后做一轮提交风格的排版优化，输出更接近可直接提交的 `docx` 成品。
+它不是通用文档引擎。当前重点是把实验主题、要求、教程链接、代码、截图、数据、空白 `docx`/WPS/Word 模板这些材料，收拢成一条可复查的本地流程：先生成结构化中文实验报告，再填充模板、插入截图、生成图注，最后做一轮排版和 layout check，输出可检查的 `docx`。
 
-当前仓库优先解决“中文大学实验报告”这个具体场景，并保持技术路径务实可落地：以 OpenClaw 为生成入口，以本地脚本做模板处理、插图和最终排版。
+当前 `main` 分支优先解决“中文大学实验报告”这个具体场景，并保持技术路径务实可落地：以 OpenClaw 为生成入口，以本地脚本做模板处理、插图和最终排版。
 
 ## 解决什么问题
 
@@ -31,7 +31,7 @@
 - 对空白 `docx` / WPS / Word 模板做字段映射和正文填充
 - 插入实验截图并生成图注，支持按章节或稳定锚点落位
 - 支持图片分组布局，例如两图一行、2x2 图片块这类常见报告排版
-- 对标题、章节标题、正文、图注、图片块做最终提交风格排版优化
+- 对标题、章节标题、正文、图注、图片块做基础排版优化
 - 支持通过 OpenClaw skill 或本地 PowerShell 入口脚本调用
 - 支持基于教程页或参考材料生成内容，但目标是改写和整理，不是长篇照抄
 
@@ -41,7 +41,7 @@
 2. 生成结构化中文实验报告正文
 3. 填充 `docx` 模板中的字段和章节内容
 4. 插入截图并生成图注，必要时做分组布局
-5. 对最终文档做排版优化，输出更完整的提交版 `docx`
+5. 对最终文档做排版优化，输出可检查的最终 `docx`
 
 ## 演示效果
 
@@ -55,11 +55,11 @@
 
 ## 当前范围
 
-- 当前版本聚焦中文大学实验报告场景
+- 当前版本聚焦中文大学实验报告场景，不承诺任意报告类型都能直接套用
 - 当前仓库主要面向 OpenClaw 用户，不是独立桌面应用
 - 仓库已经包含 `SKILL.md`、`references/`、`scripts/`、`examples/`、`demo/` 和 GitHub 协作治理文件
 - 当前稳定路径是“OpenClaw 生成 + 本地脚本处理模板、图片和排版”
-- 常见空白模板、章节正文、截图插入和最终样式处理已经可以跑通
+- 常见空白模板、章节正文、截图插入和基础样式处理可以跑通
 - 当前暂时不保证 Word/WPS GUI 自动化填写，也不承诺任意复杂模板都能无人工确认处理
 
 ## 快速开始
@@ -103,7 +103,7 @@ openclaw skills list
 
 如果你需要拆开流水线逐步处理，仓库里也已经提供模板抽取、字段映射生成、图片映射生成、插图、样式优化、网页抓取、提示词准备和端到端验证脚本，入口都在 [scripts](scripts) 目录。
 
-其中 `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 在需要自动生成正文时默认使用 `-DetailLevel full`，也就是默认要求输出更完整、不是提纲式的正文。
+其中 `build-report-from-feishu.ps1` 和 `build-report-from-url.ps1` 在需要生成正文时默认使用 `-DetailLevel full`，也就是默认要求输出更完整、不是提纲式的正文。
 
 ### 3. 一条常见用法
 
@@ -155,7 +155,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 正文排版会单独识别步骤编号和 DOS/终端命令，步骤段不做首行缩进，命令段使用等宽字体、浅灰底和更紧凑的单倍行距
 - 最终排版会统一标题、正文、图注的字号；表格型模板会尽量保留模板默认字体观感，避免额外强制字体导致成品不像原模板
 - 表格型实验报告模板会使用更接近模板默认观感的字号，把正文单元格改为顶部对齐，并减少普通正文的强制分页保持，避免留下过多空白
-- 多张图片连续归入同一实验章节时，插图流程会默认使用每行 2 张的自动分组布局；显式 `ImageSpecs` 里的 `layout` 配置仍然优先生效
+- 多张图片连续归入同一实验章节时，插图流程会默认使用每行 2 张的分组布局；显式 `ImageSpecs` 里的 `layout` 配置仍然优先生效
 - 生成最终 `docx` 后会写出 `layout-check.json`，检查图片数、图注数、残留占位符和常见实验报告章节，summary 里也会记录 `layoutCheckPassed`、错误数和警告数
 - `layout-check.json` 会检查图注编号是否连续，summary 里会给出 `layoutCheckMessage`，便于不打开 JSON 也能快速判断排版是否过关
 
@@ -181,19 +181,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 
 ## 项目现状
 
-当前版本已经可以跑通一条完整的实验报告工作流：生成正文、填模板、插图片、补图注、做最终排版。  
-仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把“实验报告”这条链路做得更稳、更好用、更容易复现。  
-后续扩展会基于现有文档流水线逐步推进，而不是把新类型文档硬塞进现有逻辑里。
+当前 `main` 分支可以跑通一条实验报告工作流：生成正文、填模板、插图片、补图注、做基础排版和 layout check。
+仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把“实验报告”这条链路做得更稳、更好用、更容易复现。
+后续扩展会先作为候选模板或实验分支推进，不把新类型文档硬塞进默认主线。
 
 ## Roadmap
 
-当前方向很明确：先把实验报告场景做实用，再逐步抽象成更通用的文档生成工具。
+当前方向：先把实验报告主线做实用，再谨慎推进候选文档类型。
 
 - 继续补常见实验报告模板和模板适配策略
-- 强化教程链接、截图、正文、模板之间的自动串联能力
+- 强化教程链接、截图、正文、模板之间的本地串联能力
 - 增强图片插入、图注和多图布局的配置能力
-- 支持更多课程作业类文档
-- 逐步扩展到周报、月报、项目文档等可配置文档类型
+- 把课程设计、周报、月报、项目文档等先作为候选路径验证
+- 只在真实模板和 smoke 覆盖足够后，把新的路径推进稳定主线
 - 继续完善样式 profile，让不同学校/模板的排版策略更容易切换
 
 更完整的路线可以看 [ROADMAP.md](ROADMAP.md)。
@@ -219,4 +219,3 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 ## License
 
 MIT
-

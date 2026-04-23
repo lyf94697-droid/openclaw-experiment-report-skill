@@ -16,12 +16,12 @@
 
 ## Long Term
 
-The repository can evolve from an experiment-report skill into a broader document-generation toolkit, but only if the architecture stays profile-driven.
+The repository can support nearby document types only after the experiment-report path stays fast, stable, and easy to verify.
 
 That means:
 
-- shared core pipeline for reference gathering, body generation, validation, template filling, image mapping, and final styling
-- document-type profiles for structure, metadata labels, required sections, caption rules, and validation thresholds
+- one reliable core pipeline for reference gathering, body generation, validation, template filling, image mapping, and final styling
+- explicit document-type presets for structure, metadata labels, required sections, caption rules, and validation thresholds
 - prompt presets for each document type instead of embedding everything into one giant experiment-report prompt
 
 Potential future profiles:
@@ -37,5 +37,5 @@ Potential future profiles:
 ## Non-Goals For Now
 
 - turning the project into a general-purpose office suite
-- pretending every document type can be solved by a single generic prompt
+- pretending every document type can be solved by a single catch-all prompt
 - shipping a GUI app before the profile model is stable

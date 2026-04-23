@@ -7,7 +7,7 @@ description: Write Chinese university lab reports from scratch or fit report con
 
 - The user asks to write or complete an experiment report from zero.
 - The user has a blank WPS, Word, or docx template and wants it filled.
-- The user provides an experiment title, requirements, screenshots, code, data, outputs, or conclusions and wants a polished report.
+- The user provides an experiment title, requirements, screenshots, code, data, outputs, or conclusions and wants a report draft or filled report.
 - The user provides a tutorial article or CSDN page as the main procedural reference.
 
 ## Core workflow
@@ -75,7 +75,7 @@ description: Write Chinese university lab reports from scratch or fit report con
 - For local docx templates, run `scripts/extract-docx-template.ps1` to capture the actual field order before producing a field mapping.
 - For local docx templates that should be machine-filled, run `scripts/generate-docx-field-map.ps1` after the report body is ready, then run `scripts/apply-docx-field-map.ps1`.
 - For local screenshots or experiment photos that should be embedded into the filled docx, prefer `scripts/generate-docx-image-map.ps1` first and then run `scripts/insert-docx-images.ps1` on the already-filled copy.
-- For a polished final docx copy, optionally run `scripts/format-docx-report-style.ps1` after filling fields and inserting images.
+- For a cleaner formatted docx copy, optionally run `scripts/format-docx-report-style.ps1` after filling fields and inserting images.
 - For chat-driven local execution, prefer `scripts/build-report-from-feishu.ps1` so the wrapper can keep the final deliverable in the output root and move intermediate files into an `artifacts/` subdirectory.
 - The image pipeline can resolve OpenClaw-staged relative attachment paths such as `media/inbound/example.png`, so when those paths appear in prompt-injected media notes you can reuse them directly in `-ImagePaths`.
 - When the template has fixed section headings plus blank paragraphs, prefer block mappings over flattening long body content into a single field.
