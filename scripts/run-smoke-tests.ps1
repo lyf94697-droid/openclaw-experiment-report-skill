@@ -1366,6 +1366,56 @@ URL: https://example.com/network-lab
     $results.Add('course-design build-report auto flowchart skipped (python unavailable)') | Out-Null
   }
 
+  if (($null -ne (Get-Command python -ErrorAction SilentlyContinue)) -or ($null -ne (Get-Command py -ErrorAction SilentlyContinue))) {
+    $diagramSpecDir = Join-Path $tempRoot 'diagram-renderer-smoke'
+    New-Item -ItemType Directory -Path $diagramSpecDir -Force | Out-Null
+    $diagramRendererPath = Join-Path $repoRoot 'scripts\render-vertical-lab-flowchart.py'
+
+    $stackSpecPath = Join-Path $diagramSpecDir 'stack.txt'
+    @'
+@TITLE 分层架构图
+@STACK 校园导览系统
+@LAYER 表现层|首页|检索页|详情页
+@LAYER 业务层|检索服务|收藏服务
+@LAYER 数据层|地点表|收藏表|日志表
+'@ | Set-Content -LiteralPath $stackSpecPath -Encoding UTF8
+
+    $laneSpecPath = Join-Path $diagramSpecDir 'lane.txt'
+    @'
+@TITLE 业务协同泳道图
+@LANE 用户|打开系统|输入关键字|查看结果
+@LANE 前端|加载首页|提交检索|展示详情
+@LANE 后端|读取分类|查询地点|返回结果
+'@ | Set-Content -LiteralPath $laneSpecPath -Encoding UTF8
+
+    $branchSpecPath = Join-Path $diagramSpecDir 'branch.txt'
+    @'
+@TITLE 检索处理流程图
+进入首页
+输入关键字
+发起检索
+是否存在匹配结果？
+提示重新输入
+调整关键字后再次检索
+展示详情与路线提示
+'@ | Set-Content -LiteralPath $branchSpecPath -Encoding UTF8
+
+    $stackPng = Join-Path $diagramSpecDir 'stack.png'
+    $lanePng = Join-Path $diagramSpecDir 'lane.png'
+    $branchPng = Join-Path $diagramSpecDir 'branch.png'
+
+    & python $diagramRendererPath --steps-file $stackSpecPath --out $stackPng
+    & python $diagramRendererPath --steps-file $laneSpecPath --out $lanePng
+    & python $diagramRendererPath --steps-file $branchSpecPath --out $branchPng
+
+    Assert-True -Condition (Test-Path -LiteralPath $stackPng) -Message 'Diagram renderer did not create the layered architecture PNG.'
+    Assert-True -Condition (Test-Path -LiteralPath $lanePng) -Message 'Diagram renderer did not create the swimlane PNG.'
+    Assert-True -Condition (Test-Path -LiteralPath $branchPng) -Message 'Diagram renderer did not create the decision-flow PNG.'
+    $results.Add('diagram renderer multi-mode OK') | Out-Null
+  } else {
+    $results.Add('diagram renderer multi-mode skipped (python unavailable)') | Out-Null
+  }
+
   $mixedGroupImageSpecsPath = Join-Path $tempRoot 'image-specs-mixed-group.json'
   @"
 {
