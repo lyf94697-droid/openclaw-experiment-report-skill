@@ -201,6 +201,345 @@ function Convert-TemplateToDocxIfNeeded {
   }
 }
 
+function Get-OptionalTextContent {
+  param(
+    [AllowNull()]
+    [string]$Path,
+
+    [AllowNull()]
+    [string]$InlineText
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($Path)) {
+    return Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($InlineText)) {
+    return $InlineText
+  }
+
+  return ""
+}
+
+function Get-JsonObjectOrNull {
+  param(
+    [AllowNull()]
+    [string]$JsonText
+  )
+
+  if ([string]::IsNullOrWhiteSpace($JsonText)) {
+    return $null
+  }
+
+  try {
+    return $JsonText | ConvertFrom-Json
+  } catch {
+    return $null
+  }
+}
+
+function Get-ImageInputItems {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$InputMode,
+
+    [AllowNull()]
+    [string]$SpecsPath,
+
+    [AllowNull()]
+    [string]$SpecsJson,
+
+    [AllowNull()]
+    [string[]]$Paths
+  )
+
+  if ([string]::Equals($InputMode, "image-paths", [System.StringComparison]::OrdinalIgnoreCase)) {
+    return @(@($Paths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | ForEach-Object {
+          [pscustomobject]@{
+            path = [string]$_
+          }
+        }))
+  }
+
+  $jsonText = Get-OptionalTextContent -Path $SpecsPath -InlineText $SpecsJson
+  $rootObject = Get-JsonObjectOrNull -JsonText $jsonText
+  if ($null -eq $rootObject) {
+    return @()
+  }
+
+  if ($rootObject -is [System.Collections.IEnumerable] -and $rootObject -isnot [string]) {
+    return @($rootObject)
+  }
+
+  if ($rootObject.PSObject.Properties.Name -contains "images") {
+    return @($rootObject.images)
+  }
+
+  return @($rootObject)
+}
+
+function Get-ImageItemValue {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Item,
+
+    [Parameter(Mandatory = $true)]
+    [string[]]$Keys
+  )
+
+  foreach ($key in $Keys) {
+    if ($Item -is [System.Collections.IDictionary]) {
+      if ($Item.Contains($key) -and -not [string]::IsNullOrWhiteSpace([string]$Item[$key])) {
+        return ([string]$Item[$key]).Trim()
+      }
+      continue
+    }
+
+    $property = $Item.PSObject.Properties[$key]
+    if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+      return ([string]$property.Value).Trim()
+    }
+  }
+
+  return $null
+}
+
+function Test-IsFlowchartSignal {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  return (-not [string]::IsNullOrWhiteSpace($Text) -and $Text -match '(?i)(流程图|flowchart|flow-chart)')
+}
+
+function Test-ImageItemsContainFlowchart {
+  param(
+    [AllowEmptyCollection()]
+    [object[]]$Items
+  )
+
+  foreach ($item in @($Items)) {
+    foreach ($signal in @(
+        (Get-ImageItemValue -Item $item -Keys @("caption", "title", "figureCaption")),
+        (Get-ImageItemValue -Item $item -Keys @("section", "sectionName", "heading")),
+        (Get-ImageItemValue -Item $item -Keys @("path", "imagePath", "file"))
+      )) {
+      if (Test-IsFlowchartSignal -Text $signal) {
+        return $true
+      }
+    }
+  }
+
+  return $false
+}
+
+function Test-ImageItemsContainExplicitCaption {
+  param(
+    [AllowEmptyCollection()]
+    [object[]]$Items
+  )
+
+  foreach ($item in @($Items)) {
+    if (-not [string]::IsNullOrWhiteSpace((Get-ImageItemValue -Item $item -Keys @("caption", "title", "figureCaption")))) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Get-CourseDesignFlowchartTitle {
+  param(
+    [AllowNull()]
+    [string]$MetadataPath,
+
+    [AllowNull()]
+    [string]$MetadataJson,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ReportPath
+  )
+
+  $metadataText = Get-OptionalTextContent -Path $MetadataPath -InlineText $MetadataJson
+  $metadataRoot = Get-JsonObjectOrNull -JsonText $metadataText
+  if ($null -ne $metadataRoot) {
+    foreach ($key in @("课题名称", "项目名称", "题目", "标题", "实验名称")) {
+      $value = Get-ImageItemValue -Item $metadataRoot -Keys @($key)
+      if (-not [string]::IsNullOrWhiteSpace($value)) {
+        return ("{0}流程图" -f $value)
+      }
+    }
+  }
+
+  $reportText = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8
+  foreach ($pattern in @(
+      '课题名称[:：]\s*(?<value>.+)',
+      '项目名称[:：]\s*(?<value>.+)',
+      '题目[:：]\s*(?<value>.+)'
+    )) {
+    if ($reportText -match $pattern) {
+      return ("{0}流程图" -f $matches["value"].Trim())
+    }
+  }
+
+  return "课程设计实现流程图"
+}
+
+function Get-CourseDesignFlowchartSteps {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ReportPath,
+
+    [AllowNull()]
+    [string]$RequirementsPath,
+
+    [AllowNull()]
+    [string]$RequirementsJson
+  )
+
+  $reportText = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8
+  $requirementsText = Get-OptionalTextContent -Path $RequirementsPath -InlineText $RequirementsJson
+  $combinedText = ($reportText + [Environment]::NewLine + $requirementsText)
+  $steps = New-Object System.Collections.Generic.List[string]
+
+  $steps.Add("需求分析与目标确认") | Out-Null
+  $steps.Add("总体方案与模块划分") | Out-Null
+
+  if ($combinedText -match '数据库|数据表|SQL|MySQL|SQLite|ER图') {
+    $steps.Add("数据库与数据结构设计") | Out-Null
+  }
+
+  if ($combinedText -match '页面|界面|前端|UI|交互|小程序|客户端') {
+    $steps.Add("页面与交互模块实现") | Out-Null
+  }
+
+  if ($combinedText -match '算法|调度|推荐|搜索|计算|逻辑|接口|后端|服务端') {
+    $steps.Add("核心业务逻辑实现") | Out-Null
+  }
+
+  $steps.Add("功能联调与测试验证") | Out-Null
+  $steps.Add("问题修正与优化完善") | Out-Null
+
+  return @($steps | Select-Object -Unique)
+}
+
+function Try-NewCourseDesignAutoFlowchart {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ReportPath,
+
+    [AllowNull()]
+    [string]$MetadataPath,
+
+    [AllowNull()]
+    [string]$MetadataJson,
+
+    [AllowNull()]
+    [string]$RequirementsPath,
+
+    [AllowNull()]
+    [string]$RequirementsJson,
+
+    [Parameter(Mandatory = $true)]
+    [string]$OutputDir,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ImageInputMode,
+
+    [AllowNull()]
+    [string]$ImageSpecsPath,
+
+    [AllowNull()]
+    [string]$ImageSpecsJson,
+
+    [AllowNull()]
+    [string[]]$ImagePaths
+  )
+
+  $reportText = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8
+  $requirementsText = Get-OptionalTextContent -Path $RequirementsPath -InlineText $RequirementsJson
+  if (($reportText + [Environment]::NewLine + $requirementsText) -match '(?i)(不要流程图|不需要流程图|no flowchart)') {
+    return $null
+  }
+
+  $existingItems = @(Get-ImageInputItems -InputMode $ImageInputMode -SpecsPath $ImageSpecsPath -SpecsJson $ImageSpecsJson -Paths $ImagePaths)
+  if (Test-ImageItemsContainFlowchart -Items $existingItems) {
+    return $null
+  }
+
+  $rendererPath = Join-Path $RepoRoot "scripts\render-vertical-lab-flowchart.py"
+  if (-not (Test-Path -LiteralPath $rendererPath)) {
+    return $null
+  }
+
+  $artifactsDir = Join-Path $OutputDir "artifacts"
+  New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+
+  $stepsPath = Join-Path $artifactsDir "course-design-auto-flowchart.steps.txt"
+  $flowchartPath = Join-Path $artifactsDir "course-design-auto-flowchart.png"
+  $mergedSpecsPath = Join-Path $artifactsDir "course-design-auto-image-specs.json"
+  $flowchartSteps = @(Get-CourseDesignFlowchartSteps -ReportPath $ReportPath -RequirementsPath $RequirementsPath -RequirementsJson $RequirementsJson)
+  $flowchartTitle = Get-CourseDesignFlowchartTitle -MetadataPath $MetadataPath -MetadataJson $MetadataJson -ReportPath $ReportPath
+
+  [System.IO.File]::WriteAllLines($stepsPath, $flowchartSteps, (New-Object System.Text.UTF8Encoding($true)))
+
+  $rendered = $false
+  foreach ($pythonOption in @(
+      @{ command = "python"; prefix = @() },
+      @{ command = "py"; prefix = @("-3") }
+    )) {
+    if ($null -eq (Get-Command $pythonOption.command -ErrorAction SilentlyContinue)) {
+      continue
+    }
+
+    try {
+      & $pythonOption.command @($pythonOption.prefix + @($rendererPath, "--out", $flowchartPath, "--title", $flowchartTitle, "--steps-file", $stepsPath))
+      if (Test-Path -LiteralPath $flowchartPath) {
+        $rendered = $true
+        break
+      }
+    } catch {
+      if (Test-Path -LiteralPath $flowchartPath) {
+        Remove-Item -LiteralPath $flowchartPath -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+
+  if (-not $rendered) {
+    Write-Warning "Skipped course-design auto flowchart because the renderer could not run successfully."
+    return $null
+  }
+
+  $flowchartCaption = if (Test-ImageItemsContainExplicitCaption -Items $existingItems) {
+    "系统实现流程图"
+  } else {
+    "图1 系统实现流程图"
+  }
+
+  $mergedImages = @(
+    [ordered]@{
+      path = $flowchartPath
+      section = "方案设计与实现"
+      caption = $flowchartCaption
+      widthCm = 14.8
+    }
+  ) + @($existingItems)
+
+  $mergedSpecsRoot = [ordered]@{
+    images = $mergedImages
+  }
+  [System.IO.File]::WriteAllText($mergedSpecsPath, ($mergedSpecsRoot | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($true)))
+
+  return [pscustomobject]@{
+    flowchartPath = $flowchartPath
+    imageSpecsPath = $mergedSpecsPath
+  }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $sourceTemplatePath = $resolvedTemplatePath
@@ -261,8 +600,6 @@ $styleOutputRequested = $StyleFinalDocx -or (-not [string]::IsNullOrWhiteSpace($
 $runFullPipeline = [string]::Equals($PipelineMode, "full", [System.StringComparison]::OrdinalIgnoreCase)
 $shouldRunValidation = $runFullPipeline -or ($requirementsInputMode -ne "none")
 $shouldGenerateDebugOutlines = $runFullPipeline
-$shouldGenerateImagePlan = $imageInputsProvided -or (-not [string]::IsNullOrWhiteSpace($ImagePlanOutPath))
-$shouldRunLayoutCheck = $runFullPipeline -or $imageInputsProvided
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $OutputDir = Join-Path $repoRoot ("tests-output\build-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
@@ -270,6 +607,37 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+
+$effectiveImageInputMode = $imageInputMode
+$effectiveImageInputsProvided = $imageInputsProvided
+$effectiveImageSpecsPath = $ImageSpecsPath
+$effectiveImageSpecsJson = $ImageSpecsJson
+$effectiveImagePaths = $ImagePaths
+$autoCourseDesignFlowchart = $null
+if ([string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+  $autoCourseDesignFlowchart = Try-NewCourseDesignAutoFlowchart `
+    -ReportPath $resolvedReportPath `
+    -MetadataPath $resolvedMetadataPath `
+    -MetadataJson $MetadataJson `
+    -RequirementsPath $resolvedRequirementsPath `
+    -RequirementsJson $RequirementsJson `
+    -OutputDir $resolvedOutputDir `
+    -RepoRoot $repoRoot `
+    -ImageInputMode $imageInputMode `
+    -ImageSpecsPath $ImageSpecsPath `
+    -ImageSpecsJson $ImageSpecsJson `
+    -ImagePaths $ImagePaths
+  if ($null -ne $autoCourseDesignFlowchart) {
+    $effectiveImageInputMode = "specs-path"
+    $effectiveImageInputsProvided = $true
+    $effectiveImageSpecsPath = [string]$autoCourseDesignFlowchart.imageSpecsPath
+    $effectiveImageSpecsJson = $null
+    $effectiveImagePaths = @()
+  }
+}
+
+$shouldGenerateImagePlan = $effectiveImageInputsProvided -or (-not [string]::IsNullOrWhiteSpace($ImagePlanOutPath))
+$shouldRunLayoutCheck = $runFullPipeline -or $effectiveImageInputsProvided
 
 $templateConversion = Convert-TemplateToDocxIfNeeded -Path $resolvedTemplatePath -OutputDir $resolvedOutputDir
 $resolvedTemplatePath = [string]$templateConversion.templatePath
@@ -355,7 +723,7 @@ if ($shouldGenerateDebugOutlines) {
   [System.IO.File]::WriteAllText($filledOutlinePath, $filledOutline, (New-Object System.Text.UTF8Encoding($true)))
 }
 
-if ($imageInputsProvided) {
+if ($effectiveImageInputsProvided) {
   if ($shouldGenerateImagePlan) {
     $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) {
       Join-Path $resolvedOutputDir "image-placement-plan.md"
@@ -384,12 +752,12 @@ if ($imageInputsProvided) {
     ReportProfileName = $ReportProfileName
     ReportProfilePath = $resolvedReportProfilePath
   }
-  if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
-    $imageInputParams.ImageSpecsPath = (Resolve-Path -LiteralPath $ImageSpecsPath).Path
-  } elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
-    $imageInputParams.ImageSpecsJson = $ImageSpecsJson
+  if ([string]::Equals($effectiveImageInputMode, "specs-path", [System.StringComparison]::OrdinalIgnoreCase)) {
+    $imageInputParams.ImageSpecsPath = (Resolve-Path -LiteralPath $effectiveImageSpecsPath).Path
+  } elseif ([string]::Equals($effectiveImageInputMode, "specs-json", [System.StringComparison]::OrdinalIgnoreCase)) {
+    $imageInputParams.ImageSpecsJson = $effectiveImageSpecsJson
   } else {
-    $imageInputParams.ImagePaths = $ImagePaths
+    $imageInputParams.ImagePaths = $effectiveImagePaths
   }
 
   if ($shouldGenerateImagePlan) {
