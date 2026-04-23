@@ -1,5 +1,5 @@
 ﻿# OpenClaw Experiment Report Skill
-> Local OpenClaw workflow for Chinese lab reports: draft report content, fill docx templates, insert screenshots, and run layout checks.
+> Local OpenClaw workflow for Chinese lab reports and course-design reports: draft report content, fill docx templates, insert screenshots, and run layout checks.
 
 [![Quality Checks](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/quality.yml)
 [![Smoke Tests](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml/badge.svg)](https://github.com/lyf94697-droid/openclaw-experiment-report-skill/actions/workflows/smoke-tests.yml)
@@ -7,11 +7,11 @@
 
 ## 项目简介
 
-这是一个基于 OpenClaw 的实验报告 skill 和 PowerShell 本地流水线。
+这是一个基于 OpenClaw 的实验报告 / 课程设计报告 skill 和 PowerShell 本地流水线。
 
 它不是通用文档引擎。当前重点是把实验主题、要求、教程链接、代码、截图、数据、空白 `docx`/WPS/Word 模板这些材料，收拢成一条可复查的本地流程：先生成结构化中文实验报告，再填充模板、插入截图、生成图注，最后做一轮排版和 layout check，输出可检查的 `docx`。
 
-当前 `main` 分支优先解决“中文大学实验报告”这个具体场景，并保持技术路径务实可落地：以 OpenClaw 为生成入口，以本地脚本做模板处理、插图和最终排版。
+当前 `main` 分支优先解决“中文大学实验报告”这个具体场景，同时提供显式的课程设计报告快线。普通实验报告仍走默认 `experiment-report`，课程设计报告需要显式传 `-ReportProfileName course-design-report`。
 
 ## 解决什么问题
 
@@ -55,7 +55,8 @@
 
 ## 当前范围
 
-- 当前版本聚焦中文大学实验报告场景，不承诺任意报告类型都能直接套用
+- 稳定主线：`experiment-report`，用于常见中文大学实验报告
+- 显式快线：`course-design-report`，用于课程设计报告，不替代普通实验报告默认路径
 - 当前仓库主要面向 OpenClaw 用户，不是独立桌面应用
 - 仓库已经包含 `SKILL.md`、`references/`、`scripts/`、`examples/`、`demo/` 和 GitHub 协作治理文件
 - 当前稳定路径是“OpenClaw 生成 + 本地脚本处理模板、图片和排版”
@@ -92,7 +93,7 @@ openclaw skills list
 
 ### 2. 常用入口脚本
 
-最常用的本地入口有 3 个：
+最常用的本地入口有 4 个：
 
 - `scripts/build-report-from-feishu.ps1`
   适合飞书或直接聊天场景，负责把生成、模板填充、插图和最终输出串起来
@@ -100,6 +101,8 @@ openclaw skills list
   适合“教程链接 -> 报告正文 -> 模板填充 -> 最终 docx”这类流程
 - `scripts/build-report.ps1`
   适合你已经有正文和模板，只想走确定性的本地 `docx` 打包流程
+- `scripts/generate-report-inputs.ps1`
+  适合先单独导出 `prompt.txt`、`metadata.auto.json`、`requirements.auto.json`，再手动调试生成或对接外部流水线
 
 如果你需要拆开流水线逐步处理，仓库里也已经提供模板抽取、字段映射生成、图片映射生成、插图、样式优化、网页抓取、提示词准备和端到端验证脚本，入口都在 [scripts](scripts) 目录。
 
@@ -152,8 +155,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report.ps1 `
 - 在教程标题或参考文本已经包含实验名称时，can omit `-ExperimentName`
 - `build-report.ps1` 支持 `-StyleProfile auto|default|compact|school`
 - 如果你想加载自定义排版配置，可以配合 `-StyleProfilePath` 使用
-- 自动生成正文、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
-- 仓库现在内置两个 profile：`experiment-report` 和 `course-design-report`；如果你要生成课程设计报告，可以直接传 `-ReportProfileName course-design-report`
+- 正文生成、默认 validation / layout-check、模板 field-map 生成，以及 `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 的章节识别现在都会从 `profiles/experiment-report.json` 读取实验报告 profile；需要切换或覆盖时，可对 `build-report.ps1` / `build-report-from-url.ps1` / `build-report-from-feishu.ps1` / `generate-docx-image-map.ps1` / `insert-docx-images.ps1` 使用 `-ReportProfileName` 或 `-ReportProfilePath`
+- 仓库现在内置两个 profile：`experiment-report` 和 `course-design-report`；课程设计报告请显式传 `-ReportProfileName course-design-report`，并参考 [docs/course-design-fastline.md](docs/course-design-fastline.md)
 - `generate-docx-field-map.ps1` 的 JSON 输出现在会额外带 `diagnostics` 和 `summary.diagnosticCountsByCode`，用于解释模板里哪些章节标题、metadata 标签或复合正文单元格没有命中自动映射规则
 - 如果你正在适配新模板或准备新增一个 report profile，可以先跑 `scripts/check-report-profile-template-fit.ps1`，它会基于 field-map diagnostics 汇总出缺 metadata、缺章节内容、建议补的 `sectionFields` alias，以及建议新增的 `fieldMapCompositeRules`
 - 只要传入图片，`build-report.ps1`、`build-report-from-feishu.ps1`、`build-report-from-url.ps1` 都会自动额外写出 `image-placement-plan.md`；如需改位置，可用 `-ImagePlanOutPath`
@@ -188,18 +191,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-smoke-tests.ps1
 
 ## 项目现状
 
-当前 `main` 分支可以跑通一条实验报告工作流：生成正文、填模板、插图片、补图注、做基础排版和 layout check。
-仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把“实验报告”这条链路做得更稳、更好用、更容易复现。
-后续扩展会先作为候选模板或实验分支推进，不把新类型文档硬塞进默认主线。
+当前 `main` 分支可以跑通实验报告工作流：生成正文、填模板、插图片、补图注、做基础排版和 layout check。课程设计报告已经作为显式快线进入 `main`，包含课程设计 profile、快线提示词、固定小节编号、课程设计表格插入和黑白 PNG 流程图生成。
+仓库还在持续迭代中，但当前优先级不是盲目扩场景，而是先把实验报告和课程设计这两条路径做得更稳、更好用、更容易复现。
+其他报告类型后续会先作为候选模板或实验分支推进，不硬塞进默认主线。
 
 ## Roadmap
 
-当前方向：先把实验报告主线做实用，再谨慎推进候选文档类型。
+当前方向：先把实验报告主线和课程设计快线做实用，再谨慎推进其他候选文档类型。
 
 - 继续补常见实验报告模板和模板适配策略
 - 强化教程链接、截图、正文、模板之间的本地串联能力
 - 增强图片插入、图注和多图布局的配置能力
-- 把课程设计、周报、月报、项目文档等先作为候选路径验证
+- 把周报、月报、项目文档等先作为候选路径验证
 - 只在真实模板和 smoke 覆盖足够后，把新的路径推进稳定主线
 - 继续完善样式 profile，让不同学校/模板的排版策略更容易切换
 

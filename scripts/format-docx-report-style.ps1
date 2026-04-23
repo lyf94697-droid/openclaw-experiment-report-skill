@@ -334,6 +334,138 @@ function Get-ParagraphText {
   return Normalize-OpenXmlText -Text ($parts -join "")
 }
 
+function Test-IsRemovableTrailingParagraph {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $text = Get-ParagraphText -Paragraph $Paragraph -NamespaceManager $NamespaceManager
+  if (-not [string]::IsNullOrWhiteSpace($text)) {
+    return $false
+  }
+
+  $protectedContent = $Paragraph.SelectSingleNode(".//w:drawing | .//w:tbl | .//w:sectPr | .//w:br[@w:type='page']", $NamespaceManager)
+  return ($null -eq $protectedContent)
+}
+
+function Remove-TrailingEmptyBodyParagraphs {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $removedCount = 0
+  while ($Body.ChildNodes.Count -gt 1) {
+    $candidateIndex = $Body.ChildNodes.Count - 1
+    $lastChild = $Body.ChildNodes[$candidateIndex]
+    if ($lastChild.LocalName -eq "sectPr") {
+      $candidateIndex--
+      if ($candidateIndex -lt 0) {
+        break
+      }
+      $lastChild = $Body.ChildNodes[$candidateIndex]
+    }
+
+    if ($lastChild.LocalName -ne "p") {
+      break
+    }
+
+    if (-not (Test-IsRemovableTrailingParagraph -Paragraph $lastChild -NamespaceManager $NamespaceManager)) {
+      break
+    }
+
+    [void]$Body.RemoveChild($lastChild)
+    $removedCount++
+  }
+
+  return $removedCount
+}
+
+function Get-NextMeaningfulBodyParagraphInfo {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $candidate = $Paragraph.NextSibling
+  while ($null -ne $candidate) {
+    if ($candidate.LocalName -eq "p") {
+      $text = Get-ParagraphText -Paragraph $candidate -NamespaceManager $NamespaceManager
+      if (-not [string]::IsNullOrWhiteSpace($text)) {
+        return [pscustomobject]@{
+          Paragraph = $candidate
+          Text = $text
+        }
+      }
+    }
+
+    $candidate = $candidate.NextSibling
+  }
+
+  return $null
+}
+
+function Remove-CourseDesignDuplicatePlaceholderParagraphs {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $removedCount = 0
+  $paragraphs = @($Body.SelectNodes("./w:p", $NamespaceManager))
+  foreach ($paragraph in $paragraphs) {
+    if ($null -eq $paragraph.ParentNode) {
+      continue
+    }
+
+    $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $NamespaceManager
+    if ([string]::IsNullOrWhiteSpace($text)) {
+      continue
+    }
+
+    $nextInfo = Get-NextMeaningfulBodyParagraphInfo -Paragraph $paragraph -NamespaceManager $NamespaceManager
+    if ($null -eq $nextInfo) {
+      continue
+    }
+
+    $removeParagraph = $false
+    switch ($text) {
+      "问题分析（需求分析、可行性分析）" {
+        $removeParagraph = [string]::Equals([string]$nextInfo.Text, "摘要：", [System.StringComparison]::Ordinal)
+        break
+      }
+      "实现结果" {
+        $removeParagraph = ([string]$nextInfo.Text -match '^[五5][、\.．]\s*实现结果$')
+        break
+      }
+      "总结" {
+        $removeParagraph = ([string]$nextInfo.Text -match '^[七7][、\.．]\s*(设计)?总结$')
+        break
+      }
+    }
+
+    if ($removeParagraph) {
+      [void]$paragraph.ParentNode.RemoveChild($paragraph)
+      $removedCount++
+    }
+  }
+
+  return $removedCount
+}
+
 function Get-HeadingPattern {
   param(
     [Parameter(Mandatory = $true)]
@@ -364,6 +496,19 @@ function Test-IsSectionHeading {
   }
 
   return $false
+}
+
+function Test-IsDecimalSubheading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return [bool]((Normalize-OpenXmlText -Text $Text) -match '^\d+\.\d+(?:\.\d+)?\s+\S+')
 }
 
 function Test-IsMetadataParagraph {
@@ -446,8 +591,39 @@ function Test-IsCommandParagraph {
 
   return (
     $trimmed -match '^(?:PS\s+[^>]+>|[A-Za-z]:\\[^>]*>|>\s*)\s*\S+' -or
-    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b)(?:\s|$)' -or
+    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b|gcc\b|g\+\+\b|clang\b|clang\+\+\b|make\b|cmake\b|\.\/\S+)(?:\s|$)' -or
     $trimmed -match '(?i)^(?:reply from|pinging|packets:|minimum =|maximum =|ipv4 address|subnet mask|default gateway|physical address|ethernet adapter)\b'
+  )
+}
+
+function Test-IsCodeParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 240 -or (Test-IsCommandParagraph -Text $trimmed)) {
+    return $false
+  }
+
+  $matchesExplicitCodePattern = (
+    $trimmed -match '^(?:#\s*(?:define|include)\b|if\s*\(|else(?:\s+if\b.*)?\s*\{?|while\s*\(|for\s*\(|switch\s*\(|return\b.*;|break;|continue;|\{|\}|}\s*else(?:\s+if\b.*)?\s*\{?)' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\->\.\[\]]*\s*=\s*.+;$' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\s\*\->\.\[\]\(\)]*\([^)]*\)\s*\{?$'
+  )
+  if ($matchesExplicitCodePattern) {
+    return $true
+  }
+
+  return (
+    $trimmed -notmatch '[一-龥]' -and
+    ($trimmed -match ';$' -or $trimmed -match '\->') -and
+    $trimmed -match '[A-Za-z_]'
   )
 }
 
@@ -605,6 +781,32 @@ function Set-ParagraphSpacing {
   }
 }
 
+function Set-ParagraphOutlineLevel {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [AllowNull()]
+    [int]$Level
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $outlineLvl = $pPr.SelectSingleNode("./w:outlineLvl", $script:namespaceManager)
+
+  if ($null -eq $Level) {
+    if ($null -ne $outlineLvl) {
+      [void]$pPr.RemoveChild($outlineLvl)
+    }
+    return
+  }
+
+  if ($null -eq $outlineLvl) {
+    $outlineLvl = $Paragraph.OwnerDocument.CreateElement("w", "outlineLvl", $wordNamespace)
+    [void]$pPr.AppendChild($outlineLvl)
+  }
+  Set-WordAttribute -Element $outlineLvl -LocalName "val" -Value ([string]$Level)
+}
+
 function Set-ParagraphPagination {
   param(
     [Parameter(Mandatory = $true)]
@@ -732,6 +934,38 @@ function Set-RunFontSize {
   }
 }
 
+function Set-RunColor {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Color
+  )
+
+  $runProperties = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  [void]$runProperties.Add((Get-OrCreateChildElement -Parent $pPr -LocalName "rPr"))
+
+  foreach ($run in @($Paragraph.SelectNodes("./w:r", $script:namespaceManager))) {
+    $runRPr = $run.SelectSingleNode("./w:rPr", $script:namespaceManager)
+    if ($null -eq $runRPr) {
+      $runRPr = $Paragraph.OwnerDocument.CreateElement("w", "rPr", $wordNamespace)
+      if ($run.HasChildNodes) {
+        $run.InsertBefore($runRPr, $run.FirstChild) | Out-Null
+      } else {
+        $run.AppendChild($runRPr) | Out-Null
+      }
+    }
+    [void]$runProperties.Add($runRPr)
+  }
+
+  foreach ($rPr in $runProperties) {
+    $colorNode = Get-OrCreateChildElement -Parent $rPr -LocalName "color"
+    Set-WordAttribute -Element $colorNode -LocalName "val" -Value $Color
+  }
+}
+
 function Set-RunTypography {
   param(
     [Parameter(Mandatory = $true)]
@@ -751,6 +985,7 @@ function Set-RunTypography {
   } else {
     Set-RunFont -Paragraph $Paragraph -FontName $FontName -SizeHalfPoints $SizeHalfPoints
   }
+  Set-RunColor -Paragraph $Paragraph -Color "000000"
 }
 
 function Set-ParagraphShading {
@@ -931,6 +1166,229 @@ function Get-TopLevelTableProfileSignal {
   }
 }
 
+function Test-IsCourseDesignCoverTitleText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $compact = Normalize-OpenXmlText -Text $Text
+  return ($compact -match '课程设计报告$')
+}
+
+function Test-IsCourseDesignCoverSubtitleText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $compact = Normalize-OpenXmlText -Text $Text
+  return ($compact -match '学年.*学期')
+}
+
+function Test-IsCourseDesignCoverLabelText {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $compact = (($Text -replace '\s+', '') -replace '：|:', '')
+  return ($compact -match '^(题目|专业|班级|学号|姓名|时间|小组成员)$')
+}
+
+function Test-IsCourseDesignCoverTable {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Table
+  )
+
+  $rows = @($Table.SelectNodes("./w:tr", $script:namespaceManager))
+  if ($rows.Count -lt 4) {
+    return $false
+  }
+
+  $matchedLabelCount = 0
+  foreach ($row in $rows) {
+    $firstCell = $row.SelectSingleNode("./w:tc[1]", $script:namespaceManager)
+    if ($null -eq $firstCell) {
+      continue
+    }
+
+    $cellText = Normalize-OpenXmlText -Text (($firstCell.SelectNodes(".//w:t | .//w:instrText", $script:namespaceManager) | ForEach-Object { $_.InnerText }) -join "")
+    if (Test-IsCourseDesignCoverLabelText -Text $cellText) {
+      $matchedLabelCount++
+    }
+  }
+
+  return ($matchedLabelCount -ge 4)
+}
+
+function Get-CourseDesignCoverElements {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  $titleParagraph = $null
+  $subtitleParagraph = $null
+  $coverTable = $null
+
+  foreach ($child in @($Body.ChildNodes)) {
+    if ($child.LocalName -eq "p") {
+      $text = Get-ParagraphText -Paragraph $child -NamespaceManager $script:namespaceManager
+      if ([string]::IsNullOrWhiteSpace($text)) {
+        continue
+      }
+
+      if ($null -eq $titleParagraph -and (Test-IsCourseDesignCoverTitleText -Text $text)) {
+        $titleParagraph = $child
+        continue
+      }
+
+      if ($null -ne $titleParagraph -and $null -eq $subtitleParagraph -and (Test-IsCourseDesignCoverSubtitleText -Text $text)) {
+        $subtitleParagraph = $child
+        continue
+      }
+
+      if (Test-IsSectionHeading -Text $text) {
+        break
+      }
+
+      continue
+    }
+
+    if ($child.LocalName -eq "tbl" -and $null -eq $coverTable) {
+      if (Test-IsCourseDesignCoverTable -Table $child) {
+        $coverTable = $child
+      }
+      continue
+    }
+  }
+
+  return [pscustomobject]@{
+    TitleParagraph = $titleParagraph
+    SubtitleParagraph = $subtitleParagraph
+    CoverTable = $coverTable
+  }
+}
+
+function Apply-CourseDesignCoverStyles {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  $coverElements = Get-CourseDesignCoverElements -Body $Body
+
+  if ($null -ne $coverElements.TitleParagraph) {
+    Set-ParagraphJustification -Paragraph $coverElements.TitleParagraph -Value "center"
+    Set-ParagraphIndent -Paragraph $coverElements.TitleParagraph -FirstLine 0
+    Set-ParagraphSpacing -Paragraph $coverElements.TitleParagraph -Before 0 -After 120 -Line 320
+    Set-ParagraphBold -Paragraph $coverElements.TitleParagraph
+    Set-RunTypography -Paragraph $coverElements.TitleParagraph -FontName "黑体" -SizeHalfPoints 52
+  }
+
+  if ($null -ne $coverElements.SubtitleParagraph) {
+    Set-ParagraphJustification -Paragraph $coverElements.SubtitleParagraph -Value "center"
+    Set-ParagraphIndent -Paragraph $coverElements.SubtitleParagraph -FirstLine 0
+    Set-ParagraphSpacing -Paragraph $coverElements.SubtitleParagraph -Before 0 -After 160 -Line 320
+    Set-ParagraphPagination -Paragraph $coverElements.SubtitleParagraph -KeepNext $false -KeepLines $false
+    Set-RunTypography -Paragraph $coverElements.SubtitleParagraph -FontName "楷体_GB2312" -SizeHalfPoints 30
+  }
+
+  if ($null -eq $coverElements.CoverTable) {
+    return
+  }
+
+  $rows = @($coverElements.CoverTable.SelectNodes("./w:tr", $script:namespaceManager))
+  for ($rowIndex = 0; $rowIndex -lt $rows.Count; $rowIndex++) {
+    $cells = @($rows[$rowIndex].SelectNodes("./w:tc", $script:namespaceManager))
+    for ($cellIndex = 0; $cellIndex -lt $cells.Count; $cellIndex++) {
+      foreach ($paragraph in @($cells[$cellIndex].SelectNodes(".//w:p", $script:namespaceManager))) {
+        Set-ParagraphJustification -Paragraph $paragraph -Value "center"
+        Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+        Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line 320
+        Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
+
+        if ($cellIndex -eq 0) {
+          Set-ParagraphBold -Paragraph $paragraph
+          Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints 32
+        } else {
+          Set-RunTypography -Paragraph $paragraph -FontName "楷体_GB2312" -SizeHalfPoints 32
+        }
+      }
+    }
+  }
+}
+
+function Ensure-SectionHasTitlePageElement {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$SectionProperties
+  )
+
+  $titlePg = $SectionProperties.SelectSingleNode("./w:titlePg", $script:namespaceManager)
+  if ($null -ne $titlePg) {
+    return $false
+  }
+
+  $titlePg = $SectionProperties.OwnerDocument.CreateElement("w", "titlePg", $wordNamespace)
+  $pgSz = $SectionProperties.SelectSingleNode("./w:pgSz", $script:namespaceManager)
+  if ($null -ne $pgSz) {
+    [void]$SectionProperties.InsertBefore($titlePg, $pgSz)
+  } else {
+    [void]$SectionProperties.AppendChild($titlePg)
+  }
+
+  return $true
+}
+
+function Ensure-SectionPageNumberStart {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$SectionProperties,
+
+    [int]$Start = 1
+  )
+
+  $pgNumType = $SectionProperties.SelectSingleNode("./w:pgNumType", $script:namespaceManager)
+  if ($null -eq $pgNumType) {
+    $pgNumType = $SectionProperties.OwnerDocument.CreateElement("w", "pgNumType", $wordNamespace)
+    $cols = $SectionProperties.SelectSingleNode("./w:cols", $script:namespaceManager)
+    if ($null -ne $cols) {
+      [void]$SectionProperties.InsertBefore($pgNumType, $cols)
+    } else {
+      [void]$SectionProperties.AppendChild($pgNumType)
+    }
+  }
+
+  $currentValue = $pgNumType.GetAttribute("w:start")
+  if ([string]::Equals($currentValue, [string]$Start, [System.StringComparison]::Ordinal)) {
+    return $false
+  }
+
+  Set-WordAttribute -Element $pgNumType -LocalName "start" -Value ([string]$Start)
+  return $true
+}
+
+function Ensure-CourseDesignCoverUsesDifferentFirstPage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body
+  )
+
+  $sectPr = $Body.SelectSingleNode("./w:sectPr", $script:namespaceManager)
+  if ($null -eq $sectPr) {
+    return $false
+  }
+
+  return (Ensure-SectionHasTitlePageElement -SectionProperties $sectPr)
+}
+
 function Resolve-StyleProfileDecision {
   param(
     [Parameter(Mandatory = $true)]
@@ -1107,18 +1565,32 @@ try {
     }
   }
   $styleSettings = [pscustomobject]$effectiveStyleSettings
+  $isCourseDesignReport = [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase)
+  if ($isCourseDesignReport) {
+    $styleSettings.BodyLineTwips = 320
+    $styleSettings.BodyFontHalfPoints = 21
+    $styleSettings.MetadataFontHalfPoints = 21
+    $styleSettings.ListFontHalfPoints = 21
+    $styleSettings.CaptionFontHalfPoints = 18
+    $styleSettings.HeadingFontHalfPoints = 24
+    $styleSettings.HeadingBeforeTwips = 80
+    $styleSettings.HeadingAfterTwips = 40
+    $styleSettings.CaptionAfterTwips = 40
+  }
   $useTemplateLikeCompactStyle = ([string]$profileDecision.ResolvedProfile -eq "compact")
   $usePaginationHints = (-not $useTemplateLikeCompactStyle)
 
   $paragraphs = @($documentXml.SelectNodes("//w:p", $script:namespaceManager))
   $styledTitleCount = 0
   $styledHeadingCount = 0
+  $styledSubheadingCount = 0
   $styledBodyCount = 0
   $styledCaptionCount = 0
   $styledImageCount = 0
   $styledMetadataCount = 0
   $styledListCount = 0
   $styledCommandCount = 0
+  $styledCodeCount = 0
   $styledTableParagraphCount = 0
   $normalizedBodyRowCount = 0
 
@@ -1172,12 +1644,28 @@ try {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.HeadingBeforeTwips -After $styleSettings.HeadingAfterTwips -Line $styleSettings.BodyLineTwips
+      Set-ParagraphOutlineLevel -Paragraph $paragraph -Level 0
       Set-ParagraphBold -Paragraph $paragraph
       if (-not $useTemplateLikeCompactStyle) {
         Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
       }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledHeadingCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
+      continue
+    }
+
+    if ($isCourseDesignReport -and (Test-IsDecimalSubheading -Text $text)) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 60 -After 20 -Line $styleSettings.BodyLineTwips
+      Set-ParagraphOutlineLevel -Paragraph $paragraph -Level 1
+      Set-ParagraphBold -Paragraph $paragraph
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints ([Math]::Max(20, [int]$styleSettings.HeadingFontHalfPoints - 2))
+      }
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
+      $styledSubheadingCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
@@ -1194,7 +1682,7 @@ try {
       continue
     }
 
-    if (Test-IsCommandParagraph -Text $text) {
+    if ((-not $isInTable) -and (Test-IsCommandParagraph -Text $text)) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "left"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before $styleSettings.CommandBeforeTwips -After $styleSettings.CommandAfterTwips -Line $styleSettings.CommandLineTwips
@@ -1204,6 +1692,20 @@ try {
       Set-ParagraphShading -Paragraph $paragraph -Fill "F2F2F2"
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
       $styledCommandCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
+      continue
+    }
+
+    if ((-not $isInTable) -and (Test-IsCodeParagraph -Text $text)) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "left"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 0 -Line $styleSettings.CommandLineTwips
+      if (-not $useTemplateLikeCompactStyle) {
+        Set-RunTypography -Paragraph $paragraph -FontName "Consolas" -SizeHalfPoints $styleSettings.CommandFontHalfPoints
+      }
+      Set-ParagraphShading -Paragraph $paragraph -Fill "F8F8F8"
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
+      $styledCodeCount++
       if ($isInTable) { $styledTableParagraphCount++ }
       continue
     }
@@ -1225,11 +1727,25 @@ try {
     Set-ParagraphIndent -Paragraph $paragraph -FirstLine $(if ($isInTable) { 0 } else { $styleSettings.BodyFirstLineTwips })
     Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.BodyAfterTwips -Line $styleSettings.BodyLineTwips
     if (-not $useTemplateLikeCompactStyle) {
-      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.BodyFontHalfPoints
+      $bodyFontHalfPoints = if ($isCourseDesignReport -and $isInTable) { 18 } else { $styleSettings.BodyFontHalfPoints }
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $bodyFontHalfPoints
     }
     Set-ParagraphPagination -Paragraph $paragraph -KeepNext $false -KeepLines $false
     $styledBodyCount++
     if ($isInTable) { $styledTableParagraphCount++ }
+  }
+
+  if ($isCourseDesignReport) {
+    Apply-CourseDesignCoverStyles -Body $body
+  }
+
+  $removedCourseDesignPlaceholderCount = 0
+  $enabledCourseDesignTitlePageCount = 0
+  if ($isCourseDesignReport) {
+    $removedCourseDesignPlaceholderCount = Remove-CourseDesignDuplicatePlaceholderParagraphs -Body $body -NamespaceManager $script:namespaceManager
+    if (Ensure-CourseDesignCoverUsesDifferentFirstPage -Body $body) {
+      $enabledCourseDesignTitlePageCount = 1
+    }
   }
 
   foreach ($row in @($documentXml.SelectNodes("//w:tbl[not(ancestor::w:tbl)]/w:tr", $script:namespaceManager))) {
@@ -1237,6 +1753,8 @@ try {
       $normalizedBodyRowCount++
     }
   }
+
+  $removedTrailingEmptyParagraphCount = Remove-TrailingEmptyBodyParagraphs -Body $body -NamespaceManager $script:namespaceManager
 
   [System.IO.File]::WriteAllText($documentXmlPath, $documentXml.OuterXml, (New-Object System.Text.UTF8Encoding($false)))
   Write-OpenXmlPackage -SourceDirectory $tempRoot -DestinationPath $resolvedOutPath
@@ -1254,14 +1772,19 @@ try {
     appliedSettings = $styleSettings
     styledTitleCount = $styledTitleCount
     styledHeadingCount = $styledHeadingCount
+    styledSubheadingCount = $styledSubheadingCount
     styledBodyCount = $styledBodyCount
     styledCaptionCount = $styledCaptionCount
     styledImageCount = $styledImageCount
     styledMetadataCount = $styledMetadataCount
     styledListCount = $styledListCount
     styledCommandCount = $styledCommandCount
+    styledCodeCount = $styledCodeCount
     styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
+    removedCourseDesignPlaceholderCount = $removedCourseDesignPlaceholderCount
+    enabledCourseDesignTitlePageCount = $enabledCourseDesignTitlePageCount
+    removedTrailingEmptyParagraphCount = $removedTrailingEmptyParagraphCount
   }
 } finally {
   if (Test-Path -LiteralPath $tempRoot) {

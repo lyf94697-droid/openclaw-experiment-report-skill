@@ -620,7 +620,7 @@ try {
   $results.Add('example local uploaded-images prompt OK') | Out-Null
 
   $oneShotUploadedPromptExample = Get-Content -LiteralPath (Join-Path $repoRoot 'examples\one-shot-uploaded-images-docx-prompt.md') -Raw -Encoding UTF8
-  Assert-True -Condition ($oneShotUploadedPromptExample -match '不要中途让我确认') -Message 'One-shot uploaded-images prompt example is missing the no-confirmation guidance.'
+  Assert-True -Condition ($oneShotUploadedPromptExample -match '不要默认拆成很长的手工任务列表') -Message 'One-shot uploaded-images prompt example is missing the fast-wrapper guidance.'
   Assert-True -Condition ($oneShotUploadedPromptExample -match '-PlanOnly') -Message 'One-shot uploaded-images prompt example is missing the image placement planning command.'
   Assert-True -Condition ($oneShotUploadedPromptExample -match '低置信度') -Message 'One-shot uploaded-images prompt example is missing the low-confidence handling guidance.'
   $results.Add('example one-shot uploaded-images prompt OK') | Out-Null
@@ -1161,34 +1161,44 @@ URL: https://example.com/network-lab
 完成时间：2026-04-08
 设计地点：实验楼 A201
 
-一、设计目标
+一、摘要
+本次课程设计围绕校园导览小程序展开，目标是完成一个能够展示校园建筑、提供地点检索与路线浏览的移动端演示系统。设计过程中重点完成了页面结构划分、基础数据组织、地点详情展示和路线说明界面的联动，并结合截图验证了页面跳转、列表展示和交互流程。
+
+二、关键词
+校园导览；小程序；课程设计；页面交互
+
+三、设计目标
 本次课程设计的目标是完成一个面向校园访客和学生的导览小程序，使用户能够快速查看教学楼、实验室和生活服务点的位置分布。
 除了完成基础的地图展示功能，还需要在交互流程中突出搜索、路线提示和常用地点收藏等核心能力，保证项目具备完整的演示价值。
 
-二、开发环境
+四、开发环境
 项目开发使用 Windows 11、Node.js、微信开发者工具和 SQLite 作为本地调试环境，前端页面采用小程序原生组件实现。
 为了方便联调与演示，后端接口在本机启动测试服务，并通过模拟数据覆盖地点检索、分类筛选和详情展示等典型场景。
 
-三、需求分析
+五、需求分析
 系统需要支持地点分类浏览、关键字搜索、地点详情查看和推荐路线提示，保证新生在不熟悉校园环境时也能快速定位目标区域。
 在分析过程中重点梳理了教学区、宿舍区和公共服务区三类地点信息结构，并明确了页面响应速度和信息准确性两项核心约束。
 
-四、方案设计与实现
+六、方案设计与实现
 整体方案采用前后端分层结构，前端负责地点列表、搜索页和详情页展示，后端负责地点数据组织、关键词过滤和路线推荐结果返回。
 在实现阶段先完成地点数据模型和接口约定，再逐步补齐首页分类卡片、搜索联想、详情页信息模块和收藏状态管理逻辑。
 为了让演示效果更加稳定，还为主要页面增加了空状态提示、加载占位和异常请求兜底提示，避免因为数据延迟导致界面体验不完整。
 
-五、运行结果
+七、实现结果
 系统启动后可以正常展示校园地点分类首页，输入教学楼关键字后能够即时返回匹配结果，并支持点击进入地点详情页查看开放时间和相关说明。
 在演示测试中，推荐路线和收藏功能都能按照预期更新界面状态，整体流程从搜索到查看结果再到返回首页保持稳定，没有出现明显的页面跳转错误。
 
-六、问题与改进
+八、问题与改进
 当前版本在地点数据量进一步增大时，搜索结果排序仍然偏向简单匹配规则，缺少结合距离和使用频率的综合排序能力。
 后续可以引入更细致的标签体系和缓存策略，同时补充地图组件联动能力，使路线展示、地点筛选和结果高亮之间形成更自然的交互闭环。
 
-七、设计总结
+九、设计总结
 通过这次课程设计，进一步理解了从需求分析、页面拆分到接口联调的完整实现流程，也明确了前后端边界划分对项目稳定性的影响。
 项目从可运行原型逐步完善到可演示成品的过程中，最大的收获是学会了围绕用户任务链路组织设计重点，而不是只堆叠单个功能模块。
+
+十、参考文献
+[1] 微信开发者工具官方文档。
+[2] 小程序开发框架相关课程资料。
 '@ | Set-Content -LiteralPath $courseDesignReportPath -Encoding UTF8
 
   $courseDesignMetadataPath = Join-Path $tempRoot 'course-design-metadata.json'

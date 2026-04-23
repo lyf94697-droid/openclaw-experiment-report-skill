@@ -84,6 +84,12 @@
       { "pattern": "analysis|error|problem|异常", "caption": "问题分析截图" }
     ]
   },
+  "paginationRiskThresholds": {
+    "longSectionChars": 900,
+    "denseSectionChars": 550,
+    "denseSectionParagraphs": 2,
+    "figureClusterRefs": 3
+  },
   "fieldMapCompositeRules": [
     {
       "matchAll": ["实验目的", "实验内容"],

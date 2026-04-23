@@ -29,6 +29,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 $fieldMapCompositeRules = @(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile)
+$paragraphCompositeRules = @(Get-ReportProfileParagraphCompositeRules -Profile $reportProfile)
 
 $labelPattern = '^(?<label>[^:\uFF1A]{1,60})[:\uFF1A]\s*(?<rest>.*)$'
 $placeholderPattern = '[_\uFF3F]{2,}|\.{3,}|\uFF08\s*\uFF09|\(\s*\)|\u25A1|\u25A0'
@@ -64,6 +65,59 @@ function Normalize-FieldKey {
   return $normalized
 }
 
+function Test-LooksLikeCommandLine {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 180) {
+    return $false
+  }
+
+  return (
+    $trimmed -match '^(?:PS\s+[^>]+>|[A-Za-z]:\\[^>]*>|>\s*)\s*\S+' -or
+    $trimmed -match '(?i)^(?:ipconfig|ping|arp|tracert|netstat|nslookup|route|netsh|net\s+|cd\s+|dir\b|java\b|javac\b|gradle\b|adb\b|git\b|powershell\b|cmd\b|gcc\b|g\+\+\b|clang\b|clang\+\+\b|make\b|cmake\b|\.\/\S+)(?:\s|$)' -or
+    $trimmed -match '(?i)^(?:reply from|pinging|packets:|minimum =|maximum =|ipv4 address|subnet mask|default gateway|physical address|ethernet adapter)\b'
+  )
+}
+
+function Test-LooksLikeCodeLine {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $trimmed = $Text.Trim()
+  if ($trimmed.Length -gt 240 -or (Test-LooksLikeCommandLine -Text $trimmed)) {
+    return $false
+  }
+
+  $matchesExplicitCodePattern = (
+    $trimmed -match '^(?:#\s*(?:define|include)\b|if\s*\(|else(?:\s+if\b.*)?\s*\{?|while\s*\(|for\s*\(|switch\s*\(|return\b.*;|break;|continue;|\{|\}|}\s*else(?:\s+if\b.*)?\s*\{?)' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\->\.\[\]]*\s*=\s*.+;$' -or
+    $trimmed -match '^[A-Za-z_][A-Za-z0-9_\s\*\->\.\[\]\(\)]*\([^)]*\)\s*\{?$'
+  )
+  if ($matchesExplicitCodePattern) {
+    return $true
+  }
+
+  return (
+    $trimmed -notmatch '[一-龥]' -and
+    ($trimmed -match ';$' -or $trimmed -match '\->') -and
+    $trimmed -match '[A-Za-z_]'
+  )
+}
+
 function Is-PlaceholderLike {
   param(
     [AllowNull()]
@@ -75,6 +129,46 @@ function Is-PlaceholderLike {
   }
 
   return [bool]($Text -match $placeholderPattern)
+}
+
+function Is-FillableInstructionLike {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $true
+  }
+
+  if ($normalizedText -match $labelPattern) {
+    return $false
+  }
+
+  if (Is-PlaceholderLike -Text $normalizedText) {
+    return $true
+  }
+
+  return [bool]($normalizedText -match '^[（(].*(针对|描述|给出|总结|明确|采用|验证|说明).*[）)]$')
+}
+
+function Is-ExplicitFillTargetInstructionLike {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return $false
+  }
+
+  if ($normalizedText -match $labelPattern) {
+    return $false
+  }
+
+  return [bool]($normalizedText -match '^[（(].*(针对|描述|给出|总结|明确|采用|验证|说明).*[）)]$')
 }
 
 function Get-OptionFieldInfo {
@@ -685,6 +779,170 @@ function Resolve-SectionRule {
   return $null
 }
 
+function Test-IsDecimalSubheading {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  return [bool]((Normalize-OpenXmlText -Text $Text) -match '^\d+\.\d+(?:\.\d+)?\s+\S+')
+}
+
+function Split-ToSentenceList {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+    return @()
+  }
+
+  $sentences = @(
+    [regex]::Split($normalizedText, '(?<=[。！？；])\s*') |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  )
+
+  if ($sentences.Count -eq 0) {
+    return @($normalizedText)
+  }
+
+  return @($sentences)
+}
+
+function Get-CourseDesignSubheadingTitles {
+  param(
+    [AllowNull()]
+    [string]$SectionId
+  )
+
+  $normalizedSectionId = if ([string]::IsNullOrWhiteSpace($SectionId)) { '' } else { ([string]$SectionId).ToLowerInvariant() }
+  switch ($normalizedSectionId) {
+    'purpose' {
+      return @(
+        '1.1 课程设计目标',
+        '1.2 基本要求与约束'
+      )
+    }
+    'theory' {
+      return @(
+        '2.1 业务需求分析',
+        '2.2 可行性分析'
+      )
+    }
+    'environment' {
+      return @(
+        '3.1 开发工具与运行环境',
+        '3.2 数据与调试配置'
+      )
+    }
+    'steps' {
+      return @(
+        '4.1 系统总体设计',
+        '4.2 功能模块设计',
+        '4.3 业务流程设计',
+        '4.4 关键实现要点'
+      )
+    }
+    'result' {
+      return @(
+        '5.1 核心功能结果',
+        '5.2 演示与测试情况'
+      )
+    }
+    'analysis' {
+      return @(
+        '6.1 现存问题分析',
+        '6.2 后续改进方向'
+      )
+    }
+    'summary' {
+      return @(
+        '7.1 课程设计收获',
+        '7.2 后续优化展望'
+      )
+    }
+    default {
+      return @()
+    }
+  }
+}
+
+function Expand-CourseDesignSectionParagraphs {
+  param(
+    [AllowNull()]
+    [string]$SectionId,
+
+    [AllowNull()]
+    [object]$SectionInfo
+  )
+
+  if ($null -eq $SectionInfo) {
+    return $SectionInfo
+  }
+
+  $titles = @(Get-CourseDesignSubheadingTitles -SectionId $SectionId)
+  if ($titles.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  $existingParagraphs = @($SectionInfo.paragraphs)
+  if ($existingParagraphs.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  if (@($existingParagraphs | Where-Object { Test-IsDecimalSubheading -Text ([string]$_) }).Count -gt 0) {
+    return $SectionInfo
+  }
+
+  $sentenceList = New-Object System.Collections.Generic.List[string]
+  foreach ($paragraph in $existingParagraphs) {
+    foreach ($sentence in @(Split-ToSentenceList -Text ([string]$paragraph))) {
+      [void]$sentenceList.Add($sentence)
+    }
+  }
+
+  if ($sentenceList.Count -eq 0) {
+    return $SectionInfo
+  }
+
+  $groupCount = [Math]::Min($titles.Count, $sentenceList.Count)
+  if ($groupCount -le 0) {
+    return $SectionInfo
+  }
+
+  $expandedParagraphs = New-Object System.Collections.Generic.List[string]
+  $cursor = 0
+  for ($index = 0; $index -lt $groupCount; $index++) {
+    [void]$expandedParagraphs.Add([string]$titles[$index])
+
+    $remainingSentenceCount = $sentenceList.Count - $cursor
+    $remainingGroupCount = $groupCount - $index
+    $takeCount = [Math]::Ceiling($remainingSentenceCount / [double]$remainingGroupCount)
+    $groupSentences = New-Object System.Collections.Generic.List[string]
+    for ($offset = 0; $offset -lt $takeCount -and $cursor -lt $sentenceList.Count; $offset++) {
+      [void]$groupSentences.Add([string]$sentenceList[$cursor])
+      $cursor++
+    }
+
+    $groupText = Normalize-OpenXmlText -Text ($groupSentences -join '')
+    if (-not [string]::IsNullOrWhiteSpace($groupText)) {
+      [void]$expandedParagraphs.Add($groupText)
+    }
+  }
+
+  return [pscustomobject]@{
+    headingText = $SectionInfo.headingText
+    text = $SectionInfo.text
+    paragraphs = @($expandedParagraphs.ToArray())
+  }
+}
+
 function Convert-ToParagraphList {
   param(
     [AllowNull()]
@@ -704,6 +962,17 @@ function Convert-ToParagraphList {
         [void]$paragraphs.Add((Normalize-OpenXmlText -Text ($buffer -join ' ')))
         $buffer.Clear()
       }
+      continue
+    }
+
+    $preserveStandaloneLine = (Test-LooksLikeCommandLine -Text $trimmedLine) -or (Test-LooksLikeCodeLine -Text $trimmedLine)
+    if ($preserveStandaloneLine) {
+      if ($buffer.Count -gt 0) {
+        [void]$paragraphs.Add((Normalize-OpenXmlText -Text ($buffer -join ' ')))
+        $buffer.Clear()
+      }
+
+      [void]$paragraphs.Add((Normalize-OpenXmlText -Text $trimmedLine))
       continue
     }
 
@@ -810,6 +1079,12 @@ function Get-ReportAnalysis {
     }
   }
 
+  if ([string]::Equals([string]$reportProfile.name, 'course-design-report', [System.StringComparison]::OrdinalIgnoreCase)) {
+    foreach ($sectionId in @($sectionsById.Keys)) {
+      $sectionsById[$sectionId] = Expand-CourseDesignSectionParagraphs -SectionId ([string]$sectionId) -SectionInfo $sectionsById[$sectionId]
+    }
+  }
+
   return @{
     SectionsById = $sectionsById
   }
@@ -856,27 +1131,30 @@ function Add-SectionParagraphBlock {
   return $true
 }
 
-function Get-CompositeCellFillSpec {
+function Get-CompositeFillSpec {
   param(
     [AllowNull()]
-    [string]$CellText,
+    [string]$Text,
+
+    [AllowNull()]
+    [object[]]$Rules,
 
     [Parameter(Mandatory = $true)]
     [hashtable]$SectionsById
   )
 
-  $normalizedCellText = Normalize-OpenXmlText -Text $CellText
-  if ([string]::IsNullOrWhiteSpace($normalizedCellText)) {
+  $normalizedText = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalizedText)) {
     return $null
   }
 
   $paragraphs = New-Object System.Collections.Generic.List[string]
   $mappedSectionIds = New-Object System.Collections.Generic.List[string]
 
-  foreach ($compositeRule in $fieldMapCompositeRules) {
+  foreach ($compositeRule in @($Rules)) {
     $matchesRule = $true
     foreach ($pattern in @($compositeRule.matchAll)) {
-      if ([string]::IsNullOrWhiteSpace([string]$pattern) -or $normalizedCellText -notmatch [string]$pattern) {
+      if ([string]::IsNullOrWhiteSpace([string]$pattern) -or $normalizedText -notmatch [string]$pattern) {
         $matchesRule = $false
         break
       }
@@ -913,14 +1191,48 @@ function Get-CompositeCellFillSpec {
     }
 
     if ($paragraphs.Count -gt 0 -and $mappedSectionIds.Count -gt 0) {
+      $throughRowOffset = 0
+      if ($compositeRule.PSObject.Properties.Name -contains "throughRowOffset" -and $null -ne $compositeRule.throughRowOffset) {
+        try {
+          $throughRowOffset = [Math]::Max(0, [int]$compositeRule.throughRowOffset)
+        } catch {
+          $throughRowOffset = 0
+        }
+      }
+
       return [pscustomobject]@{
         Paragraphs = @($paragraphs)
         MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
+        ThroughRowOffset = $throughRowOffset
       }
     }
   }
 
   return $null
+}
+
+function Get-CompositeCellFillSpec {
+  param(
+    [AllowNull()]
+    [string]$CellText,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$SectionsById
+  )
+
+  return Get-CompositeFillSpec -Text $CellText -Rules $fieldMapCompositeRules -SectionsById $SectionsById
+}
+
+function Get-CompositeParagraphFillSpec {
+  param(
+    [AllowNull()]
+    [string]$ParagraphText,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$SectionsById
+  )
+
+  return Get-CompositeFillSpec -Text $ParagraphText -Rules $paragraphCompositeRules -SectionsById $SectionsById
 }
 
 function Get-CompositeTableBodyFillSpec {
@@ -953,6 +1265,29 @@ function Get-CompositeTableBodyFillSpec {
     }
   }
 
+  $maxThroughRowOffset = 0
+  foreach ($entry in $orderedEntries) {
+    $entryThroughRowOffset = 0
+    if ($entry.PSObject.Properties.Name -contains "ThroughRowOffset" -and $null -ne $entry.ThroughRowOffset) {
+      try {
+        $entryThroughRowOffset = [Math]::Max(0, [int]$entry.ThroughRowOffset)
+      } catch {
+        $entryThroughRowOffset = 0
+      }
+    }
+
+    if ($entryThroughRowOffset -gt $maxThroughRowOffset) {
+      $maxThroughRowOffset = $entryThroughRowOffset
+    }
+  }
+
+  $expandedThroughRowIndex = [Math]::Min($tableRowCount, ($throughRowIndex + $maxThroughRowOffset))
+  $expandedThroughLocation = if ($expandedThroughRowIndex -eq $throughRowIndex) {
+    [string]$orderedEntries[-1].Location
+  } else {
+    [string]$TableBlock.rows[$expandedThroughRowIndex - 1].cells[0].location
+  }
+
   $paragraphs = New-Object System.Collections.Generic.List[string]
   $mappedSectionIds = New-Object System.Collections.Generic.List[string]
 
@@ -976,7 +1311,7 @@ function Get-CompositeTableBodyFillSpec {
 
   return [pscustomobject]@{
     StartLocation = [string]$orderedEntries[0].Location
-    ThroughLocation = [string]$orderedEntries[-1].Location
+    ThroughLocation = $expandedThroughLocation
     Paragraphs = @($paragraphs)
     MappedSectionIds = @($mappedSectionIds | Select-Object -Unique)
   }
@@ -1039,6 +1374,14 @@ function Add-FieldMapEntry {
 
 $resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $reportInfo = Get-ReportInput -TextPath $ReportPath -InlineText $ReportText
+$reportInputMode = if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { "path" } else { "inline" }
+$metadataInputMode = if (-not [string]::IsNullOrWhiteSpace($MetadataPath)) {
+  "path"
+} elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
+  "inline"
+} else {
+  "none"
+}
 $metadataValues = @{}
 Import-OptionalMetadata -PathToJson $MetadataPath -InlineJson $MetadataJson -MetadataValues $metadataValues
 $reportAnalysis = Get-ReportAnalysis -Text ([string]$reportInfo.Text) -MetadataValues $metadataValues
@@ -1059,14 +1402,49 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
       continue
     }
 
+    if (Is-FillableInstructionLike -Text $paragraphText) {
+      continue
+    }
+
+    $paragraphCompositeFill = Get-CompositeParagraphFillSpec -ParagraphText $paragraphText -SectionsById $reportAnalysis.SectionsById
+    if ($null -ne $paragraphCompositeFill) {
+      $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
+      $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
+      $fieldMapKey = if ($nextBlockIsFillTarget -and -not [string]::IsNullOrWhiteSpace([string]$nextBlock.location)) {
+        [string]$nextBlock.location
+      } else {
+        $paragraphText
+      }
+      $sectionValue = if ($nextBlockIsFillTarget) {
+        @($paragraphCompositeFill.Paragraphs)
+      } else {
+        [ordered]@{
+          mode = "after"
+          paragraphs = @($paragraphCompositeFill.Paragraphs)
+        }
+      }
+
+      if (Add-FieldMapEntry -FieldMap $fieldMap -Key $fieldMapKey -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
+        $mappedSectionCount += @($paragraphCompositeFill.MappedSectionIds).Count
+      }
+      continue
+    }
+
     $sectionRule = Resolve-SectionRule -HeadingText $paragraphText
     if ($null -ne $sectionRule) {
       if ($reportAnalysis.SectionsById.ContainsKey($sectionRule.id)) {
         $sectionInfo = $reportAnalysis.SectionsById[$sectionRule.id]
         if (@($sectionInfo.paragraphs).Count -gt 0) {
           $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
-          $useAfter = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-PlaceholderLike -Text ([string]$nextBlock.text))
-          $sectionValue = if ($useAfter) {
+          $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
+          $fieldMapKey = if ($nextBlockIsFillTarget -and -not [string]::IsNullOrWhiteSpace([string]$nextBlock.location)) {
+            [string]$nextBlock.location
+          } else {
+            $paragraphText
+          }
+          $sectionValue = if ($nextBlockIsFillTarget) {
+            @($sectionInfo.paragraphs)
+          } elseif (($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-PlaceholderLike -Text ([string]$nextBlock.text))) {
             [ordered]@{
               mode = "after"
               paragraphs = @($sectionInfo.paragraphs)
@@ -1077,7 +1455,7 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
             @($sectionInfo.paragraphs)
           }
 
-          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $paragraphText -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
+          if (Add-FieldMapEntry -FieldMap $fieldMap -Key $fieldMapKey -Value $sectionValue -Notes $notes -Diagnostics $diagnostics) {
             $mappedSectionCount++
           }
         } else {
@@ -1178,6 +1556,7 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
               CellIndex = $cellIndex + 1
               Paragraphs = @($compositeCellFill.Paragraphs)
               MappedSectionIds = @($compositeCellFill.MappedSectionIds)
+              ThroughRowOffset = $(if ($compositeCellFill.PSObject.Properties.Name -contains "ThroughRowOffset") { [int]$compositeCellFill.ThroughRowOffset } else { 0 })
             }) | Out-Null
           continue
         }
@@ -1310,6 +1689,8 @@ $result = [ordered]@{
   reportSource = $reportInfo.Source
   reportProfileName = [string]$reportProfile.name
   reportProfilePath = [string]$reportProfile.resolvedProfilePath
+  reportInputMode = $reportInputMode
+  metadataInputMode = $metadataInputMode
   summary = [ordered]@{
     metadataValueCount = $metadataValues.Count
     reportSectionCount = $reportAnalysis.SectionsById.Count

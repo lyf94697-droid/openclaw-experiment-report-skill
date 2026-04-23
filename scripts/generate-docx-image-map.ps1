@@ -413,6 +413,40 @@ function Resolve-SectionId {
   return $null
 }
 
+function Resolve-AvailableSectionId {
+  param(
+    [AllowNull()]
+    [string]$RequestedSectionId,
+
+    [AllowEmptyCollection()]
+    [string[]]$AvailableSectionIds
+  )
+
+  $resolvedAvailableSectionIds = @($AvailableSectionIds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+  if ([string]::IsNullOrWhiteSpace($RequestedSectionId) -or $resolvedAvailableSectionIds.Count -eq 0) {
+    return $null
+  }
+
+  if ($resolvedAvailableSectionIds -contains $RequestedSectionId) {
+    return $RequestedSectionId
+  }
+
+  $preferredOrder = New-Object System.Collections.Generic.List[string]
+  foreach ($candidate in @($RequestedSectionId) + @(Get-ReportProfileImageFallbackSectionOrder -Profile $reportProfile)) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and -not $preferredOrder.Contains($candidate)) {
+      $preferredOrder.Add($candidate) | Out-Null
+    }
+  }
+
+  foreach ($candidate in $preferredOrder) {
+    if ($resolvedAvailableSectionIds -contains $candidate) {
+      return $candidate
+    }
+  }
+
+  return $resolvedAvailableSectionIds[0]
+}
+
 function Get-ZipEntryText {
   param(
     [Parameter(Mandatory = $true)]
@@ -585,6 +619,27 @@ function Resolve-ImageInputSpec {
     AnchorProvided = (-not [string]::IsNullOrWhiteSpace($anchor))
     Layout = $layout
   }
+}
+
+function Test-IsCourseDesignFlowchartImageSpec {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$ImageSpec
+  )
+
+  $signals = @(
+    [string]$ImageSpec.Caption,
+    [string]$ImageSpec.SectionName,
+    [string]$ImageSpec.BaseName
+  )
+
+  foreach ($signal in $signals) {
+    if (-not [string]::IsNullOrWhiteSpace($signal) -and $signal -match '(?i)(流程图|flowchart|flow-chart)') {
+      return $true
+    }
+  }
+
+  return $false
 }
 
 function New-ImageLayoutOutput {
@@ -923,6 +978,13 @@ if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
   $resolvedSpecsPathForProbe = (Resolve-Path -LiteralPath $ImageSpecsPath).Path
 }
 $script:ImagePathProbeRoots = Get-ImagePathProbeRoots -DocxPath $resolvedDocxPath -SpecsPath $resolvedSpecsPathForProbe
+$imageInputMode = if (-not [string]::IsNullOrWhiteSpace($ImageSpecsPath)) {
+  "specs-path"
+} elseif (-not [string]::IsNullOrWhiteSpace($ImageSpecsJson)) {
+  "specs-json"
+} else {
+  "image-paths"
+}
 
 $rawItems = Get-ImageInputItems -SpecsPath $ImageSpecsPath -SpecsJson $ImageSpecsJson -Paths $ImagePaths
 $imageSpecs = @($rawItems | ForEach-Object { Resolve-ImageInputSpec -Item $_ })
@@ -952,11 +1014,20 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
       throw "Image section was not recognized: $($spec.SectionName)"
     }
     if ($availableSectionIds -notcontains $resolvedSectionId) {
-      throw "Image section is not available in the target docx: $($spec.SectionName)"
+      $fallbackSectionId = Resolve-AvailableSectionId -RequestedSectionId $resolvedSectionId -AvailableSectionIds $availableSectionIds
+      if ([string]::IsNullOrWhiteSpace($fallbackSectionId)) {
+        throw "Image section is not available in the target docx: $($spec.SectionName)"
+      }
+      $notes.Add(("Image {0} requested section {1}, but the target docx does not contain it. Falling back to {2}." -f ($index + 1), $spec.SectionName, $fallbackSectionId)) | Out-Null
+      $resolvedSectionId = $fallbackSectionId
+      $sectionSource = "explicit-fallback"
+      $sectionReason = "Requested section was not present in the target docx, so the nearest available section was used."
+      $sectionConfidence = "medium"
+    } else {
+      $sectionSource = "explicit"
+      $sectionReason = "Section was provided in the image spec."
+      $sectionConfidence = "high"
     }
-    $sectionSource = "explicit"
-    $sectionReason = "Section was provided in the image spec."
-    $sectionConfidence = "high"
   } else {
     $resolvedSectionId = Infer-SectionIdFromBaseName -BaseName $spec.BaseName
     if (-not [string]::IsNullOrWhiteSpace($resolvedSectionId) -and ($availableSectionIds -contains $resolvedSectionId)) {
@@ -975,6 +1046,14 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
   $resolvedRule = $sectionRuleLookup[$resolvedSectionId]
   $caption = if ($spec.CaptionProvided) { $spec.Caption } else { Get-DefaultCaption -Index ($index + 1) -SectionId $resolvedSectionId -BaseName $spec.BaseName }
   $widthCm = if ($null -ne $spec.WidthCm) { $spec.WidthCm } else { $defaultImageWidthCm }
+  $isRowLayout = ($null -ne $spec.Layout -and [string]::Equals([string]$spec.Layout.mode, "row", [System.StringComparison]::OrdinalIgnoreCase))
+  if (
+    [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+    (-not $isRowLayout) -and
+    (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $spec)
+  ) {
+    $widthCm = [Math]::Max([double]$widthCm, 14.8)
+  }
 
   $sectionHeading = ($discoveredSections | Where-Object { $_.id -eq $resolvedSectionId } | Select-Object -First 1 -ExpandProperty headingText)
 
@@ -1053,6 +1132,7 @@ $result = [pscustomobject]@{
     docxPath = $resolvedDocxPath
     reportProfileName = [string]$reportProfile.name
     reportProfilePath = [string]$reportProfile.resolvedProfilePath
+    imageInputMode = $imageInputMode
     imageCount = $resultImages.Count
     availableSections = @($discoveredSections | ForEach-Object { $_.headingText } | Select-Object -Unique)
     planOnly = [bool]$PlanOnly

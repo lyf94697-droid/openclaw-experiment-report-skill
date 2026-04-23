@@ -74,6 +74,8 @@ The first new document types should be the ones that reuse the most of the curre
 
 ### 1. Course Design Reports
 
+Status: explicit fastline is in `main`.
+
 Why first:
 
 - closest to experiment reports

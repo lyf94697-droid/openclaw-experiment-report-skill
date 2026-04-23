@@ -7,7 +7,7 @@ Use this file when preparing the repository page, first release, and social prev
 Recommended repository description:
 
 ```text
-OpenClaw skill and PowerShell pipeline for Chinese lab reports: docx template filling, screenshot insertion, captions, and layout checks.
+OpenClaw skill and PowerShell pipeline for Chinese lab reports and course-design reports: docx template filling, screenshot insertion, captions, and layout checks.
 ```
 
 Recommended topics:
@@ -65,6 +65,7 @@ Recommended release notes:
 ## Highlights
 
 - Draft Chinese university experiment report bodies from topics, screenshots, tutorial URLs, and structured requirements.
+- Use an explicit course-design fastline when the target is a school course-design report.
 - Fill blank Word or docx templates through deterministic field mapping.
 - Insert grouped screenshots with captions, including 2x2 layout blocks anchored under one section.
 - Apply formatting for headings, metadata rows, body text, captions, and image groups.
@@ -82,7 +83,7 @@ Recommended release notes:
 
 - Designed for OpenClaw-based local workflows
 - Best tested on Windows and PowerShell
-- Stable path is focused on experiment reports
+- Stable path is focused on experiment reports, with course-design support behind `-ReportProfileName course-design-report`
 - Complex school templates may still need template diagnostics or manual mapping review
 ```
 
