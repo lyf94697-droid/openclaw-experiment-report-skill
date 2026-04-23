@@ -1344,12 +1344,23 @@ URL: https://example.com/network-lab
     Assert-True -Condition ([string]$courseDesignBuildImageMap.images[2].caption -eq '图3 运行结果截图') -Message 'Course-design build-report did not preserve numbering for the result screenshot.'
     $courseDesignBuildSummary = (Get-Content -LiteralPath (Join-Path $courseDesignBuildOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignBuildSummary.filledDocxWithImagesPath)) -Message 'Course-design build-report summary is missing the image-filled docx path.'
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignBuildSummary.courseDesignTablesDocxPath)) -Message 'Course-design build-report summary is missing the course-design tables docx path.'
     $courseDesignBuildImageDocxInspect = Join-Path $tempRoot 'course-design-build-image-inspect'
     [System.IO.Compression.ZipFile]::ExtractToDirectory([string]$courseDesignBuildSummary.filledDocxWithImagesPath, $courseDesignBuildImageDocxInspect)
     [xml]$courseDesignBuildImageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $courseDesignBuildImageDocxInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
     Assert-True -Condition ($courseDesignBuildImageDocumentXml.OuterXml -match '图1 系统实现流程图') -Message 'Course-design build-report image docx is missing the auto flowchart caption.'
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $courseDesignBuildImageDocxInspect 'word\media\image1.png')) -Message 'Course-design build-report image docx is missing the first inserted image.'
     Remove-Item -LiteralPath $courseDesignBuildImageDocxInspect -Recurse -Force
+    $courseDesignTablesInspect = Join-Path $tempRoot 'course-design-build-tables-inspect'
+    [System.IO.Compression.ZipFile]::ExtractToDirectory([string]$courseDesignBuildSummary.courseDesignTablesDocxPath, $courseDesignTablesInspect)
+    [xml]$courseDesignTablesDocumentXml = [System.IO.File]::ReadAllText((Join-Path $courseDesignTablesInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+    Assert-True -Condition ($courseDesignTablesDocumentXml.OuterXml -match '表\d+-1 功能模块表') -Message 'Course-design build-report tables docx is missing the chapter-aware module table caption.'
+    Assert-True -Condition ($courseDesignTablesDocumentXml.OuterXml -match '\d+\.\d+\s*功能模块设计') -Message 'Course-design build-report tables docx is missing the chapter-aware subsection heading.'
+    Remove-Item -LiteralPath $courseDesignTablesInspect -Recurse -Force
+    Assert-True -Condition (Test-Path -LiteralPath ([string]$courseDesignBuildSummary.styledDocxPath)) -Message 'Course-design build-report summary is missing the styled docx path.'
+    $courseDesignStyledOutline = & (Join-Path $repoRoot 'scripts\extract-docx-template.ps1') -Path ([string]$courseDesignBuildSummary.styledDocxPath) -Format markdown | Out-String
+    Assert-True -Condition ($courseDesignStyledOutline -match 'P\d+: \d+\.\d+ 功能模块设计') -Message 'Course-design build-report styled docx is missing the expected decimal subsection heading.'
+    Assert-True -Condition ($courseDesignStyledOutline -notmatch 'P\d+: 系统设计|P\d+: 实现结果|P\d+: 总结') -Message 'Course-design build-report styled docx still contains duplicate placeholder headings.'
     $results.Add('course-design build-report auto flowchart OK') | Out-Null
   } else {
     $results.Add('course-design build-report auto flowchart skipped (python unavailable)') | Out-Null

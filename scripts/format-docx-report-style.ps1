@@ -334,6 +334,33 @@ function Get-ParagraphText {
   return Normalize-OpenXmlText -Text ($parts -join "")
 }
 
+function Set-ParagraphText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph,
+
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $targetText = if ($null -eq $Text) { "" } else { [string]$Text }
+  $textNodes = @($Paragraph.SelectNodes(".//w:t | .//w:instrText", $script:namespaceManager))
+  if ($textNodes.Count -eq 0) {
+    $run = $Paragraph.OwnerDocument.CreateElement("w", "r", $wordNamespace)
+    $textNode = $Paragraph.OwnerDocument.CreateElement("w", "t", $wordNamespace)
+    $textNode.SetAttribute("space", "http://www.w3.org/XML/1998/namespace", "preserve")
+    $textNode.InnerText = $targetText
+    [void]$run.AppendChild($textNode)
+    [void]$Paragraph.AppendChild($run)
+    return
+  }
+
+  $textNodes[0].InnerText = $targetText
+  for ($i = $textNodes.Count - 1; $i -ge 1; $i--) {
+    [void]$textNodes[$i].ParentNode.RemoveChild($textNodes[$i])
+  }
+}
+
 function Test-IsRemovableTrailingParagraph {
   param(
     [Parameter(Mandatory = $true)]
@@ -447,6 +474,14 @@ function Remove-CourseDesignDuplicatePlaceholderParagraphs {
         $removeParagraph = [string]::Equals([string]$nextInfo.Text, "摘要：", [System.StringComparison]::Ordinal)
         break
       }
+      "系统设计" {
+        $removeParagraph = (
+          ([string]$nextInfo.Text -match '^图\d+\s*系统实现流程图$') -or
+          ([string]$nextInfo.Text -match '^[四4][、\.．]\s*(方案设计与实现|系统设计)$') -or
+          ([string]$nextInfo.Text -match '^\d+\.1\s*(系统总体设计|功能模块设计)$')
+        )
+        break
+      }
       "实现结果" {
         $removeParagraph = ([string]$nextInfo.Text -match '^[五5][、\.．]\s*实现结果$')
         break
@@ -464,6 +499,94 @@ function Remove-CourseDesignDuplicatePlaceholderParagraphs {
   }
 
   return $removedCount
+}
+
+function Convert-ChineseOrdinalToInt {
+  param([AllowNull()][string]$Text)
+
+  $normalized = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return $null
+  }
+
+  $lookup = @{
+    "一" = 1
+    "二" = 2
+    "三" = 3
+    "四" = 4
+    "五" = 5
+    "六" = 6
+    "七" = 7
+    "八" = 8
+    "九" = 9
+    "十" = 10
+  }
+
+  if ($lookup.ContainsKey($normalized)) {
+    return [int]$lookup[$normalized]
+  }
+
+  return $null
+}
+
+function Get-SectionHeadingNumber {
+  param([AllowNull()][string]$Text)
+
+  $normalized = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return $null
+  }
+
+  if ($normalized -match '^(?<num>\d+)\s*[\.．、]') {
+    return [int]$matches["num"]
+  }
+
+  if ($normalized -match '^(?<cn>[一二三四五六七八九十]+)\s*[\.．、]') {
+    return Convert-ChineseOrdinalToInt -Text $matches["cn"]
+  }
+
+  return $null
+}
+
+function Renumber-CourseDesignDecimalSubheadings {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $currentSectionNumber = $null
+  $currentSubsectionNumber = 0
+  $renumberedCount = 0
+  foreach ($paragraph in @($Body.SelectNodes("./w:p", $NamespaceManager))) {
+    $text = Get-ParagraphText -Paragraph $paragraph -NamespaceManager $NamespaceManager
+    if ([string]::IsNullOrWhiteSpace($text)) {
+      continue
+    }
+
+    if (Test-IsSectionHeading -Text $text) {
+      $currentSectionNumber = Get-SectionHeadingNumber -Text $text
+      $currentSubsectionNumber = 0
+      continue
+    }
+
+    if ($null -eq $currentSectionNumber) {
+      continue
+    }
+
+    if ($text -match '^(?<chapter>\d+)\.(?<sub>\d+)\s+(?<title>\S.*)$') {
+      $currentSubsectionNumber++
+      $desiredText = "{0}.{1} {2}" -f $currentSectionNumber, $currentSubsectionNumber, [string]$matches["title"]
+      if (-not [string]::Equals($text, $desiredText, [System.StringComparison]::Ordinal)) {
+        Set-ParagraphText -Paragraph $paragraph -Text $desiredText
+        $renumberedCount++
+      }
+    }
+  }
+
+  return $renumberedCount
 }
 
 function Get-HeadingPattern {
@@ -1740,9 +1863,11 @@ try {
   }
 
   $removedCourseDesignPlaceholderCount = 0
+  $renumberedCourseDesignSubheadingCount = 0
   $enabledCourseDesignTitlePageCount = 0
   if ($isCourseDesignReport) {
     $removedCourseDesignPlaceholderCount = Remove-CourseDesignDuplicatePlaceholderParagraphs -Body $body -NamespaceManager $script:namespaceManager
+    $renumberedCourseDesignSubheadingCount = Renumber-CourseDesignDecimalSubheadings -Body $body -NamespaceManager $script:namespaceManager
     if (Ensure-CourseDesignCoverUsesDifferentFirstPage -Body $body) {
       $enabledCourseDesignTitlePageCount = 1
     }
@@ -1783,6 +1908,7 @@ try {
     styledTableParagraphCount = $styledTableParagraphCount
     normalizedBodyRowCount = $normalizedBodyRowCount
     removedCourseDesignPlaceholderCount = $removedCourseDesignPlaceholderCount
+    renumberedCourseDesignSubheadingCount = $renumberedCourseDesignSubheadingCount
     enabledCourseDesignTitlePageCount = $enabledCourseDesignTitlePageCount
     removedTrailingEmptyParagraphCount = $removedTrailingEmptyParagraphCount
   }

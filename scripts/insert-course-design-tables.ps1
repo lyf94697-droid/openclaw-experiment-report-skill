@@ -40,6 +40,110 @@ function Get-NodeText {
   return (($parts -join "") -replace "\s+", " ").Trim()
 }
 
+function Convert-ChineseOrdinalToInt {
+  param([AllowNull()][string]$Text)
+
+  $normalized = if ($null -eq $Text) { "" } else { [string]$Text }
+  $normalized = $normalized.Trim()
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return $null
+  }
+
+  $lookup = @{
+    "一" = 1
+    "二" = 2
+    "三" = 3
+    "四" = 4
+    "五" = 5
+    "六" = 6
+    "七" = 7
+    "八" = 8
+    "九" = 9
+    "十" = 10
+  }
+  if ($lookup.ContainsKey($normalized)) {
+    return [int]$lookup[$normalized]
+  }
+
+  return $null
+}
+
+function Get-HeadingChapterNumber {
+  param([AllowNull()][string]$Text)
+
+  $normalized = if ($null -eq $Text) { "" } else { [string]$Text }
+  $normalized = $normalized.Trim()
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return $null
+  }
+
+  if ($normalized -match '^(?<num>\d+)\s*[\.．、]') {
+    return [int]$matches["num"]
+  }
+
+  if ($normalized -match '^第\s*(?<num>\d+)\s*[章节]') {
+    return [int]$matches["num"]
+  }
+
+  if ($normalized -match '^(?<cn>[一二三四五六七八九十]+)\s*[\.．、]') {
+    return Convert-ChineseOrdinalToInt -Text $matches["cn"]
+  }
+
+  if ($normalized -match '^第\s*(?<cn>[一二三四五六七八九十]+)\s*[章节]') {
+    return Convert-ChineseOrdinalToInt -Text $matches["cn"]
+  }
+
+  return $null
+}
+
+function Get-NextSubsectionNumber {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode[]]$Children,
+
+    [int]$StartIndex = -1,
+
+    [AllowNull()]
+    [System.Xml.XmlNode]$StopNode,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager,
+
+    [int]$ChapterNumber = 4
+  )
+
+  if ($StartIndex -lt 0) {
+    return 1
+  }
+
+  $maxSubsectionNumber = 0
+  $pattern = '^{0}\.(?<sub>\d+)\s+' -f [regex]::Escape([string]$ChapterNumber)
+  for ($i = $StartIndex + 1; $i -lt $Children.Count; $i++) {
+    $child = $Children[$i]
+    if ($null -ne $StopNode -and [object]::ReferenceEquals($child, $StopNode)) {
+      break
+    }
+
+    if ($child.LocalName -ne "p") {
+      continue
+    }
+
+    $text = Get-NodeText -Node $child -NamespaceManager $NamespaceManager
+    if ([string]::IsNullOrWhiteSpace($text)) {
+      continue
+    }
+
+    if ($text -match $pattern) {
+      $subsectionNumber = [int]$matches["sub"]
+      if ($subsectionNumber -gt $maxSubsectionNumber) {
+        $maxSubsectionNumber = $subsectionNumber
+      }
+    }
+  }
+
+  return ($maxSubsectionNumber + 1)
+}
+
 function New-RunPropertiesXml {
   param(
     [string]$FontName = "宋体",
@@ -292,18 +396,29 @@ function Get-CourseDesignTableProfile {
 }
 
 function New-CourseDesignTablesXml {
-  param([Parameter(Mandatory = $true)][object]$Profile)
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Profile,
+
+    [int]$ChapterNumber = 4,
+
+    [int]$StartingSubsectionNumber = 1
+  )
+
+  $moduleSectionNumber = $StartingSubsectionNumber
+  $databaseSectionNumber = $StartingSubsectionNumber + 1
+  $fieldTableSectionNumber = $StartingSubsectionNumber + 2
 
   $xml = New-Object System.Collections.Generic.List[string]
-  [void]$xml.Add((New-ParagraphXml -Text "（1）功能模块设计" -FirstLineTwips 420 -BeforeTwips 80 -AfterTwips 0 -LineTwips 320 -FontName "宋体" -SizeHalfPoints 21))
-  [void]$xml.Add((New-TableBlockXml -Caption "表4-1 功能模块表" -Headers @("功能模块", "包含子功能模块", "功能") -Rows @($Profile.modules) -Widths @(1800, 2200, 4600) -MergeFirstColumn))
-  [void]$xml.Add((New-ParagraphXml -Text "（2）数据库设计" -FirstLineTwips 420 -BeforeTwips 120 -AfterTwips 0 -LineTwips 320 -FontName "宋体" -SizeHalfPoints 21))
-  [void]$xml.Add((New-TableBlockXml -Caption "表4-2 数据库表" -Headers @("序号", "数据库表", "数据表存储的内容") -Rows @($Profile.database) -Widths @(900, 2500, 5200)))
-  [void]$xml.Add((New-ParagraphXml -Text "（3）数据库表结构" -FirstLineTwips 420 -BeforeTwips 120 -AfterTwips 0 -LineTwips 320 -FontName "宋体" -SizeHalfPoints 21))
+  [void]$xml.Add((New-ParagraphXml -Text ("{0}.{1} 功能模块设计" -f $ChapterNumber, $moduleSectionNumber) -FirstLineTwips 420 -BeforeTwips 80 -AfterTwips 0 -LineTwips 320 -FontName "宋体" -SizeHalfPoints 21))
+  [void]$xml.Add((New-TableBlockXml -Caption ("表{0}-1 功能模块表" -f $ChapterNumber) -Headers @("功能模块", "包含子功能模块", "功能") -Rows @($Profile.modules) -Widths @(1800, 2200, 4600) -MergeFirstColumn))
+  [void]$xml.Add((New-ParagraphXml -Text ("{0}.{1} 数据库设计" -f $ChapterNumber, $databaseSectionNumber) -FirstLineTwips 420 -BeforeTwips 120 -AfterTwips 0 -LineTwips 320 -FontName "宋体" -SizeHalfPoints 21))
+  [void]$xml.Add((New-TableBlockXml -Caption ("表{0}-2 数据库表" -f $ChapterNumber) -Headers @("序号", "数据库表", "数据表存储的内容") -Rows @($Profile.database) -Widths @(900, 2500, 5200)))
+  [void]$xml.Add((New-ParagraphXml -Text ("{0}.{1} 数据库表结构" -f $ChapterNumber, $fieldTableSectionNumber) -FirstLineTwips 420 -BeforeTwips 120 -AfterTwips 0 -LineTwips 320 -FontName "宋体" -SizeHalfPoints 21))
 
   $tableNo = 3
   foreach ($fieldTable in @($Profile.fieldTables)) {
-    $caption = "表4-{0} {1}" -f $tableNo, [string]$fieldTable.name
+    $caption = "表{0}-{1} {2}" -f $ChapterNumber, $tableNo, [string]$fieldTable.name
     [void]$xml.Add((New-TableBlockXml -Caption $caption -Headers @("序号", "字段名", "字段类型", "说明", "备注") -Rows @($fieldTable.rows) -Widths @(800, 1500, 2500, 2200, 1200)))
     $tableNo++
   }
@@ -382,7 +497,7 @@ try {
   }
 
   $documentText = Get-NodeText -Node $body -NamespaceManager $namespaceManager
-  if ($documentText -match "表4-1\s*功能模块表|功能模块表.*数据库表结构") {
+  if ($documentText -match "表\d+-1\s*功能模块表|功能模块表.*数据库表结构") {
     Copy-Item -LiteralPath $resolvedDocxPath -Destination $resolvedOutPath -Force
     [pscustomobject]@{
       docxPath = $resolvedDocxPath
@@ -396,6 +511,7 @@ try {
 
   $children = @($body.ChildNodes)
   $startIndex = -1
+  $designHeadingText = $null
   for ($i = 0; $i -lt $children.Count; $i++) {
     if ($children[$i].LocalName -ne "p") {
       continue
@@ -403,6 +519,7 @@ try {
     $text = Get-NodeText -Node $children[$i] -NamespaceManager $namespaceManager
     if ($text -match "方案设计与实现|系统总体设计|系统设计") {
       $startIndex = $i
+      $designHeadingText = $text
       break
     }
   }
@@ -435,8 +552,13 @@ try {
   }
 
   $profile = Get-CourseDesignTableProfile -DocumentText $documentText
+  $chapterNumber = Get-HeadingChapterNumber -Text $designHeadingText
+  if ($null -eq $chapterNumber) {
+    $chapterNumber = 4
+  }
+  $startingSubsectionNumber = Get-NextSubsectionNumber -Children $children -StartIndex $startIndex -StopNode $insertBefore -NamespaceManager $namespaceManager -ChapterNumber $chapterNumber
   $fragment = $documentXml.CreateDocumentFragment()
-  $fragment.InnerXml = New-CourseDesignTablesXml -Profile $profile
+  $fragment.InnerXml = New-CourseDesignTablesXml -Profile $profile -ChapterNumber $chapterNumber -StartingSubsectionNumber $startingSubsectionNumber
 
   $insertedNodeCount = 0
   while ($fragment.HasChildNodes) {
@@ -452,6 +574,8 @@ try {
     outPath = $resolvedOutPath
     inserted = $true
     insertedNodeCount = $insertedNodeCount
+    chapterNumber = $chapterNumber
+    startingSubsectionNumber = $startingSubsectionNumber
     tableCount = 2 + @($profile.fieldTables).Count
   }
 } finally {

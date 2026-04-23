@@ -419,7 +419,10 @@ function Get-CourseDesignFlowchartSteps {
   }
 
   $steps.Add("功能联调与测试验证") | Out-Null
-  $steps.Add("问题修正与优化完善") | Out-Null
+  $steps.Add("是否达到设计要求？") | Out-Null
+  $steps.Add("问题定位与方案调整") | Out-Null
+  $steps.Add("实现优化与结果复测") | Out-Null
+  $steps.Add("形成最终结果与文档输出") | Out-Null
 
   return @($steps | Select-Object -Unique)
 }
