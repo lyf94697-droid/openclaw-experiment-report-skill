@@ -401,30 +401,62 @@ function Get-CourseDesignFlowchartSteps {
   $reportText = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8
   $requirementsText = Get-OptionalTextContent -Path $RequirementsPath -InlineText $RequirementsJson
   $combinedText = ($reportText + [Environment]::NewLine + $requirementsText)
-  $steps = New-Object System.Collections.Generic.List[string]
-
-  $steps.Add("需求分析与目标确认") | Out-Null
-  $steps.Add("总体方案与模块划分") | Out-Null
-
-  if ($combinedText -match '数据库|数据表|SQL|MySQL|SQLite|ER图') {
-    $steps.Add("数据库与数据结构设计") | Out-Null
+  $rootTitle = "课程设计系统"
+  foreach ($pattern in @(
+      '课题名称[:：]\s*(?<value>.+)',
+      '项目名称[:：]\s*(?<value>.+)',
+      '题目[:：]\s*(?<value>.+)'
+    )) {
+    if ($reportText -match $pattern) {
+      $rootTitle = $matches["value"].Trim()
+      break
+    }
   }
 
-  if ($combinedText -match '页面|界面|前端|UI|交互|小程序|客户端') {
-    $steps.Add("页面与交互模块实现") | Out-Null
+  $frontendModules = New-Object System.Collections.Generic.List[string]
+  if ($combinedText -match '分类|目录|导航|首页|列表') {
+    $frontendModules.Add("分类浏览") | Out-Null
+  }
+  if ($combinedText -match '搜索|查询|检索') {
+    $frontendModules.Add("信息检索") | Out-Null
+  }
+  if ($combinedText -match '详情|展示|说明|结果') {
+    $frontendModules.Add("详情展示") | Out-Null
+  }
+  foreach ($fallbackLabel in @("页面展示", "交互入口", "结果详情")) {
+    if ($frontendModules.Count -ge 3) {
+      break
+    }
+    if ($frontendModules -notcontains $fallbackLabel) {
+      $frontendModules.Add($fallbackLabel) | Out-Null
+    }
   }
 
-  if ($combinedText -match '算法|调度|推荐|搜索|计算|逻辑|接口|后端|服务端') {
-    $steps.Add("核心业务逻辑实现") | Out-Null
+  $backendModules = New-Object System.Collections.Generic.List[string]
+  if ($combinedText -match '逻辑|算法|调度|推荐|接口|服务端|业务') {
+    $backendModules.Add("业务处理") | Out-Null
+  }
+  if ($combinedText -match '数据库|数据表|SQL|MySQL|SQLite|ER图|存储') {
+    $backendModules.Add("数据管理") | Out-Null
+  }
+  if ($combinedText -match '收藏|订单|成绩|权限|日志|状态|审核') {
+    $backendModules.Add("状态维护") | Out-Null
+  }
+  $backendModules.Add("测试验证") | Out-Null
+  foreach ($fallbackLabel in @("异常处理", "日志管理", "配置维护")) {
+    if ($backendModules.Count -ge 4) {
+      break
+    }
+    if ($backendModules -notcontains $fallbackLabel) {
+      $backendModules.Add($fallbackLabel) | Out-Null
+    }
   }
 
-  $steps.Add("功能联调与测试验证") | Out-Null
-  $steps.Add("是否达到设计要求？") | Out-Null
-  $steps.Add("问题定位与方案调整") | Out-Null
-  $steps.Add("实现优化与结果复测") | Out-Null
-  $steps.Add("形成最终结果与文档输出") | Out-Null
-
-  return @($steps | Select-Object -Unique)
+  return @(
+    "@TREE $rootTitle",
+    ("@GROUP 前台模块|{0}" -f ((@($frontendModules | Select-Object -Unique -First 3)) -join "|")),
+    ("@GROUP 后台模块|{0}" -f ((@($backendModules | Select-Object -Unique -First 4)) -join "|"))
+  )
 }
 
 function Try-NewCourseDesignAutoFlowchart {
@@ -518,9 +550,9 @@ function Try-NewCourseDesignAutoFlowchart {
   }
 
   $flowchartCaption = if (Test-ImageItemsContainExplicitCaption -Items $existingItems) {
-    "系统实现流程图"
+    "系统总体设计图"
   } else {
-    "图1 系统实现流程图"
+    "图1 系统总体设计图"
   }
 
   $mergedImages = @(

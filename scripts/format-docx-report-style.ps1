@@ -476,7 +476,7 @@ function Remove-CourseDesignDuplicatePlaceholderParagraphs {
       }
       "系统设计" {
         $removeParagraph = (
-          ([string]$nextInfo.Text -match '^图\d+\s*系统实现流程图$') -or
+          ([string]$nextInfo.Text -match '^图\d+\s*系统(?:实现流程|总体设计)图$') -or
           ([string]$nextInfo.Text -match '^[四4][、\.．]\s*(方案设计与实现|系统设计)$') -or
           ([string]$nextInfo.Text -match '^\d+\.1\s*(系统总体设计|功能模块设计)$')
         )

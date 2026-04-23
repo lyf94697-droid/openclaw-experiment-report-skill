@@ -1338,7 +1338,7 @@ URL: https://example.com/network-lab
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $courseDesignBuildOutputDir 'generated-image-map.json')) -Message 'Course-design build-report did not emit the merged image map.'
     $courseDesignBuildImageMap = (Get-Content -LiteralPath (Join-Path $courseDesignBuildOutputDir 'generated-image-map.json') -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition (@($courseDesignBuildImageMap.images).Count -eq 3) -Message 'Course-design build-report should merge one auto flowchart and two provided screenshots.'
-    Assert-True -Condition ([string]$courseDesignBuildImageMap.images[0].caption -eq '图1 系统实现流程图') -Message 'Course-design build-report did not place the auto flowchart first with the expected caption.'
+    Assert-True -Condition ([string]$courseDesignBuildImageMap.images[0].caption -eq '图1 系统总体设计图') -Message 'Course-design build-report did not place the auto diagram first with the expected caption.'
     Assert-True -Condition ([double]$courseDesignBuildImageMap.images[0].widthCm -ge 14.8) -Message 'Course-design build-report did not widen the auto flowchart image.'
     Assert-True -Condition ([string]$courseDesignBuildImageMap.images[1].caption -eq '图2 实现过程截图') -Message 'Course-design build-report did not preserve numbering for the implementation screenshot.'
     Assert-True -Condition ([string]$courseDesignBuildImageMap.images[2].caption -eq '图3 运行结果截图') -Message 'Course-design build-report did not preserve numbering for the result screenshot.'
@@ -1348,7 +1348,7 @@ URL: https://example.com/network-lab
     $courseDesignBuildImageDocxInspect = Join-Path $tempRoot 'course-design-build-image-inspect'
     [System.IO.Compression.ZipFile]::ExtractToDirectory([string]$courseDesignBuildSummary.filledDocxWithImagesPath, $courseDesignBuildImageDocxInspect)
     [xml]$courseDesignBuildImageDocumentXml = [System.IO.File]::ReadAllText((Join-Path $courseDesignBuildImageDocxInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
-    Assert-True -Condition ($courseDesignBuildImageDocumentXml.OuterXml -match '图1 系统实现流程图') -Message 'Course-design build-report image docx is missing the auto flowchart caption.'
+    Assert-True -Condition ($courseDesignBuildImageDocumentXml.OuterXml -match '图1 系统总体设计图') -Message 'Course-design build-report image docx is missing the auto diagram caption.'
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $courseDesignBuildImageDocxInspect 'word\media\image1.png')) -Message 'Course-design build-report image docx is missing the first inserted image.'
     Remove-Item -LiteralPath $courseDesignBuildImageDocxInspect -Recurse -Force
     $courseDesignTablesInspect = Join-Path $tempRoot 'course-design-build-tables-inspect'
