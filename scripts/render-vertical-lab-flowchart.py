@@ -756,16 +756,20 @@ def render_branched_flowchart(title: str, steps: list[str], out_path: Path) -> N
         target_y = (loop_target_box[1] + loop_target_box[3]) // 2
         last_branch_box = right_boxes[-1]
         loop_start = (last_branch_box[0], (last_branch_box[1] + last_branch_box[3]) // 2)
+        loop_drop_x = loop_start[0] - 72
+        loop_join_x = loop_target_box[0] - 72
+        future_end_bottom = result_box[3] + gap + term_h
+        loop_y = future_end_bottom + 36
         loop_points = [
             loop_start,
-            (loop_start[0] - 64, loop_start[1]),
-            (loop_start[0] - 64, target_y + 124),
-            (loop_target_box[0] - 64, target_y + 124),
-            (loop_target_box[0] - 64, target_y),
+            (loop_drop_x, loop_start[1]),
+            (loop_drop_x, loop_y),
+            (loop_join_x, loop_y),
+            (loop_join_x, target_y),
             (loop_target_box[0], target_y),
         ]
         draw_polyline_arrow(draw, loop_points, color=MUTED, width=3)
-        draw_connector_label(draw, (loop_target_box[0] + 20, target_y + 84), "修正后继续验证", label_font)
+        draw_connector_label(draw, (loop_drop_x - 136, loop_y - 42), "修正后继续验证", label_font)
 
     end_box = left_box(result_box[3] + gap, term_w, term_h)
     draw_arrow(draw, (left_center_x, result_box[3]), (left_center_x, end_box[1]))
