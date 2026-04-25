@@ -120,6 +120,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-report-from-feishu.ps1 
 
 对应说明见 [docs/course-design-fastline.md](docs/course-design-fastline.md)。
 
+## 固定版式规范
+
+这些规则是当前默认交付标准，后续对话接手本仓库时也应按此执行：
+
+- 实验报告套原模板外框时，顶部信息表保留正常表格线；正文只放进一个外框区域，不在段落或小节之间额外加横线。
+- 课程设计报告的流程图 / 总体设计图默认单独放大，宽度下限为 `15.8 cm`，不要和其他截图自动并排压小。
+- 课程设计流程图标题只保留居中文字，不加标题左右两侧的装饰横线。
+- 生成成品后至少跑 layout check；关键交付建议导出 PDF 或打开页面检查外框、图宽和线条是否重叠。
+- 不把这些规则扩展成通用绘图引擎，只服务课程设计 / 实验报告交付。
+
 ## 仓库目录
 
 ```text

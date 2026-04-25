@@ -567,30 +567,29 @@ function Set-MetadataRowsToTemplateStandard {
     [int]$MetadataCellMarginTwips
   )
 
-  Set-TableWidth -Document $Document -Table $Table -NamespaceManager $NamespaceManager -WidthValue "4999" -WidthType "pct"
+  Set-TableWidth -Document $Document -Table $Table -NamespaceManager $NamespaceManager -WidthValue "8522" -WidthType "dxa"
   Set-TableJustification -Document $Document -Table $Table -NamespaceManager $NamespaceManager -Value "center"
-  Set-TableLayout -Document $Document -Table $Table -NamespaceManager $NamespaceManager -LayoutType "autofit"
+  Set-TableLayout -Document $Document -Table $Table -NamespaceManager $NamespaceManager -LayoutType "fixed"
   Set-TableCellMargins -Document $Document -Table $Table -NamespaceManager $NamespaceManager -TopTwips 0 -LeftTwips $MetadataCellMarginTwips -BottomTwips 0 -RightTwips $MetadataCellMarginTwips
   Set-TableBorders -Document $Document -Table $Table -NamespaceManager $NamespaceManager
-  Set-TableGridColumns -Document $Document -Table $Table -NamespaceManager $NamespaceManager -ColumnWidths @(4173, 3588, 3226)
+  Set-TableGridColumns -Document $Document -Table $Table -NamespaceManager $NamespaceManager -ColumnWidths @(2988, 360, 1080, 1425, 2669)
 
   $rowSpecs = New-Object object[] 4
   $rowSpecs[0] = @(
-    @{ Width = "1899"; Type = "pct"; Span = 1 },
-    @{ Width = "1633"; Type = "pct"; Span = 1 },
-    @{ Width = "1466"; Type = "pct"; Span = 1 }
+    @{ Width = "2988"; Type = "dxa"; Span = 1 },
+    @{ Width = "2865"; Type = "dxa"; Span = 3 },
+    @{ Width = "2669"; Type = "dxa"; Span = 1 }
   )
   $rowSpecs[1] = @(
-    @{ Width = "1899"; Type = "pct"; Span = 1 },
-    @{ Width = "3100"; Type = "pct"; Span = 2 }
+    @{ Width = "3348"; Type = "dxa"; Span = 2 },
+    @{ Width = "5174"; Type = "dxa"; Span = 3 }
   )
   $rowSpecs[2] = @(
-    @{ Width = "5000"; Type = "pct"; Span = 3 }
+    @{ Width = "8522"; Type = "dxa"; Span = 5 }
   )
   $rowSpecs[3] = @(
-    @{ Width = "1899"; Type = "pct"; Span = 1 },
-    @{ Width = "1633"; Type = "pct"; Span = 1 },
-    @{ Width = "1466"; Type = "pct"; Span = 1 }
+    @{ Width = "4428"; Type = "dxa"; Span = 3 },
+    @{ Width = "4094"; Type = "dxa"; Span = 2 }
   )
 
   $rows = @($Table.SelectNodes("./w:tr", $NamespaceManager))
@@ -849,6 +848,7 @@ try {
 
   Set-MetadataRowsToTemplateStandard -Document $documentXml -Table $mainTable -NamespaceManager $namespaceManager -MetadataCellMarginTwips $MetadataCellMarginTwips
   $columnSpan = Get-TableColumnSpan -Table $mainTable -NamespaceManager $namespaceManager
+  $mainTableWidthTwips = Get-TableGridWidth -Table $mainTable -NamespaceManager $namespaceManager
 
   $nodesToMove = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
   $seenMainTable = $false
@@ -868,59 +868,29 @@ try {
 
   $movedBlockCount = 0
   if ($nodesToMove.Count -gt 0) {
-    $nodeGroups = New-Object System.Collections.Generic.List[object]
-    $currentGroup = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
-    $currentMode = ""
+    $tableRow = $documentXml.CreateElement("w", "tr", $wNs)
+    $tableCell = $documentXml.CreateElement("w", "tc", $wNs)
+    Set-CellWidthAndSpan -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -WidthValue ([string]$mainTableWidthTwips) -WidthType "dxa" -GridSpan $columnSpan
+    Set-CellMargins -Document $documentXml -Cell $tableCell -MarginTwips $BodyCellMarginTwips
 
     foreach ($node in $nodesToMove) {
-      $groupMode = Get-NodeGroupMode -Node $node -NamespaceManager $namespaceManager
-      if ($groupMode -eq "code") {
-        if ($currentMode -ne "code" -and $currentGroup.Count -gt 0) {
-          [void]$nodeGroups.Add(@($currentGroup.ToArray()))
-          $currentGroup.Clear()
-        }
-        $currentMode = "code"
-        [void]$currentGroup.Add($node)
-        continue
-      }
-
-      if ($currentGroup.Count -gt 0) {
-        [void]$nodeGroups.Add(@($currentGroup.ToArray()))
-        $currentGroup.Clear()
-      }
-      $currentMode = ""
-      [void]$nodeGroups.Add(@($node))
+      [void]$body.RemoveChild($node)
+      [void]$tableCell.AppendChild($node)
+      $movedBlockCount++
     }
 
-    if ($currentGroup.Count -gt 0) {
-      [void]$nodeGroups.Add(@($currentGroup.ToArray()))
+    $lastCellChild = if ($tableCell.ChildNodes.Count -gt 0) {
+      $tableCell.ChildNodes[$tableCell.ChildNodes.Count - 1]
+    } else {
+      $null
+    }
+    if ($null -eq $lastCellChild -or $lastCellChild.LocalName -ne "p") {
+      $emptyParagraph = $documentXml.CreateElement("w", "p", $wNs)
+      [void]$tableCell.AppendChild($emptyParagraph)
     }
 
-    foreach ($nodeGroup in $nodeGroups) {
-      $tableRow = $documentXml.CreateElement("w", "tr", $wNs)
-      $tableCell = $documentXml.CreateElement("w", "tc", $wNs)
-      Set-CellWidthAndSpan -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -WidthValue "5000" -WidthType "pct" -GridSpan $columnSpan
-      Set-CellMargins -Document $documentXml -Cell $tableCell -MarginTwips $BodyCellMarginTwips
-
-      foreach ($node in @($nodeGroup)) {
-        [void]$body.RemoveChild($node)
-        [void]$tableCell.AppendChild($node)
-        $movedBlockCount++
-      }
-
-      $lastCellChild = if ($tableCell.ChildNodes.Count -gt 0) {
-        $tableCell.ChildNodes[$tableCell.ChildNodes.Count - 1]
-      } else {
-        $null
-      }
-      if ($null -eq $lastCellChild -or $lastCellChild.LocalName -ne "p") {
-        $emptyParagraph = $documentXml.CreateElement("w", "p", $wNs)
-        [void]$tableCell.AppendChild($emptyParagraph)
-      }
-
-      [void]$tableRow.AppendChild($tableCell)
-      [void]$mainTable.AppendChild($tableRow)
-    }
+    [void]$tableRow.AppendChild($tableCell)
+    [void]$mainTable.AppendChild($tableRow)
   }
 
   Ensure-ParagraphAfterTable -Document $documentXml -Body $body -Table $mainTable -NamespaceManager $namespaceManager
@@ -947,7 +917,7 @@ try {
     mainTableRowCount = @($mainTable.SelectNodes("./w:tr", $namespaceManager)).Count
     topLevelTableCount = @($body.SelectNodes("./w:tbl", $namespaceManager)).Count
     tableBorderStyle = "single sz=4"
-    tableWidthTwips = "4999/pct"
+    tableWidthTwips = $mainTableWidthTwips
     metadataCellMarginTwips = $MetadataCellMarginTwips
     bodyCellMarginTwips = $BodyCellMarginTwips
   }

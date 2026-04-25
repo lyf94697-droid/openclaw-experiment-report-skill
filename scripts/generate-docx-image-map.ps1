@@ -768,15 +768,36 @@ function Apply-AutoRowLayouts {
       $index++
       continue
     }
+    $entryProbe = [pscustomobject]@{
+      Caption = [string]$entry.OutputEntry["caption"]
+      SectionName = [string]$entry.OutputEntry["section"]
+      BaseName = [System.IO.Path]::GetFileNameWithoutExtension([string]$entry.OutputEntry["path"])
+    }
+    if (
+      [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+      (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $entryProbe)
+    ) {
+      $index++
+      continue
+    }
 
     $sectionId = [string]$entry.ResolvedSectionId
     $runEntries = New-Object System.Collections.Generic.List[object]
     while ($index -lt $Entries.Count) {
       $candidate = $Entries[$index]
+      $candidateProbe = [pscustomobject]@{
+        Caption = [string]$candidate.OutputEntry["caption"]
+        SectionName = [string]$candidate.OutputEntry["section"]
+        BaseName = [System.IO.Path]::GetFileNameWithoutExtension([string]$candidate.OutputEntry["path"])
+      }
       if (
         $null -ne $candidate.Layout -or
         -not [string]::IsNullOrWhiteSpace([string]$candidate.Anchor) -or
-        [string]$candidate.ResolvedSectionId -ne $sectionId
+        [string]$candidate.ResolvedSectionId -ne $sectionId -or
+        (
+          [string]::Equals([string]$reportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+          (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $candidateProbe)
+        )
       ) {
         break
       }
@@ -1052,7 +1073,7 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
     (-not $isRowLayout) -and
     (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $spec)
   ) {
-    $widthCm = [Math]::Max([double]$widthCm, 14.8)
+    $widthCm = [Math]::Max([double]$widthCm, 15.8)
   }
 
   $sectionHeading = ($discoveredSections | Where-Object { $_.id -eq $resolvedSectionId } | Select-Object -First 1 -ExpandProperty headingText)

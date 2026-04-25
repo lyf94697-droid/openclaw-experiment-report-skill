@@ -760,7 +760,7 @@ function Apply-ProfileSpecificImageSpecAdjustments {
     }
 
     if (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $imageSpec) {
-      $imageSpec.WidthCm = [Math]::Max([double]$imageSpec.WidthCm, 14.8)
+      $imageSpec.WidthCm = [Math]::Max([double]$imageSpec.WidthCm, 15.8)
     }
   }
 

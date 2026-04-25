@@ -34,3 +34,11 @@
   - figure captions
   - recommended insertion positions
 - Prefer one screenshot per line when images are dense. Use two per row only when they are clearly paired and the template has enough width.
+
+## 5. Course-design flowcharts
+
+- In `course-design-report`, treat the generated flowchart or overall design diagram as a standalone design figure, not as a normal screenshot.
+- Use a near-full-width placement for course-design flowcharts. The fixed lower bound is `15.8 cm`.
+- Do not auto-group course-design flowcharts into two-column row layouts with screenshots.
+- Keep generated black-and-white flowchart titles as centered text only, without left/right decorative lines.
+- Before final delivery, check the rendered page when possible: the diagram should be large enough, lines should not overlap nodes, and the title should stay clean.

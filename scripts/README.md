@@ -29,6 +29,14 @@
 - `insert-docx-images.ps1`
 - `render-vertical-lab-flowchart.py`
 
+## 固化版式行为
+
+- `convert-docx-template-frame.ps1`：实验报告套原模板外框时，顶部信息表保留表格线，正文合并到一个外框区域，正文段落之间不额外加横线。
+- `build-report.ps1`：课程设计报告自动生成的总体设计图默认放在图片列表最前，并使用大图宽度。
+- `generate-docx-image-map.ps1` / `insert-docx-images.ps1`：`course-design-report` 的流程图宽度下限为 `15.8 cm`，且不参与自动两列并排布局。
+- `render-vertical-lab-flowchart.py`：黑白流程图标题只保留居中文字，不绘制标题左右两侧装饰横线。
+- `run-smoke-tests.ps1`：烟测会检查课程设计流程图宽度和非并排布局，避免后续改动破坏固定效果。
+
 ## 质量检查
 
 - `validate-report-draft.ps1`

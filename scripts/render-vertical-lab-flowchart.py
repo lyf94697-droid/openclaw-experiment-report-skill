@@ -162,8 +162,6 @@ def draw_title(draw: ImageDraw.ImageDraw, width: int, title: str, font: ImageFon
     left = (width - text_width) / 2
     right = left + text_width
 
-    draw.line((96, baseline, left - 24, baseline), fill=INK, width=3)
-    draw.line((right + 24, baseline, width - 96, baseline), fill=INK, width=3)
     draw.text((left, baseline - text_height + 8), title, font=font, fill=INK)
     return 114
 

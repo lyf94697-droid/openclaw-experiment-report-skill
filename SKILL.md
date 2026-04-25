@@ -45,6 +45,16 @@ description: Write Chinese university lab reports and course-design reports, or 
 19. If direct chat includes uploaded image attachments and the user also provides local image paths, use the uploaded images to understand the visible content and use the local image paths as the actual files for deterministic `docx` embedding.
 20. If direct chat includes uploaded image attachments but no manual local image paths, check whether the runtime injected attachment note lines such as `[media attached ...]` into the prompt. If those lines contain usable image file paths, extract them and pass them into `-ImagePaths` for the local wrapper instead of stopping at body-only output.
 
+## Fixed visual standards
+
+- When the user says to use the previous standard, the fixed standard is: experiment reports keep the original-template outer frame, course-design reports use a large standalone flowchart, and generated flowchart titles have no side decoration lines.
+- For experiment-report template-frame output, keep normal table lines in the top metadata table. Put the body into one full-width framed body area, without horizontal separator lines between paragraphs or sections.
+- For `course-design-report`, render the overall design flowchart / process diagram near full body width. The default lower bound is `15.8 cm`.
+- Do not auto-place course-design flowcharts side by side with screenshots. Flowcharts are standalone design diagrams; screenshots can still use row layouts when they are clearly paired.
+- For generated black-and-white flowcharts, keep the title as centered text only. Do not draw left/right decorative horizontal lines around the title.
+- After generating a local `docx`, run the strongest practical layout check available. For important deliverables, export or render pages and visually check the frame, flowchart size, and line overlap before claiming completion.
+- Keep these rules scoped to Chinese lab reports and course-design reports. Do not turn them into a generic document platform or graph engine unless explicitly requested.
+
 ## Writing rules
 
 - Use clear Chinese suitable for university reports.

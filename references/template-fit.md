@@ -39,3 +39,10 @@
 - When the user gives a tutorial article plus their own screenshots or results, treat the article as procedural reference and the screenshots or results as factual evidence.
 - Fill missing explanatory sections from the article, but keep the result section aligned with the user's actual outputs.
 - If the article includes code and the user has not provided their own code, mark it as reference implementation instead of pretending it is the user's exact work.
+
+## 6. Template frame standard
+
+- When an experiment report needs to keep the original school-template outer frame, preserve normal table lines in the top metadata area.
+- Put the main body into one full-width framed body area so the body keeps only the outer border.
+- Do not create horizontal separator lines between body paragraphs or sections.
+- Use this as the default for the current template-frame workflow unless the user explicitly asks for dense table lines.

@@ -560,7 +560,7 @@ function Try-NewCourseDesignAutoFlowchart {
       path = $flowchartPath
       section = "方案设计与实现"
       caption = $flowchartCaption
-      widthCm = 14.8
+      widthCm = 15.8
     }
   ) + @($existingItems)
 

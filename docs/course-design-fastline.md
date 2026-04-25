@@ -59,6 +59,9 @@ Use `build-report-from-feishu.ps1` when the report body already exists or when d
 - Do not run full validation, template diagnostics, or layout checking by default; run them only when adapting a new template or when the output is visibly wrong.
 - Do not change `experiment-report` defaults while working on course-design reports.
 - Treat `附件6` as a visual and structural reference, not as a committed source artifact.
+- Keep the generated overall design flowchart as a standalone large image. Its width should be at least `15.8 cm`, and it should not be grouped into an automatic two-column row layout with screenshots.
+- Keep generated flowchart titles as centered text only. Do not add decorative horizontal lines on the left or right side of the title.
+- For final course-design deliverables, visually check that the flowchart is large enough, not squeezed by nearby screenshots, and has no obvious line overlap.
 
 ## When To Escalate To Slow Checks
 

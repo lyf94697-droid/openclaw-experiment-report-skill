@@ -1379,7 +1379,8 @@ URL: https://example.com/network-lab
     $courseDesignBuildImageMap = (Get-Content -LiteralPath (Join-Path $courseDesignBuildOutputDir 'generated-image-map.json') -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition (@($courseDesignBuildImageMap.images).Count -eq 3) -Message 'Course-design build-report should merge one auto flowchart and two provided screenshots.'
     Assert-True -Condition ([string]$courseDesignBuildImageMap.images[0].caption -eq '图1 系统总体设计图') -Message 'Course-design build-report did not place the auto diagram first with the expected caption.'
-    Assert-True -Condition ([double]$courseDesignBuildImageMap.images[0].widthCm -ge 14.8) -Message 'Course-design build-report did not widen the auto flowchart image.'
+    Assert-True -Condition ([double]$courseDesignBuildImageMap.images[0].widthCm -ge 15.8) -Message 'Course-design build-report did not widen the auto flowchart image.'
+    Assert-True -Condition (-not ($courseDesignBuildImageMap.images[0].PSObject.Properties.Name -contains 'layout')) -Message 'Course-design flowchart should not be auto-grouped into a two-column row layout.'
     Assert-True -Condition ([string]$courseDesignBuildImageMap.images[1].caption -eq '图2 实现过程截图') -Message 'Course-design build-report did not preserve numbering for the implementation screenshot.'
     Assert-True -Condition ([string]$courseDesignBuildImageMap.images[2].caption -eq '图3 运行结果截图') -Message 'Course-design build-report did not preserve numbering for the result screenshot.'
     $courseDesignBuildSummary = (Get-Content -LiteralPath (Join-Path $courseDesignBuildOutputDir 'summary.json') -Raw -Encoding UTF8) | ConvertFrom-Json
