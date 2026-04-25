@@ -8,6 +8,8 @@ Thumbs.db
 local-inputs/
 outputs/
 tests-output/
+__pycache__/
+*.pyc
 *.filled.docx
 *.images.docx
 *.styled.docx

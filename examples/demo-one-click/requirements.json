@@ -1,0 +1,39 @@
+{
+  "courseName": "计算机网络",
+  "experimentName": "局域网搭建与常用 DOS 命令使用",
+  "minChars": 700,
+  "sections": [
+    { "name": "实验目的", "aliases": ["实验目的"], "minChars": 30 },
+    { "name": "实验环境", "aliases": ["实验环境", "实验设备与环境"], "minChars": 30 },
+    { "name": "实验原理或任务要求", "aliases": ["实验原理或任务要求", "实验原理", "任务要求"], "minChars": 30 },
+    { "name": "实验步骤", "aliases": ["实验步骤", "实验过程"], "minChars": 60 },
+    { "name": "实验结果", "aliases": ["实验结果", "实验现象与结果记录"], "minChars": 50 },
+    { "name": "问题分析", "aliases": ["问题分析", "结果分析"], "minChars": 30 },
+    { "name": "实验总结", "aliases": ["实验总结", "总结与思考"], "minChars": 30 }
+  ],
+  "requiredKeywords": [
+    "局域网",
+    "DOS",
+    "ipconfig",
+    "ping",
+    "arp",
+    "192.168.10.11",
+    "192.168.10.12"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "可根据实际情况修改",
+    "以下是一份",
+    "示例",
+    "样例",
+    "ChatGPT",
+    "Claude",
+    "AI生成",
+    "交换机与路由器基本配置实验",
+    "192.168.20.10",
+    "192.168.20.1",
+    "Cisco Packet Tracer"
+  ]
+}

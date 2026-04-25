@@ -21,11 +21,28 @@ function Copy-RepositoryContent {
     [string]$DestinationRoot
   )
 
-  $excludeNames = @(".git", "local-inputs", "outputs", "tests-output")
+  $excludeNames = @(".git", ".cursor", ".vscode", ".idea", "local-inputs", "outputs", "tests-output")
   $items = Get-ChildItem -LiteralPath $SourceRoot -Force | Where-Object { $_.Name -notin $excludeNames }
   foreach ($item in $items) {
     $destination = Join-Path $DestinationRoot $item.Name
     Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force
+  }
+}
+
+function Remove-ExcludedInstallArtifacts {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$DestinationRoot
+  )
+
+  foreach ($directoryName in @(".cursor", ".vscode", ".idea", "__pycache__")) {
+    foreach ($directory in @(Get-ChildItem -LiteralPath $DestinationRoot -Recurse -Force -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $directoryName })) {
+      Remove-Item -LiteralPath $directory.FullName -Recurse -Force
+    }
+  }
+
+  foreach ($file in @(Get-ChildItem -LiteralPath $DestinationRoot -Recurse -Force -File -Filter "*.pyc" -ErrorAction SilentlyContinue)) {
+    Remove-Item -LiteralPath $file.FullName -Force
   }
 }
 
@@ -90,6 +107,7 @@ if (Test-Path -LiteralPath $TargetDir) {
 if ($PSCmdlet.ShouldProcess($TargetDir, "Install skill files")) {
   New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
   Copy-RepositoryContent -SourceRoot $repoRoot -DestinationRoot $TargetDir
+  Remove-ExcludedInstallArtifacts -DestinationRoot $TargetDir
 }
 
 Write-Output "Installed skill to $TargetDir"

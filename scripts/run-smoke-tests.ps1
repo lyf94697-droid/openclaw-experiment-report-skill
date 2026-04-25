@@ -491,6 +491,23 @@ function Test-HasUtf8Bom {
   return $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
 }
 
+function Resolve-RepoRelativeExamplePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  if ([System.IO.Path]::IsPathRooted($Path)) {
+    return [System.IO.Path]::GetFullPath($Path)
+  }
+
+  $normalizedPath = $Path -replace '^[.][\\/]', ''
+  return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $normalizedPath))
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openclaw-exp-report-smoke-" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
@@ -519,18 +536,30 @@ try {
       (Join-Path $repoRoot 'demo\assets\step-ipconfig.png'),
       (Join-Path $repoRoot 'demo\assets\result-ping.png'),
       (Join-Path $repoRoot 'demo\assets\result-arp.png'),
+      (Join-Path $repoRoot 'docs\README.md'),
+      (Join-Path $repoRoot 'docs\one-click-demo.md'),
+      (Join-Path $repoRoot 'docs\social-launch-kit.md'),
+      (Join-Path $repoRoot 'examples\README.md'),
       (Join-Path $repoRoot 'examples\docx-field-map.json'),
       (Join-Path $repoRoot 'examples\docx-image-map.json'),
       (Join-Path $repoRoot 'examples\docx-image-map-row.json'),
       (Join-Path $repoRoot 'examples\docx-image-specs.json'),
       (Join-Path $repoRoot 'examples\docx-image-specs-row.json'),
+      (Join-Path $repoRoot 'examples\demo-one-click\README.md'),
+      (Join-Path $repoRoot 'examples\demo-one-click\metadata.json'),
+      (Join-Path $repoRoot 'examples\demo-one-click\report.txt'),
+      (Join-Path $repoRoot 'examples\demo-one-click\requirements.json'),
       (Join-Path $repoRoot 'examples\docx-report-metadata.json'),
       (Join-Path $repoRoot 'examples\feishu-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\local-uploaded-images-docx-prompt.md'),
       (Join-Path $repoRoot 'examples\sample-report.txt'),
       (Join-Path $repoRoot 'examples\e2e-sample-requirements.json'),
+      (Join-Path $repoRoot 'examples\report-templates\experiment-report-template.docx'),
+      (Join-Path $repoRoot 'examples\report-templates\README.md'),
       (Join-Path $repoRoot 'profiles\experiment-report.json'),
       (Join-Path $repoRoot 'profiles\course-design-report.json'),
+      (Join-Path $repoRoot 'profiles\README.md'),
+      (Join-Path $repoRoot 'references\README.md'),
       (Join-Path $repoRoot 'references\template-fit.md'),
       (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1'),
       (Join-Path $repoRoot 'scripts\build-report.ps1'),
@@ -550,8 +579,10 @@ try {
       (Join-Path $repoRoot 'scripts\prepare-report-prompt.ps1'),
       (Join-Path $repoRoot 'scripts\report-defaults.ps1'),
       (Join-Path $repoRoot 'scripts\report-profiles.ps1'),
+      (Join-Path $repoRoot 'scripts\README.md'),
       (Join-Path $repoRoot 'scripts\reset-openclaw-session.ps1'),
       (Join-Path $repoRoot 'scripts\run-e2e-sample.ps1'),
+      (Join-Path $repoRoot 'scripts\run-one-click-demo.ps1'),
       (Join-Path $repoRoot 'scripts\self-check.ps1'),
       (Join-Path $repoRoot 'scripts\validate-report-draft.ps1')
     )) {
@@ -590,6 +621,10 @@ try {
   Assert-True -Condition (@($exampleImageSpecs.images).Count -ge 2) -Message 'Example image-specs JSON is missing example images.'
   Assert-True -Condition ([string]$exampleImageSpecs.images[0].section -eq '实验步骤') -Message 'Example image-specs JSON is missing the expected first section.'
   Assert-True -Condition ([string]$exampleImageSpecs.images[1].section -eq '实验结果') -Message 'Example image-specs JSON is missing the expected second section.'
+  foreach ($image in @($exampleImageSpecs.images)) {
+    $resolvedExamplePath = Resolve-RepoRelativeExamplePath -RepoRoot $repoRoot -Path ([string]$image.path)
+    Assert-True -Condition (Test-Path -LiteralPath $resolvedExamplePath -PathType Leaf) -Message "Example image-specs JSON references a missing asset: $resolvedExamplePath"
+  }
   $results.Add('example image specs JSON OK') | Out-Null
 
   $exampleRowImageSpecs = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-image-specs-row.json') -Raw -Encoding UTF8) | ConvertFrom-Json
@@ -597,6 +632,10 @@ try {
   Assert-True -Condition (@($exampleRowImageSpecs.images).Count -eq 4) -Message 'Example row image-specs JSON should include four images.'
   Assert-True -Condition ([string]$exampleRowImageSpecs.images[0].layout.mode -eq 'row') -Message 'Example row image-specs JSON is missing the row layout mode.'
   Assert-True -Condition ([int]$exampleRowImageSpecs.images[0].layout.columns -eq 2) -Message 'Example row image-specs JSON is missing the expected layout columns.'
+  foreach ($image in @($exampleRowImageSpecs.images)) {
+    $resolvedExamplePath = Resolve-RepoRelativeExamplePath -RepoRoot $repoRoot -Path ([string]$image.path)
+    Assert-True -Condition (Test-Path -LiteralPath $resolvedExamplePath -PathType Leaf) -Message "Example row image-specs JSON references a missing asset: $resolvedExamplePath"
+  }
   $results.Add('example row image specs JSON OK') | Out-Null
 
   $exampleMetadata = (Get-Content -LiteralPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') -Raw -Encoding UTF8) | ConvertFrom-Json
@@ -632,18 +671,19 @@ try {
   $results.Add('example e2e requirements JSON OK') | Out-Null
 
   $demoReadme = Get-Content -LiteralPath (Join-Path $repoRoot 'demo\README.md') -Raw -Encoding UTF8
-  Assert-True -Condition ($demoReadme -match '2x2 Layout Preview') -Message 'Demo README is missing the expected layout preview section.'
+  Assert-True -Condition ($demoReadme -match '2x2 布局预览') -Message 'Demo README is missing the expected layout preview section.'
   Assert-True -Condition ($demoReadme -match 'demo-grid') -Message 'Demo README is missing the shared row-layout example.'
   $results.Add('demo documentation OK') | Out-Null
 
   $repoReadme = Get-Content -LiteralPath (Join-Path $repoRoot 'README.md') -Raw -Encoding UTF8
+  Assert-True -Condition ($repoReadme -match 'run-one-click-demo\.ps1') -Message 'README is missing the one-click demo documentation.'
   Assert-True -Condition ($repoReadme -match 'build-report-from-feishu\.ps1') -Message 'README is missing the Feishu wrapper script documentation.'
-  Assert-True -Condition ($repoReadme -match 'DetailLevel full') -Message 'README is missing the richer detail-level usage guidance.'
-  Assert-True -Condition ($repoReadme -match 'uploaded images and you also provide local image paths') -Message 'README is missing the hybrid uploaded-image plus local-path guidance.'
-  Assert-True -Condition ($repoReadme -match 'media/inbound/example\.png') -Message 'README is missing the uploaded-attachment path guidance.'
-  Assert-True -Condition ($repoReadme -match 'can omit `-ExperimentName`') -Message 'README is missing the remembered experiment-name guidance.'
+  Assert-True -Condition ($repoReadme -match 'course-design-report') -Message 'README is missing the course-design profile guidance.'
+  Assert-True -Condition ($repoReadme -match 'docs/one-click-demo\.md') -Message 'README is missing the one-click demo document link.'
+  Assert-True -Condition ($repoReadme -match 'docs/social-launch-kit\.md') -Message 'README is missing the social launch kit link.'
   Assert-True -Condition ($repoReadme -match 'ROADMAP\.md') -Message 'README is missing the roadmap link.'
-  Assert-True -Condition ($repoReadme -match 'Repository Health') -Message 'README is missing the repository health section.'
+  Assert-True -Condition ($repoReadme -match '仓库目录') -Message 'README is missing the repository structure section.'
+  Assert-True -Condition ($repoReadme -match '文档导航') -Message 'README is missing the documentation navigation section.'
   $results.Add('README wrapper documentation OK') | Out-Null
 
   $roadmapText = Get-Content -LiteralPath (Join-Path $repoRoot 'ROADMAP.md') -Raw -Encoding UTF8
@@ -2075,6 +2115,18 @@ URL: https://example.com/network-lab
   Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
   $results.Add('build-report pipeline OK') | Out-Null
 
+  $oneClickDemoOutputDir = Join-Path $tempRoot 'one-click-demo-output'
+  & (Join-Path $repoRoot 'scripts\run-one-click-demo.ps1') -OutputDir $oneClickDemoOutputDir | Out-Null
+  $oneClickSummaryPath = Join-Path $oneClickDemoOutputDir 'summary.json'
+  Assert-True -Condition (Test-Path -LiteralPath $oneClickSummaryPath) -Message 'One-click demo did not create summary.json.'
+  $oneClickSummary = (Get-Content -LiteralPath $oneClickSummaryPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$oneClickSummary.finalDocxPath)) -Message 'One-click demo summary final docx path does not exist.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$oneClickSummary.imagePlanPath)) -Message 'One-click demo summary image-plan path does not exist.'
+  Assert-True -Condition ([bool]$oneClickSummary.layoutCheckPassed) -Message 'One-click demo summary reported a failed layout check.'
+  Assert-True -Condition ([string]$oneClickSummary.reportProfileName -eq 'experiment-report') -Message 'One-click demo summary is missing the expected report profile name.'
+  Assert-True -Condition ([string]$oneClickSummary.imageInputMode -eq 'specs-json') -Message 'One-click demo should use inline image specs for deterministic assets.'
+  $results.Add('one-click demo OK') | Out-Null
+
   $feishuBuildOutputDir = Join-Path $tempRoot 'feishu-build-output'
   & (Join-Path $repoRoot 'scripts\build-report-from-feishu.ps1') `
     -TemplatePath $sampleDocx `
@@ -2132,13 +2184,19 @@ URL: https://example.com/network-lab
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\apply-docx-field-map.ps1')) -Message 'Install script did not copy fill script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\validate-report-draft.ps1')) -Message 'Install script did not copy validation script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-e2e-sample.ps1')) -Message 'Install script did not copy e2e script.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\run-one-click-demo.ps1')) -Message 'Install script did not copy the one-click demo script.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\experiment-report.json')) -Message 'Install script did not copy the experiment-report profile.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'profiles\course-design-report.json')) -Message 'Install script did not copy the course-design-report profile.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\report-templates\experiment-report-template.docx')) -Message 'Install script did not copy the experiment-report demo template.'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\demo-one-click\report.txt')) -Message 'Install script did not copy the one-click demo report.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\feishu-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the Feishu uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget 'examples\local-uploaded-images-docx-prompt.md')) -Message 'Install script did not copy the local uploaded-images prompt example.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\pull_request_template.md')) -Message 'Install script did not copy the PR template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\ISSUE_TEMPLATE\bug_report.md')) -Message 'Install script did not copy the bug-report template.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $installTarget '.github\workflows\quality.yml')) -Message 'Install script did not copy the quality workflow.'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $installTarget '.cursor'))) -Message 'Install script should not copy the .cursor directory.'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $installTarget '.vscode'))) -Message 'Install script should not copy the .vscode directory.'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $installTarget 'scripts\__pycache__'))) -Message 'Install script should not copy Python cache directories.'
   $results.Add('install script first install OK') | Out-Null
 
   & (Join-Path $repoRoot 'scripts\install-skill.ps1') -TargetDir $installTarget -Force | Out-Null
