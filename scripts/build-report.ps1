@@ -1,6 +1,5 @@
 ﻿[CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)]
   [string]$TemplatePath,
 
   [Parameter(Mandatory = $true)]
@@ -56,6 +55,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "report-defaults.ps1")
 . (Join-Path $PSScriptRoot "report-profiles.ps1")
 
 function Ensure-ParentDirectory {
@@ -576,7 +576,13 @@ function Try-NewCourseDesignAutoFlowchart {
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
+$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
+$resolvedReportProfilePath = [string]$reportProfile.resolvedProfilePath
+$resolvedTemplatePath = Resolve-ExperimentReportTemplatePath `
+  -TemplatePath $TemplatePath `
+  -ReportProfileName ([string]$reportProfile.name) `
+  -ReportProfilePath $resolvedReportProfilePath `
+  -RepoRoot $repoRoot
 $sourceTemplatePath = $resolvedTemplatePath
 $templateConversion = $null
 $resolvedReportPath = (Resolve-Path -LiteralPath $ReportPath).Path
@@ -591,13 +597,13 @@ if (-not [string]::IsNullOrWhiteSpace($RequirementsPath)) {
   $resolvedRequirementsPath = (Resolve-Path -LiteralPath $RequirementsPath).Path
 }
 
-$reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
-$resolvedReportProfilePath = [string]$reportProfile.resolvedProfilePath
 $effectiveStyleProfile = if ($PSBoundParameters.ContainsKey("StyleProfile")) {
   $StyleProfile
 } else {
   Get-ReportProfileDefaultStyleProfile -Profile $reportProfile
 }
+$templateFrameDefaulted = ((-not [bool]$CreateTemplateFrameDocx) -and [string]::IsNullOrWhiteSpace($TemplateFrameDocxOutPath) -and (Test-ExperimentReportTemplateFrameDefault -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath $resolvedReportProfilePath))
+$shouldCreateTemplateFrameDocx = ([bool]$CreateTemplateFrameDocx) -or (-not [string]::IsNullOrWhiteSpace($TemplateFrameDocxOutPath)) -or $templateFrameDefaulted
 $metadataInputMode = if (-not [string]::IsNullOrWhiteSpace($resolvedMetadataPath)) {
   "path"
 } elseif (-not [string]::IsNullOrWhiteSpace($MetadataJson)) {
@@ -891,7 +897,7 @@ $finalDocxPath = if ($null -ne $resolvedStyledDocxOutPath) {
   $resolvedFilledDocxOutPath
 }
 
-if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($TemplateFrameDocxOutPath))) {
+if ($shouldCreateTemplateFrameDocx) {
   $resolvedTemplateFrameDocxOutPath = if ([string]::IsNullOrWhiteSpace($TemplateFrameDocxOutPath)) {
     Join-Path $resolvedOutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalDocxPath)) + ".template-frame.docx")
   } else {
@@ -958,6 +964,9 @@ $summary = [pscustomobject]@{
   reportProfilePath = $resolvedReportProfilePath
   templatePath = $resolvedTemplatePath
   sourceTemplatePath = $sourceTemplatePath
+  templatePathDefaulted = (-not $PSBoundParameters.ContainsKey("TemplatePath") -or [string]::IsNullOrWhiteSpace($TemplatePath))
+  templateFrameDefaulted = $templateFrameDefaulted
+  fixedExperimentReportStyle = (Test-IsExperimentReportProfile -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath $resolvedReportProfilePath)
   templateConversionStatus = $(if ($null -ne $templateConversion) { [string]$templateConversion.status } else { "none" })
   templateConversionConverter = $(if ($null -ne $templateConversion) { [string]$templateConversion.converter } else { "none" })
   convertedTemplatePath = $(if ($null -ne $templateConversion) { [string]$templateConversion.convertedTemplatePath } else { $null })

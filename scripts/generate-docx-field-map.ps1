@@ -30,6 +30,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $repoRoot
 $fieldMapCompositeRules = @(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile)
 $paragraphCompositeRules = @(Get-ReportProfileParagraphCompositeRules -Profile $reportProfile)
+$extraSectionHeadings = @(Get-ReportProfileExtraSectionHeadings -Profile $reportProfile)
 
 $labelPattern = '^(?<label>[^:\uFF1A]{1,60})[:\uFF1A]\s*(?<rest>.*)$'
 $placeholderPattern = '[_\uFF3F]{2,}|\.{3,}|\uFF08\s*\uFF09|\(\s*\)|\u25A1|\u25A0'
@@ -63,6 +64,23 @@ function Normalize-FieldKey {
   $normalized = $normalized -replace '\s+', ''
   $normalized = $normalized -replace '[\p{P}\p{S}\uFF3F]+', ''
   return $normalized
+}
+
+function Get-SectionHeadingLookupKey {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  $normalized = Normalize-OpenXmlText -Text $Text
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return ""
+  }
+
+  $normalized = $normalized -replace '^(?:#{1,6}\s*)?', ''
+  $normalized = $normalized -replace '^(?:第?[0-9一二三四五六七八九十]+(?:章|节)?[.\)\u3001]?\s*)?', ''
+  $normalized = $normalized -replace '[:\uFF1A]\s*$', ''
+  return Normalize-FieldKey -Text $normalized
 }
 
 function Test-LooksLikeCommandLine {
@@ -589,6 +607,36 @@ $sectionRules = @(
   }
 )
 
+$extraSectionRules = @(
+  foreach ($heading in $extraSectionHeadings) {
+    $headingKey = Get-SectionHeadingLookupKey -Text ([string]$heading)
+    if ([string]::IsNullOrWhiteSpace($headingKey)) {
+      continue
+    }
+
+    [pscustomobject]@{
+      id = "__extra_section_$headingKey"
+      aliases = @([string]$heading)
+      isExtra = $true
+      extraHeadingKey = $headingKey
+    }
+  }
+)
+
+$allSectionBoundaryRules = @(
+  foreach ($rule in $sectionRules) {
+    [pscustomobject]@{
+      id = [string]$rule.id
+      aliases = @($rule.aliases)
+      isExtra = $false
+      extraHeadingKey = ""
+    }
+  }
+  foreach ($rule in $extraSectionRules) {
+    $rule
+  }
+)
+
 $metadataAliasLookup = @{}
 foreach ($rule in $metadataRules) {
   foreach ($alias in $rule.aliases) {
@@ -1039,7 +1087,7 @@ function Get-ReportAnalysis {
   }
 
   $sectionMatches = New-Object System.Collections.Generic.List[object]
-  foreach ($rule in $sectionRules) {
+  foreach ($rule in $allSectionBoundaryRules) {
     $headingIndex = $null
     $headingText = $null
     $headingPattern = Get-HeadingPattern -Aliases $rule.aliases
@@ -1061,21 +1109,29 @@ function Get-ReportAnalysis {
           id = $rule.id
           headingIndex = $headingIndex
           headingText = $headingText
+          isExtra = [bool]$rule.isExtra
+          extraHeadingKey = [string]$rule.extraHeadingKey
         }) | Out-Null
     }
   }
 
   $sectionsById = @{}
+  $extraSectionsByHeading = @{}
   $orderedMatches = @($sectionMatches | Sort-Object headingIndex)
   for ($i = 0; $i -lt $orderedMatches.Count; $i++) {
     $current = $orderedMatches[$i]
     $nextHeadingIndex = if (($i + 1) -lt $orderedMatches.Count) { $orderedMatches[$i + 1].headingIndex } else { $lines.Count }
     $contentLines = if (($current.headingIndex + 1) -lt $nextHeadingIndex) { $lines[($current.headingIndex + 1)..($nextHeadingIndex - 1)] } else { @() }
     $contentText = ($contentLines -join [Environment]::NewLine).Trim()
-    $sectionsById[$current.id] = [pscustomobject]@{
+    $sectionInfo = [pscustomobject]@{
       headingText = $current.headingText
       text = $contentText
       paragraphs = @(Convert-ToParagraphList -Text $contentText)
+    }
+    if ([bool]$current.isExtra) {
+      $extraSectionsByHeading[[string]$current.extraHeadingKey] = $sectionInfo
+    } else {
+      $sectionsById[$current.id] = $sectionInfo
     }
   }
 
@@ -1087,6 +1143,7 @@ function Get-ReportAnalysis {
 
   return @{
     SectionsById = $sectionsById
+    ExtraSectionsByHeading = $extraSectionsByHeading
   }
 }
 
@@ -1140,7 +1197,9 @@ function Get-CompositeFillSpec {
     [object[]]$Rules,
 
     [Parameter(Mandatory = $true)]
-    [hashtable]$SectionsById
+    [hashtable]$SectionsById,
+
+    [hashtable]$ExtraSectionsByHeading = @{}
   )
 
   $normalizedText = Normalize-OpenXmlText -Text $Text
@@ -1166,6 +1225,26 @@ function Get-CompositeFillSpec {
 
     foreach ($block in @($compositeRule.blocks)) {
       $blockAdded = $false
+      $blockHeadingKey = Get-SectionHeadingLookupKey -Text ([string]$block.heading)
+      if (
+        -not [string]::IsNullOrWhiteSpace($blockHeadingKey) -and
+        $ExtraSectionsByHeading.ContainsKey($blockHeadingKey)
+      ) {
+        $extraSectionInfo = $ExtraSectionsByHeading[$blockHeadingKey]
+        if ($null -ne $extraSectionInfo -and @($extraSectionInfo.paragraphs).Count -gt 0) {
+          if (-not $blockAdded -and -not [string]::IsNullOrWhiteSpace([string]$block.heading)) {
+            [void]$paragraphs.Add([string]$block.heading)
+            $blockAdded = $true
+          }
+
+          foreach ($paragraph in @($extraSectionInfo.paragraphs)) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$paragraph)) {
+              [void]$paragraphs.Add([string]$paragraph)
+            }
+          }
+        }
+      }
+
       foreach ($sectionId in @($block.sectionIds)) {
         if (-not $SectionsById.ContainsKey([string]$sectionId)) {
           continue
@@ -1217,10 +1296,12 @@ function Get-CompositeCellFillSpec {
     [string]$CellText,
 
     [Parameter(Mandatory = $true)]
-    [hashtable]$SectionsById
+    [hashtable]$SectionsById,
+
+    [hashtable]$ExtraSectionsByHeading = @{}
   )
 
-  return Get-CompositeFillSpec -Text $CellText -Rules $fieldMapCompositeRules -SectionsById $SectionsById
+  return Get-CompositeFillSpec -Text $CellText -Rules $fieldMapCompositeRules -SectionsById $SectionsById -ExtraSectionsByHeading $ExtraSectionsByHeading
 }
 
 function Get-CompositeParagraphFillSpec {
@@ -1229,10 +1310,12 @@ function Get-CompositeParagraphFillSpec {
     [string]$ParagraphText,
 
     [Parameter(Mandatory = $true)]
-    [hashtable]$SectionsById
+    [hashtable]$SectionsById,
+
+    [hashtable]$ExtraSectionsByHeading = @{}
   )
 
-  return Get-CompositeFillSpec -Text $ParagraphText -Rules $paragraphCompositeRules -SectionsById $SectionsById
+  return Get-CompositeFillSpec -Text $ParagraphText -Rules $paragraphCompositeRules -SectionsById $SectionsById -ExtraSectionsByHeading $ExtraSectionsByHeading
 }
 
 function Get-CompositeTableBodyFillSpec {
@@ -1406,7 +1489,7 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
       continue
     }
 
-    $paragraphCompositeFill = Get-CompositeParagraphFillSpec -ParagraphText $paragraphText -SectionsById $reportAnalysis.SectionsById
+    $paragraphCompositeFill = Get-CompositeParagraphFillSpec -ParagraphText $paragraphText -SectionsById $reportAnalysis.SectionsById -ExtraSectionsByHeading $reportAnalysis.ExtraSectionsByHeading
     if ($null -ne $paragraphCompositeFill) {
       $nextBlock = if (($blockIndex + 1) -lt $blocks.Count) { $blocks[$blockIndex + 1] } else { $null }
       $nextBlockIsFillTarget = ($null -ne $nextBlock) -and $nextBlock.type -eq "paragraph" -and (Is-ExplicitFillTargetInstructionLike -Text ([string]$nextBlock.text))
@@ -1548,7 +1631,7 @@ for ($blockIndex = 0; $blockIndex -lt $blocks.Count; $blockIndex++) {
           continue
         }
 
-        $compositeCellFill = Get-CompositeCellFillSpec -CellText $cellText -SectionsById $reportAnalysis.SectionsById
+        $compositeCellFill = Get-CompositeCellFillSpec -CellText $cellText -SectionsById $reportAnalysis.SectionsById -ExtraSectionsByHeading $reportAnalysis.ExtraSectionsByHeading
         if ($null -ne $compositeCellFill) {
           $tableCompositeEntries.Add([pscustomobject]@{
               Location = [string]$cell.location

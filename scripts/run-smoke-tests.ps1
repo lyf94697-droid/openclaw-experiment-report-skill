@@ -716,6 +716,18 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$resolvedInferredNames.experimentName -eq '交换机 VLAN 配置实验') -Message 'Report-defaults helper should prefer inferred experiment names over stored defaults.'
   Assert-True -Condition ([bool]$resolvedInferredNames.usedInferredExperimentName) -Message 'Report-defaults helper should report that it used an inferred experiment name.'
   Assert-True -Condition (-not [bool]$resolvedInferredNames.usedStoredExperimentName) -Message 'Report-defaults helper should not report stored experiment-name reuse when inference wins.'
+  $defaultTemplateFixture = Join-Path $tempRoot 'default-template.docx'
+  Set-Content -LiteralPath $defaultTemplateFixture -Value 'template fixture' -Encoding UTF8
+  $oldExperimentReportTemplatePath = $env:EXPERIMENT_REPORT_TEMPLATE_PATH
+  try {
+    $env:EXPERIMENT_REPORT_TEMPLATE_PATH = $defaultTemplateFixture
+    $resolvedDefaultTemplatePath = Resolve-ExperimentReportTemplatePath -TemplatePath '' -ReportProfileName 'experiment-report' -RepoRoot $repoRoot
+    Assert-True -Condition ([string]$resolvedDefaultTemplatePath -eq [string](Resolve-Path -LiteralPath $defaultTemplateFixture).Path) -Message 'Report-defaults helper did not resolve the default experiment report template path.'
+    Assert-True -Condition (Test-ExperimentReportTemplateFrameDefault -ReportProfileName 'experiment-report') -Message 'Experiment reports should default to template-frame output.'
+    Assert-True -Condition (-not (Test-ExperimentReportTemplateFrameDefault -ReportProfileName 'course-design-report')) -Message 'Template-frame default should stay scoped to experiment reports.'
+  } finally {
+    $env:EXPERIMENT_REPORT_TEMPLATE_PATH = $oldExperimentReportTemplatePath
+  }
   $results.Add('report defaults helper OK') | Out-Null
 
   . (Join-Path $repoRoot 'scripts\report-profiles.ps1')
@@ -1018,6 +1030,53 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($coverBodyFieldMapRoot.fieldMap.T1R5C1.paragraphs).Count -ge 6) -Message 'Cover-body template mapping is missing expected body paragraphs.'
   Assert-True -Condition ((@($coverBodyFieldMapRoot.diagnostics | Where-Object { $_.code -eq 'composite_body_after_table' }).Count) -ge 1) -Message 'Cover-body template mapping should emit the structured composite-body diagnostic.'
   $results.Add('docx cover-body field-map generation OK') | Out-Null
+
+  $extraContentReportPath = Join-Path $tempRoot 'extra-content-report.md'
+  @'
+计算机网络实验报告
+
+课程名称：计算机网络
+实验名称：Web 服务器搭建
+
+实验目的
+掌握 Windows Server 中 IIS Web 服务的安装、站点发布和访问验证方法。
+
+实验内容
+完成 IIS 默认站点验证、自定义 Site1 站点创建、个人主页发布和浏览器访问测试。
+
+实验环境
+Windows Server 2022 虚拟机，IIS Web 服务器角色，客户端浏览器和 ping 命令。
+
+实验原理
+Web 服务器通过 HTTP 端口监听客户端请求，并根据站点绑定和物理目录返回网页文件。
+
+实验步骤
+先安装 IIS，再创建 Site1 站点，最后使用浏览器和 ping 命令验证访问结果。
+
+实验结果
+浏览器能够打开自定义个人主页，ping 测试能够收到服务器回复。
+
+问题分析
+如果 ping 不通，应优先检查虚拟网络和服务器地址；如果能 ping 通但网页打不开，应检查 IIS 站点绑定。
+
+实验总结
+本次实验完成了 Web 服务器搭建、站点发布和访问验证，能够区分网络连通问题与 Web 服务配置问题。
+'@ | Set-Content -LiteralPath $extraContentReportPath -Encoding UTF8
+
+  $extraContentFieldMapPath = Join-Path $tempRoot 'extra-content-field-map.json'
+  & (Join-Path $repoRoot 'scripts\generate-docx-field-map.ps1') `
+    -TemplatePath $coverBodyDocx `
+    -ReportPath $extraContentReportPath `
+    -MetadataPath (Join-Path $repoRoot 'examples\docx-report-metadata.json') `
+    -Format json `
+    -OutFile $extraContentFieldMapPath | Out-Null
+  $extraContentFieldMapRoot = (Get-Content -LiteralPath $extraContentFieldMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
+  $extraContentParagraphs = @($extraContentFieldMapRoot.fieldMap.T1R5C1.paragraphs)
+  Assert-True -Condition (@($extraContentParagraphs | Where-Object { $_ -eq '实验内容' }).Count -eq 0) -Message 'Composite field-map should not keep a duplicate unnumbered 实验内容 heading.'
+  Assert-True -Condition (@($extraContentParagraphs | Where-Object { $_ -eq '2 实验内容' }).Count -eq 1) -Message 'Composite field-map should keep exactly one numbered 2 实验内容 heading.'
+  Assert-True -Condition (($extraContentParagraphs -join "`n") -match '完成 IIS 默认站点验证') -Message 'Composite field-map should preserve the source 实验内容 body.'
+  Assert-True -Condition (($extraContentParagraphs -join "`n") -match 'Windows Server 2022 虚拟机') -Message 'Composite field-map should still include the experiment environment body.'
+  $results.Add('docx extra content composite merge OK') | Out-Null
 
   $coverBodyFilledDocx = Join-Path $tempRoot 'cover-body-template.filled.docx'
   $coverBodyFillResult = & (Join-Path $repoRoot 'scripts\apply-docx-field-map.ps1') -TemplatePath $coverBodyDocx -MappingPath $coverBodyFieldMapPath -OutPath $coverBodyFilledDocx
@@ -1814,6 +1873,12 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($imageDocumentXml.SelectNodes('//wp:inline', $imageNamespaceManager)).Count -ge 2) -Message 'Inserted docx is missing expected image drawing nodes.'
   Assert-True -Condition ($imageDocumentXml.OuterXml -match '图1 实验目的示意图') -Message 'Inserted docx is missing the first image caption.'
   Assert-True -Condition ($imageDocumentXml.OuterXml -match '图2 表格截图示意') -Message 'Inserted docx is missing the second image caption.'
+  $insertedCaptionParagraph = $imageDocumentXml.SelectSingleNode("//w:p[.//w:t = '图1 实验目的示意图']", $imageNamespaceManager)
+  Assert-True -Condition ($null -ne $insertedCaptionParagraph) -Message 'Inserted docx is missing a standalone caption paragraph.'
+  $insertedCaptionJustification = $insertedCaptionParagraph.SelectSingleNode('./w:pPr/w:jc', $imageNamespaceManager)
+  Assert-True -Condition ($null -ne $insertedCaptionJustification -and $insertedCaptionJustification.GetAttribute('val', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq 'center') -Message 'Inserted image caption should be centered below the image.'
+  $insertedCaptionIndent = $insertedCaptionParagraph.SelectSingleNode('./w:pPr/w:ind', $imageNamespaceManager)
+  Assert-True -Condition ($null -ne $insertedCaptionIndent -and $insertedCaptionIndent.GetAttribute('left', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0' -and $insertedCaptionIndent.GetAttribute('right', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0' -and $insertedCaptionIndent.GetAttribute('firstLine', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0') -Message 'Inserted image caption should not inherit body paragraph indentation.'
   Assert-True -Condition (@($imageRelationshipsXml.Relationships.Relationship | Where-Object { $_.Target -match '^media/image\d+\.png$' }).Count -ge 2) -Message 'Inserted docx is missing expected image relationships.'
   Assert-True -Condition (@($imageContentTypesXml.Types.Default | Where-Object { $_.Extension -eq 'png' -and $_.ContentType -eq 'image/png' }).Count -ge 1) -Message 'Inserted docx is missing the png content type registration.'
   $results.Add('docx image insertion OK') | Out-Null
@@ -1977,6 +2042,8 @@ URL: https://example.com/network-lab
   $styledDocxTemp = Join-Path $tempRoot 'styled-docx-inspect'
   [System.IO.Compression.ZipFile]::ExtractToDirectory($styledDocx, $styledDocxTemp)
   [xml]$styledDocumentXml = [System.IO.File]::ReadAllText((Join-Path $styledDocxTemp 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $styledNamespaceManager = New-Object System.Xml.XmlNamespaceManager($styledDocumentXml.NameTable)
+  $styledNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:jc w:val="center"') -Message 'Styled docx is missing centered paragraph formatting.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:ind w:firstLine="420"') -Message 'Styled docx is missing the expected first-line indent.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:b/?') -Message 'Styled docx is missing bold heading formatting.'
@@ -1991,6 +2058,12 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:keepLines') -Message 'Styled docx is missing keep-lines pagination hints.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:tcMar') -Message 'Styled docx is missing table cell margin normalization.'
   Assert-True -Condition ($styledDocumentXml.OuterXml -match 'w:vAlign[^>]*w:val="top"') -Message 'Styled docx is missing top-aligned table cell formatting.'
+  $styledCaptionParagraph = $styledDocumentXml.SelectSingleNode("//w:p[.//w:t = '图1 主机 A 的 ping 测试结果']", $styledNamespaceManager)
+  Assert-True -Condition ($null -ne $styledCaptionParagraph) -Message 'Styled docx is missing the row-layout caption paragraph.'
+  $styledCaptionJustification = $styledCaptionParagraph.SelectSingleNode('./w:pPr/w:jc', $styledNamespaceManager)
+  Assert-True -Condition ($null -ne $styledCaptionJustification -and $styledCaptionJustification.GetAttribute('val', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq 'center') -Message 'Styled image caption should remain centered below the image.'
+  $styledCaptionIndent = $styledCaptionParagraph.SelectSingleNode('./w:pPr/w:ind', $styledNamespaceManager)
+  Assert-True -Condition ($null -ne $styledCaptionIndent -and $styledCaptionIndent.GetAttribute('left', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0' -and $styledCaptionIndent.GetAttribute('right', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0' -and $styledCaptionIndent.GetAttribute('firstLine', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0') -Message 'Styled image caption should not inherit body paragraph indentation.'
   Remove-Item -LiteralPath $styledDocxTemp -Recurse -Force
 
   $compactStyledDocx = Join-Path $tempRoot 'sample-template.row-images.compact-styled.docx'
@@ -2126,6 +2199,20 @@ URL: https://example.com/network-lab
   [xml]$buildTemplateFrameXml = [System.IO.File]::ReadAllText((Join-Path $buildTemplateFrameInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
   $buildTemplateFrameNamespaceManager = New-Object System.Xml.XmlNamespaceManager($buildTemplateFrameXml.NameTable)
   $buildTemplateFrameNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
+  $buildTemplateFrameCaptionParagraphs = @(
+    $buildTemplateFrameXml.SelectNodes('//w:p', $buildTemplateFrameNamespaceManager) |
+      Where-Object {
+        $captionText = ((@($_.SelectNodes('.//w:t', $buildTemplateFrameNamespaceManager)) | ForEach-Object { $_.InnerText }) -join '').Trim()
+        $captionText -match '^图\s*\d+'
+      }
+  )
+  Assert-True -Condition ($buildTemplateFrameCaptionParagraphs.Count -ge 1) -Message 'Template-frame docx is missing image caption paragraphs.'
+  foreach ($buildTemplateFrameCaptionParagraph in $buildTemplateFrameCaptionParagraphs) {
+    $buildTemplateFrameCaptionJustification = $buildTemplateFrameCaptionParagraph.SelectSingleNode('./w:pPr/w:jc', $buildTemplateFrameNamespaceManager)
+    Assert-True -Condition ($null -ne $buildTemplateFrameCaptionJustification -and $buildTemplateFrameCaptionJustification.GetAttribute('val', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq 'center') -Message 'Template-frame image captions should stay centered below their images.'
+    $buildTemplateFrameCaptionIndent = $buildTemplateFrameCaptionParagraph.SelectSingleNode('./w:pPr/w:ind', $buildTemplateFrameNamespaceManager)
+    Assert-True -Condition ($null -ne $buildTemplateFrameCaptionIndent -and $buildTemplateFrameCaptionIndent.GetAttribute('left', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0' -and $buildTemplateFrameCaptionIndent.GetAttribute('right', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0' -and $buildTemplateFrameCaptionIndent.GetAttribute('firstLine', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main') -eq '0') -Message 'Template-frame image captions should not inherit body indentation.'
+  }
   $buildTemplateFrameNotFirstPageCount = @($buildTemplateFrameXml.SelectNodes("//w:sectPr/w:pgBorders[@w:display='notFirstPage']", $buildTemplateFrameNamespaceManager)).Count
   Assert-True -Condition ($buildTemplateFrameNotFirstPageCount -ge 1) -Message 'Template-frame docx page frame should not wrap the first-page title.'
   foreach ($pageFrameSide in @('top', 'left', 'bottom', 'right')) {

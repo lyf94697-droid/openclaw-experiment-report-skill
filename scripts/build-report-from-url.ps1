@@ -246,7 +246,15 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 $resolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 
-$resolvedTemplatePath = Resolve-AbsolutePathIfProvided -Path $TemplatePath
+$resolvedTemplatePath = if ([string]::IsNullOrWhiteSpace($TemplatePath) -and -not (Test-IsExperimentReportProfile -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath ([string]$reportProfile.resolvedProfilePath))) {
+  $null
+} else {
+  Resolve-ExperimentReportTemplatePath `
+    -TemplatePath $TemplatePath `
+    -ReportProfileName ([string]$reportProfile.name) `
+    -ReportProfilePath ([string]$reportProfile.resolvedProfilePath) `
+    -RepoRoot $repoRoot
+}
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
 $resolvedRequirementsPath = Resolve-AbsolutePathIfProvided -Path $RequirementsPath
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
@@ -254,6 +262,8 @@ $resolvedPreGeneratedReportPath = Resolve-AbsolutePathIfProvided -Path $PreGener
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedFinalDocxPath = if ([string]::IsNullOrWhiteSpace($FinalDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($FinalDocxPath) }
 $resolvedTemplateFrameDocxPath = if ([string]::IsNullOrWhiteSpace($TemplateFrameDocxPath)) { $null } else { [System.IO.Path]::GetFullPath($TemplateFrameDocxPath) }
+$templateFrameDefaulted = ((-not [bool]$CreateTemplateFrameDocx) -and [string]::IsNullOrWhiteSpace($TemplateFrameDocxPath) -and (Test-ExperimentReportTemplateFrameDefault -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)))
+$shouldCreateTemplateFrameDocx = ([bool]$CreateTemplateFrameDocx) -or (-not [string]::IsNullOrWhiteSpace($TemplateFrameDocxPath)) -or $templateFrameDefaulted
 $inputSummaryPath = if ([string]::IsNullOrWhiteSpace($resolvedPreparedInputsSummaryPath)) {
   Join-Path $resolvedOutputDir "report-inputs-summary.json"
 } else {
@@ -405,7 +415,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedImagePlanOutPath)) {
     $buildParams.ImagePlanOutPath = $resolvedImagePlanOutPath
   }
-  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+  if ($shouldCreateTemplateFrameDocx) {
     $buildParams.CreateTemplateFrameDocx = $true
   }
 
@@ -446,7 +456,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedTemplatePath)) {
 
 $buildTemplateFrameDocxPath = $(if ($null -ne $buildSummary -and $buildSummary.PSObject.Properties.Name -contains "templateFrameDocxPath") { [string]$buildSummary.templateFrameDocxPath } else { $null })
 $templateFrameDocxPath = $null
-if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+if ($shouldCreateTemplateFrameDocx) {
   if ([string]::IsNullOrWhiteSpace($buildTemplateFrameDocxPath) -or -not (Test-Path -LiteralPath $buildTemplateFrameDocxPath -PathType Leaf)) {
     throw "Template-frame docx was requested, but build-report.ps1 did not produce templateFrameDocxPath."
   }
@@ -574,6 +584,10 @@ $pipelineTraceMarkdownLines = New-Object System.Collections.Generic.List[string]
 $wrapperSummaryPath = Join-Path $resolvedOutputDir "url-build-summary.json"
 $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
+  templatePath = $resolvedTemplatePath
+  templatePathDefaulted = (-not $PSBoundParameters.ContainsKey("TemplatePath") -or [string]::IsNullOrWhiteSpace($TemplatePath))
+  templateFrameDefaulted = $templateFrameDefaulted
+  fixedExperimentReportStyle = (Test-IsExperimentReportProfile -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath ([string]$reportProfile.resolvedProfilePath))
   reportProfileName = [string]$reportProfile.name
   reportProfilePath = [string]$reportProfile.resolvedProfilePath
   reportProfileDisplayName = $documentLabel

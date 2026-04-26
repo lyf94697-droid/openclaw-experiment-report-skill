@@ -733,7 +733,7 @@ function Ensure-ParagraphAfterTable {
     $nextNode = $nextNode.NextSibling
   }
 
-  if ($null -ne $nextNode -and $nextNode.LocalName -eq "p") {
+  if ($null -ne $nextNode -and ($nextNode.LocalName -eq "p" -or $nextNode.LocalName -eq "sectPr")) {
     return
   }
 
@@ -888,6 +888,46 @@ function Test-IsFigureCaptionNode {
 
   $text = Get-ParagraphNodeText -Paragraph $Node -NamespaceManager $NamespaceManager
   return ($text -match '^图\s*\d+')
+}
+
+function Set-FigureCaptionNodeFormatting {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [AllowNull()]
+    [System.Xml.XmlNode]$Node,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  if (-not (Test-IsFigureCaptionNode -Node $Node -NamespaceManager $NamespaceManager)) {
+    return
+  }
+
+  $wNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  $paragraphProperties = $Node.SelectSingleNode("./w:pPr", $NamespaceManager)
+  if ($null -eq $paragraphProperties) {
+    $paragraphProperties = $Document.CreateElement("w", "pPr", $wNs)
+    [void]$Node.PrependChild($paragraphProperties)
+  }
+
+  foreach ($existingJustification in @($paragraphProperties.SelectNodes("w:jc", $NamespaceManager))) {
+    [void]$paragraphProperties.RemoveChild($existingJustification)
+  }
+  $justification = $Document.CreateElement("w", "jc", $wNs)
+  [void]$justification.Attributes.Append((New-WAttr -Document $Document -Name "val" -Value "center"))
+  [void]$paragraphProperties.AppendChild($justification)
+
+  foreach ($existingIndent in @($paragraphProperties.SelectNodes("w:ind", $NamespaceManager))) {
+    [void]$paragraphProperties.RemoveChild($existingIndent)
+  }
+  $indent = $Document.CreateElement("w", "ind", $wNs)
+  [void]$indent.Attributes.Append((New-WAttr -Document $Document -Name "left" -Value "0"))
+  [void]$indent.Attributes.Append((New-WAttr -Document $Document -Name "right" -Value "0"))
+  [void]$indent.Attributes.Append((New-WAttr -Document $Document -Name "firstLine" -Value "0"))
+  [void]$paragraphProperties.AppendChild($indent)
 }
 
 function Get-TemplateFrameBodyNodeGroups {
@@ -1260,6 +1300,7 @@ try {
       Set-CellHorizontalBorderValues -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -Top $topBorder -Bottom $bottomBorder
 
       foreach ($node in @($nodeGroups[$groupIndex])) {
+        Set-FigureCaptionNodeFormatting -Document $documentXml -Node $node -NamespaceManager $namespaceManager
         [void]$body.RemoveChild($node)
         [void]$tableCell.AppendChild($node)
         $movedBlockCount++

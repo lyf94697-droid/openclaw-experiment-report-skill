@@ -1,6 +1,5 @@
 ﻿[CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)]
   [string]$TemplatePath,
 
   [string]$ReportPath,
@@ -201,7 +200,6 @@ $labels = Get-ReportProfileLabels -Profile $reportProfile
 $documentLabel = Get-ReportProfileDisplayName -Profile $reportProfile -Fallback "报告"
 $courseNameLabel = if ($labels.Contains("CourseName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["CourseName"])) { [string]$labels["CourseName"] } else { "课程名称" }
 $titleNameLabel = if ($labels.Contains("ExperimentName") -and -not [string]::IsNullOrWhiteSpace([string]$labels["ExperimentName"])) { [string]$labels["ExperimentName"] } else { "题目名称" }
-$resolvedTemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 $resolvedReportPath = Resolve-AbsolutePathIfProvided -Path $ReportPath
 $resolvedPromptPath = Resolve-AbsolutePathIfProvided -Path $PromptPath
 $resolvedMetadataPath = Resolve-AbsolutePathIfProvided -Path $MetadataPath
@@ -211,6 +209,13 @@ $resolvedReportProfilePath = Resolve-AbsolutePathIfProvided -Path $ReportProfile
 $resolvedImageSpecsPath = Resolve-AbsolutePathIfProvided -Path $ImageSpecsPath
 $resolvedImagePlanOutPath = if ([string]::IsNullOrWhiteSpace($ImagePlanOutPath)) { $null } else { [System.IO.Path]::GetFullPath($ImagePlanOutPath) }
 $resolvedStyleProfilePath = Resolve-AbsolutePathIfProvided -Path $StyleProfilePath
+$resolvedTemplatePath = Resolve-ExperimentReportTemplatePath `
+  -TemplatePath $TemplatePath `
+  -ReportProfileName ([string]$reportProfile.name) `
+  -ReportProfilePath ([string]$reportProfile.resolvedProfilePath) `
+  -RepoRoot $repoRoot
+$templateFrameDefaulted = ((-not [bool]$CreateTemplateFrameDocx) -and [string]::IsNullOrWhiteSpace($TemplateFrameDocxPath) -and (Test-ExperimentReportTemplateFrameDefault -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath ([string]$reportProfile.resolvedProfilePath)))
+$shouldCreateTemplateFrameDocx = ([bool]$CreateTemplateFrameDocx) -or (-not [string]::IsNullOrWhiteSpace($TemplateFrameDocxPath)) -or $templateFrameDefaulted
 
 $generationInputsProvided = (-not [string]::IsNullOrWhiteSpace($PromptText)) -or `
   (-not [string]::IsNullOrWhiteSpace($resolvedPromptPath)) -or `
@@ -332,7 +337,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace([string]$reportProfile.resolvedProfilePath)) {
     $buildParams.ReportProfilePath = [string]$reportProfile.resolvedProfilePath
   }
-  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+  if ($shouldCreateTemplateFrameDocx) {
     $buildParams.CreateTemplateFrameDocx = $true
   }
 
@@ -424,7 +429,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedReportPath)) {
   if (-not [string]::IsNullOrWhiteSpace($resolvedPreGeneratedReportPath)) {
     $buildParams.PreGeneratedReportPath = $resolvedPreGeneratedReportPath
   }
-  if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+  if ($shouldCreateTemplateFrameDocx) {
     $buildParams.CreateTemplateFrameDocx = $true
   }
 
@@ -465,7 +470,7 @@ if (-not [string]::Equals($generatedFinalDocxPath, $resolvedFinalDocxDestination
 
 $generatedTemplateFrameDocxPath = $(if ($null -ne $innerSummary -and $innerSummary.PSObject.Properties.Name -contains "templateFrameDocxPath") { [string]$innerSummary.templateFrameDocxPath } else { $null })
 $resolvedTemplateFrameDocxDestination = $null
-if ($CreateTemplateFrameDocx -or (-not [string]::IsNullOrWhiteSpace($resolvedTemplateFrameDocxPath))) {
+if ($shouldCreateTemplateFrameDocx) {
   if ([string]::IsNullOrWhiteSpace($generatedTemplateFrameDocxPath) -or -not (Test-Path -LiteralPath $generatedTemplateFrameDocxPath -PathType Leaf)) {
     throw "Template-frame docx was requested, but the inner build did not produce templateFrameDocxPath."
   }
@@ -637,6 +642,9 @@ $wrapperSummary = [pscustomobject]@{
   outputDir = $resolvedOutputDir
   artifactsDir = $resolvedArtifactsDir
   templatePath = $resolvedTemplatePath
+  templatePathDefaulted = (-not $PSBoundParameters.ContainsKey("TemplatePath") -or [string]::IsNullOrWhiteSpace($TemplatePath))
+  templateFrameDefaulted = $templateFrameDefaulted
+  fixedExperimentReportStyle = (Test-IsExperimentReportProfile -ReportProfileName ([string]$reportProfile.name) -ReportProfilePath ([string]$reportProfile.resolvedProfilePath))
   mode = $wrapperMode
   generationMode = $generationMode
   pipelineMode = $PipelineMode

@@ -1117,7 +1117,8 @@ function New-CaptionParagraph {
 <w:p xmlns:w="$wordNamespace">
   <w:pPr>
     <w:jc w:val="center"/>
-    <w:spacing w:after="80"/>
+    <w:ind w:left="0" w:right="0" w:firstLine="0"/>
+    <w:spacing w:before="0" w:after="80"/>
   </w:pPr>
   <w:r>
     <w:t>$escapedCaption</w:t>

@@ -918,6 +918,20 @@ function Set-ParagraphIndent {
   }
 }
 
+function Set-ParagraphNoIndent {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Paragraph
+  )
+
+  $pPr = Get-OrCreateParagraphProperties -Paragraph $Paragraph
+  $ind = Get-OrCreateChildElement -Parent $pPr -LocalName "ind"
+  Set-WordAttribute -Element $ind -LocalName "left" -Value "0"
+  Set-WordAttribute -Element $ind -LocalName "right" -Value "0"
+  Set-WordAttribute -Element $ind -LocalName "firstLine" -Value "0"
+  $ind.RemoveAttribute("hanging", $wordNamespace)
+}
+
 function Set-ParagraphSpacing {
   param(
     [Parameter(Mandatory = $true)]
@@ -1893,7 +1907,7 @@ try {
 
     if (Test-IsCaptionParagraph -Text $text) {
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
-      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphNoIndent -Paragraph $paragraph
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.CaptionAfterTwips -Line $(if ($useTemplateLikeCompactStyle) { $null } else { $styleSettings.BodyLineTwips })
       if (-not $useTemplateLikeCompactStyle) {
         Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints $styleSettings.CaptionFontHalfPoints

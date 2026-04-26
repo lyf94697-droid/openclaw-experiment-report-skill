@@ -367,3 +367,97 @@ function Save-ExperimentReportDefaults {
   [System.IO.File]::WriteAllText($resolvedDefaultsPath, ($payload | ConvertTo-Json -Depth 4), (New-Object System.Text.UTF8Encoding($true)))
   return $resolvedDefaultsPath
 }
+
+function Test-IsExperimentReportProfile {
+  param(
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfileName) -and [string]::Equals($ReportProfileName, "experiment-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+    return $true
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($ReportProfilePath)) {
+    $profileBaseName = [System.IO.Path]::GetFileNameWithoutExtension($ReportProfilePath)
+    if ([string]::Equals($profileBaseName, "experiment-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Get-ExperimentReportDefaultTemplateCandidates {
+  param(
+    [AllowNull()]
+    [string]$RepoRoot,
+
+    [AllowNull()]
+    [string]$EnvTemplatePath = $env:EXPERIMENT_REPORT_TEMPLATE_PATH
+  )
+
+  $candidates = New-Object System.Collections.Generic.List[string]
+  if (-not [string]::IsNullOrWhiteSpace($EnvTemplatePath)) {
+    [void]$candidates.Add($EnvTemplatePath)
+  }
+
+  $experimentReportDirName = New-ExperimentReportTextFromCodePoints -CodePoints @(0x5B9E, 0x9A8C, 0x62A5, 0x544A)
+  $templateDirName = New-ExperimentReportTextFromCodePoints -CodePoints @(0x6A21, 0x677F)
+  $templateFileName = "{0}{1}{2}1.docx" -f $experimentReportDirName, (New-ExperimentReportTextFromCodePoints -CodePoints @(0x6A21, 0x7248)), ""
+  [void]$candidates.Add((Join-Path (Join-Path "E:\$experimentReportDirName" "00-$templateDirName") $templateFileName))
+
+  if (-not [string]::IsNullOrWhiteSpace($RepoRoot)) {
+    [void]$candidates.Add((Join-Path $RepoRoot "examples\report-templates\experiment-report-template.docx"))
+  }
+
+  return @($candidates.ToArray())
+}
+
+function Resolve-ExperimentReportTemplatePath {
+  param(
+    [AllowNull()]
+    [string]$TemplatePath,
+
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath,
+
+    [AllowNull()]
+    [string]$RepoRoot
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($TemplatePath)) {
+    return (Resolve-Path -LiteralPath $TemplatePath).Path
+  }
+
+  if (-not (Test-IsExperimentReportProfile -ReportProfileName $ReportProfileName -ReportProfilePath $ReportProfilePath)) {
+    throw "TemplatePath is required for report profile: $ReportProfileName"
+  }
+
+  $candidates = @(Get-ExperimentReportDefaultTemplateCandidates -RepoRoot $RepoRoot)
+  foreach ($candidate in $candidates) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+      return (Resolve-Path -LiteralPath $candidate).Path
+    }
+  }
+
+  throw ("No experiment-report template was found. Provide -TemplatePath or set EXPERIMENT_REPORT_TEMPLATE_PATH. Checked: {0}" -f ($candidates -join "; "))
+}
+
+function Test-ExperimentReportTemplateFrameDefault {
+  param(
+    [AllowNull()]
+    [string]$ReportProfileName = "experiment-report",
+
+    [AllowNull()]
+    [string]$ReportProfilePath
+  )
+
+  return (Test-IsExperimentReportProfile -ReportProfileName $ReportProfileName -ReportProfilePath $ReportProfilePath)
+}
