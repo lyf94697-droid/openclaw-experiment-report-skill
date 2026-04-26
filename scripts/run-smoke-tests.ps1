@@ -2132,6 +2132,19 @@ URL: https://example.com/network-lab
     $buildTemplateFramePageFrameSideCount = @($buildTemplateFrameXml.SelectNodes(("//w:sectPr/w:pgBorders/w:{0}[@w:val='single']" -f $pageFrameSide), $buildTemplateFrameNamespaceManager)).Count
     Assert-True -Condition ($buildTemplateFramePageFrameSideCount -ge 1) -Message ("Template-frame docx is missing the closed page frame side: {0}." -f $pageFrameSide)
   }
+  $buildTemplateFrameTitlePageCount = @($buildTemplateFrameXml.SelectNodes("//w:sectPr/w:titlePg", $buildTemplateFrameNamespaceManager)).Count
+  Assert-True -Condition ($buildTemplateFrameTitlePageCount -ge 1) -Message 'Template-frame docx should keep the report title outside the first-page frame.'
+  $buildTemplateFrameFirstFooterRefs = @($buildTemplateFrameXml.SelectNodes("//w:sectPr/w:footerReference[@w:type='first']", $buildTemplateFrameNamespaceManager))
+  Assert-True -Condition ($buildTemplateFrameFirstFooterRefs.Count -ge 1) -Message 'Template-frame docx is missing the first-page frame footer.'
+  $buildTemplateFrameFirstFooterRid = $buildTemplateFrameFirstFooterRefs[0].GetAttribute('id', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships')
+  [xml]$buildTemplateFrameRelsXml = [System.IO.File]::ReadAllText((Join-Path $buildTemplateFrameInspect 'word\_rels\document.xml.rels'), (New-Object System.Text.UTF8Encoding($false)))
+  $buildTemplateFrameFooterRelationship = @($buildTemplateFrameRelsXml.SelectNodes("//*[local-name()='Relationship']") | Where-Object { $_.GetAttribute('Id') -eq $buildTemplateFrameFirstFooterRid }) | Select-Object -First 1
+  Assert-True -Condition ($null -ne $buildTemplateFrameFooterRelationship) -Message 'Template-frame docx first-page footer relationship is missing.'
+  $buildTemplateFrameFooterPath = Join-Path (Join-Path $buildTemplateFrameInspect 'word') ([string]$buildTemplateFrameFooterRelationship.GetAttribute('Target'))
+  Assert-True -Condition (Test-Path -LiteralPath $buildTemplateFrameFooterPath) -Message 'Template-frame docx first-page footer part is missing.'
+  $buildTemplateFrameFooterText = [System.IO.File]::ReadAllText($buildTemplateFrameFooterPath, (New-Object System.Text.UTF8Encoding($false)))
+  Assert-True -Condition ($buildTemplateFrameFooterText -match 'FirstPageFrameBottom') -Message 'Template-frame docx first-page footer is missing the bottom frame line.'
+  Assert-True -Condition ($buildTemplateFrameFooterText -notmatch '<w:tbl') -Message 'Template-frame docx first-page footer frame must not use a layout-consuming table.'
   Remove-Item -LiteralPath $buildTemplateFrameInspect -Recurse -Force
   $results.Add('build-report pipeline OK') | Out-Null
 

@@ -54,6 +54,27 @@ function New-WAttr {
   return $attr
 }
 
+function New-RAttr {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Value
+  )
+
+  $attr = $Document.CreateAttribute(
+    "r",
+    $Name,
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  )
+  $attr.Value = $Value
+  return $attr
+}
+
 function Set-WAttrValue {
   param(
     [Parameter(Mandatory = $true)]
@@ -922,8 +943,8 @@ function Ensure-ClosedPageFrameBorder {
       $pageWidthTwips = 0
       if ([int]::TryParse($pageWidthText, [ref]$pageWidthTwips) -and $pageWidthTwips -gt $TableWidthTwips) {
         $sideMarginTwips = [int][Math]::Floor(($pageWidthTwips - $TableWidthTwips) / 2)
-        Set-WAttrValue -Element $pageMargins -Name "left" -Value ([string]$sideMarginTwips)
-        Set-WAttrValue -Element $pageMargins -Name "right" -Value ([string]$sideMarginTwips)
+        [void](Set-WAttrValue -Element $pageMargins -Name "left" -Value ([string]$sideMarginTwips))
+        [void](Set-WAttrValue -Element $pageMargins -Name "right" -Value ([string]$sideMarginTwips))
       }
     }
 
@@ -946,6 +967,184 @@ function Ensure-ClosedPageFrameBorder {
     } else {
       [void]$sectionProperties.AppendChild($pageBorders)
     }
+  }
+}
+
+function Get-NextRelationshipId {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$RelationshipsXml
+  )
+
+  $maxRelationshipNumber = 0
+  foreach ($relationship in @($RelationshipsXml.SelectNodes("//*[local-name()='Relationship']"))) {
+    $id = [string]$relationship.GetAttribute("Id")
+    if ($id -match '^rId(\d+)$') {
+      $number = [int]$Matches[1]
+      if ($number -gt $maxRelationshipNumber) {
+        $maxRelationshipNumber = $number
+      }
+    }
+  }
+
+  return ("rId{0}" -f ($maxRelationshipNumber + 1))
+}
+
+function Write-XmlDocument {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $settings = New-Object System.Xml.XmlWriterSettings
+  $settings.Encoding = New-Object System.Text.UTF8Encoding($false)
+  $settings.Indent = $false
+  $writer = [System.Xml.XmlWriter]::Create($Path, $settings)
+  try {
+    $Document.Save($writer)
+  } finally {
+    $writer.Close()
+  }
+}
+
+function Ensure-FirstPageBottomFrameFooter {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PackageDirectory,
+
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlElement]$SectionProperties,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $wNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  $wordDir = Join-Path $PackageDirectory "word"
+  $relsPath = Join-Path $wordDir "_rels\document.xml.rels"
+  $contentTypesPath = Join-Path $PackageDirectory "[Content_Types].xml"
+  $pageMargins = $SectionProperties.SelectSingleNode("w:pgMar", $NamespaceManager)
+  $pageSize = $SectionProperties.SelectSingleNode("w:pgSz", $NamespaceManager)
+  $frameLeftTwips = 913
+  $frameWidthTwips = 10080
+  $frameTopTwips = 2880
+  $frameHeightTwips = 12270
+  if ($null -ne $pageMargins) {
+    $bottomMargin = $pageMargins.GetAttribute("bottom", $wNs)
+    if (-not [string]::IsNullOrWhiteSpace($bottomMargin)) {
+      # Align the first-page footer line with the text bottom so it closes the table frame.
+      [void](Set-WAttrValue -Element $pageMargins -Name "footer" -Value $bottomMargin)
+    }
+
+    $leftMargin = $pageMargins.GetAttribute("left", $wNs)
+    $rightMargin = $pageMargins.GetAttribute("right", $wNs)
+    $pageWidthText = if ($null -ne $pageSize) { $pageSize.GetAttribute("w", $wNs) } else { "" }
+    $pageHeightText = if ($null -ne $pageSize) { $pageSize.GetAttribute("h", $wNs) } else { "" }
+    $pageWidthTwips = 0
+    $pageHeightTwips = 0
+    $leftMarginTwips = 0
+    $rightMarginTwips = 0
+    $bottomMarginTwips = 0
+    if (
+      [int]::TryParse($pageWidthText, [ref]$pageWidthTwips) -and
+      [int]::TryParse($pageHeightText, [ref]$pageHeightTwips) -and
+      [int]::TryParse($leftMargin, [ref]$leftMarginTwips) -and
+      [int]::TryParse($rightMargin, [ref]$rightMarginTwips) -and
+      [int]::TryParse($bottomMargin, [ref]$bottomMarginTwips)
+    ) {
+      $frameLeftTwips = $leftMarginTwips
+      $calculatedWidth = $pageWidthTwips - $leftMarginTwips - $rightMarginTwips
+      if ($calculatedWidth -gt 0) {
+        $frameWidthTwips = $calculatedWidth
+      }
+      $frameBottomTwips = $pageHeightTwips - $bottomMarginTwips - 240
+      if ($frameBottomTwips -gt $frameTopTwips) {
+        $frameHeightTwips = $frameBottomTwips - $frameTopTwips
+      }
+    }
+  }
+  $pointCulture = [System.Globalization.CultureInfo]::InvariantCulture
+  $frameLeftPoints = [string]::Format($pointCulture, "{0:0.###}pt", ($frameLeftTwips / 20.0))
+  $frameTopPoints = [string]::Format($pointCulture, "{0:0.###}pt", ($frameTopTwips / 20.0))
+  $frameWidthPoints = [string]::Format($pointCulture, "{0:0.###}pt", ($frameWidthTwips / 20.0))
+  $frameHeightPoints = [string]::Format($pointCulture, "{0:0.###}pt", ($frameHeightTwips / 20.0))
+  $frameRightPoints = [string]::Format($pointCulture, "{0:0.###}pt", (($frameLeftTwips + $frameWidthTwips) / 20.0))
+  $frameBottomPoints = [string]::Format($pointCulture, "{0:0.###}pt", (($frameTopTwips + $frameHeightTwips) / 20.0))
+
+  $footerIndex = 1
+  do {
+    $footerFileName = "footer$footerIndex.xml"
+    $footerPath = Join-Path $wordDir $footerFileName
+    $footerIndex++
+  } while (Test-Path -LiteralPath $footerPath)
+
+  $footerXml = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+  <w:p>
+    <w:pPr>
+      <w:spacing w:before="0" w:after="0" />
+    </w:pPr>
+    <w:r>
+      <w:pict>
+        <v:line id="FirstPageFrameLeft" o:allowincell="f" strokecolor="#000000" strokeweight="0.5pt" style="position:absolute;margin-left:$frameLeftPoints;margin-top:$frameTopPoints;width:0;height:$frameHeightPoints;z-index:251654144;mso-position-horizontal-relative:page;mso-position-vertical-relative:page;mso-wrap-style:none" from="0,0" to="0,$frameHeightPoints" />
+        <v:line id="FirstPageFrameRight" o:allowincell="f" strokecolor="#000000" strokeweight="0.5pt" style="position:absolute;margin-left:$frameRightPoints;margin-top:$frameTopPoints;width:0;height:$frameHeightPoints;z-index:251654145;mso-position-horizontal-relative:page;mso-position-vertical-relative:page;mso-wrap-style:none" from="0,0" to="0,$frameHeightPoints" />
+        <v:line id="FirstPageFrameBottom" o:allowincell="f" strokecolor="#000000" strokeweight="0.5pt" style="position:absolute;margin-left:$frameLeftPoints;margin-top:$frameBottomPoints;width:$frameWidthPoints;height:0;z-index:251654146;mso-position-horizontal-relative:page;mso-position-vertical-relative:page;mso-wrap-style:none" from="0,0" to="$frameWidthPoints,0" />
+      </w:pict>
+    </w:r>
+  </w:p>
+  <w:p>
+    <w:pPr>
+      <w:pBdr>
+        <w:top w:val="single" w:sz="4" w:space="0" w:color="auto" />
+      </w:pBdr>
+      <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto" />
+    </w:pPr>
+  </w:p>
+</w:ftr>
+"@
+  [System.IO.File]::WriteAllText($footerPath, $footerXml, (New-Object System.Text.UTF8Encoding($false)))
+
+  [xml]$relationshipsXml = Get-Content -LiteralPath $relsPath -Raw -Encoding UTF8
+  $relsNs = "http://schemas.openxmlformats.org/package/2006/relationships"
+  $relationshipId = Get-NextRelationshipId -RelationshipsXml $relationshipsXml
+  $relationship = $relationshipsXml.CreateElement("Relationship", $relsNs)
+  $relationship.SetAttribute("Id", $relationshipId)
+  $relationship.SetAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer")
+  $relationship.SetAttribute("Target", $footerFileName)
+  [void]$relationshipsXml.DocumentElement.AppendChild($relationship)
+  Write-XmlDocument -Document $relationshipsXml -Path $relsPath
+
+  [xml]$contentTypesXml = Get-Content -LiteralPath $contentTypesPath -Raw -Encoding UTF8
+  $ctNs = "http://schemas.openxmlformats.org/package/2006/content-types"
+  $overridePartName = "/word/$footerFileName"
+  $existingOverride = @($contentTypesXml.SelectNodes("//*[local-name()='Override']") | Where-Object { $_.GetAttribute("PartName") -eq $overridePartName })
+  if ($existingOverride.Count -eq 0) {
+    $override = $contentTypesXml.CreateElement("Override", $ctNs)
+    $override.SetAttribute("PartName", $overridePartName)
+    $override.SetAttribute("ContentType", "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml")
+    [void]$contentTypesXml.DocumentElement.AppendChild($override)
+    Write-XmlDocument -Document $contentTypesXml -Path $contentTypesPath
+  }
+
+  foreach ($existingFirstFooter in @($SectionProperties.SelectNodes("w:footerReference[@w:type='first']", $NamespaceManager))) {
+    [void]$SectionProperties.RemoveChild($existingFirstFooter)
+  }
+
+  $footerReference = $Document.CreateElement("w", "footerReference", $wNs)
+  [void]$footerReference.Attributes.Append((New-WAttr -Document $Document -Name "type" -Value "first"))
+  [void]$footerReference.Attributes.Append((New-RAttr -Document $Document -Name "id" -Value $relationshipId))
+  [void]$SectionProperties.InsertBefore($footerReference, $SectionProperties.FirstChild)
+
+  if ($null -eq $SectionProperties.SelectSingleNode("w:titlePg", $NamespaceManager)) {
+    $titlePage = $Document.CreateElement("w", "titlePg", $wNs)
+    [void]$SectionProperties.InsertAfter($titlePage, $footerReference)
   }
 }
 
@@ -1083,6 +1282,10 @@ try {
 
   Ensure-ParagraphAfterTable -Document $documentXml -Body $body -Table $mainTable -NamespaceManager $namespaceManager
   Ensure-ClosedPageFrameBorder -Document $documentXml -NamespaceManager $namespaceManager -TableWidthTwips $mainTableWidthTwips
+  $firstSectionProperties = $documentXml.SelectSingleNode("//w:sectPr[1]", $namespaceManager)
+  if ($null -ne $firstSectionProperties) {
+    Ensure-FirstPageBottomFrameFooter -PackageDirectory $unzipDir -Document $documentXml -SectionProperties $firstSectionProperties -NamespaceManager $namespaceManager
+  }
 
   $writerSettings = New-Object System.Xml.XmlWriterSettings
   $writerSettings.Encoding = New-Object System.Text.UTF8Encoding($false)
