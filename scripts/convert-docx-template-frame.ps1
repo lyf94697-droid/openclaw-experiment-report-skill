@@ -933,6 +933,7 @@ function Ensure-ClosedPageFrameBorder {
 
     $pageBorders = $Document.CreateElement("w", "pgBorders", $wNs)
     [void]$pageBorders.Attributes.Append((New-WAttr -Document $Document -Name "offsetFrom" -Value "text"))
+    [void]$pageBorders.Attributes.Append((New-WAttr -Document $Document -Name "display" -Value "notFirstPage"))
 
     foreach ($side in @("top", "left", "bottom", "right")) {
       $border = $Document.CreateElement("w", $side, $wNs)
@@ -1056,7 +1057,7 @@ try {
       Set-CellMargins -Document $documentXml -Cell $tableCell -MarginTwips $BodyCellMarginTwips -TopTwips $topMargin -BottomTwips $bottomMargin
 
       $topBorder = if ($groupIndex -eq 0) { "single" } else { "nil" }
-      $bottomBorder = if ($groupIndex -eq ($nodeGroups.Count - 1)) { "single" } else { "nil" }
+      $bottomBorder = "nil"
       Set-CellHorizontalBorderValues -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -Top $topBorder -Bottom $bottomBorder
 
       foreach ($node in @($nodeGroups[$groupIndex])) {
