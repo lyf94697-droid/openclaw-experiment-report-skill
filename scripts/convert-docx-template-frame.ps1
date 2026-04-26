@@ -54,6 +54,21 @@ function New-WAttr {
   return $attr
 }
 
+function Set-WAttrValue {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlElement]$Element,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Value
+  )
+
+  $Element.SetAttribute($Name, "http://schemas.openxmlformats.org/wordprocessingml/2006/main", $Value)
+}
+
 function Add-BorderAttrs {
   param(
     [Parameter(Mandatory = $true)]
@@ -886,17 +901,32 @@ function Get-TemplateFrameBodyNodeGroups {
   return $groups
 }
 
-function Ensure-PageBottomBorder {
+function Ensure-ClosedPageFrameBorder {
   param(
     [Parameter(Mandatory = $true)]
     [xml]$Document,
 
     [Parameter(Mandatory = $true)]
-    [System.Xml.XmlNamespaceManager]$NamespaceManager
+    [System.Xml.XmlNamespaceManager]$NamespaceManager,
+
+    [Parameter(Mandatory = $true)]
+    [int]$TableWidthTwips
   )
 
   $wNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
   foreach ($sectionProperties in @($Document.SelectNodes("//w:sectPr", $NamespaceManager))) {
+    $pageSize = $sectionProperties.SelectSingleNode("w:pgSz", $NamespaceManager)
+    $pageMargins = $sectionProperties.SelectSingleNode("w:pgMar", $NamespaceManager)
+    if ($null -ne $pageSize -and $null -ne $pageMargins -and $TableWidthTwips -gt 0) {
+      $pageWidthText = $pageSize.GetAttribute("w", $wNs)
+      $pageWidthTwips = 0
+      if ([int]::TryParse($pageWidthText, [ref]$pageWidthTwips) -and $pageWidthTwips -gt $TableWidthTwips) {
+        $sideMarginTwips = [int][Math]::Floor(($pageWidthTwips - $TableWidthTwips) / 2)
+        Set-WAttrValue -Element $pageMargins -Name "left" -Value ([string]$sideMarginTwips)
+        Set-WAttrValue -Element $pageMargins -Name "right" -Value ([string]$sideMarginTwips)
+      }
+    }
+
     foreach ($existingPageBorders in @($sectionProperties.SelectNodes("w:pgBorders", $NamespaceManager))) {
       [void]$sectionProperties.RemoveChild($existingPageBorders)
     }
@@ -904,9 +934,11 @@ function Ensure-PageBottomBorder {
     $pageBorders = $Document.CreateElement("w", "pgBorders", $wNs)
     [void]$pageBorders.Attributes.Append((New-WAttr -Document $Document -Name "offsetFrom" -Value "text"))
 
-    $bottomBorder = $Document.CreateElement("w", "bottom", $wNs)
-    Add-BorderAttrs -Document $Document -Element $bottomBorder
-    [void]$pageBorders.AppendChild($bottomBorder)
+    foreach ($side in @("top", "left", "bottom", "right")) {
+      $border = $Document.CreateElement("w", $side, $wNs)
+      Add-BorderAttrs -Document $Document -Element $border
+      [void]$pageBorders.AppendChild($border)
+    }
 
     if ($sectionProperties.HasChildNodes) {
       [void]$sectionProperties.InsertBefore($pageBorders, $sectionProperties.FirstChild)
@@ -1049,7 +1081,7 @@ try {
   }
 
   Ensure-ParagraphAfterTable -Document $documentXml -Body $body -Table $mainTable -NamespaceManager $namespaceManager
-  Ensure-PageBottomBorder -Document $documentXml -NamespaceManager $namespaceManager
+  Ensure-ClosedPageFrameBorder -Document $documentXml -NamespaceManager $namespaceManager -TableWidthTwips $mainTableWidthTwips
 
   $writerSettings = New-Object System.Xml.XmlWriterSettings
   $writerSettings.Encoding = New-Object System.Text.UTF8Encoding($false)

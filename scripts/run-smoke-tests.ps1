@@ -2126,8 +2126,10 @@ URL: https://example.com/network-lab
   [xml]$buildTemplateFrameXml = [System.IO.File]::ReadAllText((Join-Path $buildTemplateFrameInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
   $buildTemplateFrameNamespaceManager = New-Object System.Xml.XmlNamespaceManager($buildTemplateFrameXml.NameTable)
   $buildTemplateFrameNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
-  $buildTemplateFramePageBottomCount = @($buildTemplateFrameXml.SelectNodes('//w:sectPr/w:pgBorders/w:bottom[@w:val="single"]', $buildTemplateFrameNamespaceManager)).Count
-  Assert-True -Condition ($buildTemplateFramePageBottomCount -ge 1) -Message 'Template-frame docx is missing the per-page bottom border.'
+  foreach ($pageFrameSide in @('top', 'left', 'bottom', 'right')) {
+    $buildTemplateFramePageFrameSideCount = @($buildTemplateFrameXml.SelectNodes(("//w:sectPr/w:pgBorders/w:{0}[@w:val='single']" -f $pageFrameSide), $buildTemplateFrameNamespaceManager)).Count
+    Assert-True -Condition ($buildTemplateFramePageFrameSideCount -ge 1) -Message ("Template-frame docx is missing the closed page frame side: {0}." -f $pageFrameSide)
+  }
   Remove-Item -LiteralPath $buildTemplateFrameInspect -Recurse -Force
   $results.Add('build-report pipeline OK') | Out-Null
 
