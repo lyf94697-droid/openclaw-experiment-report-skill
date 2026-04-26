@@ -886,6 +886,36 @@ function Get-TemplateFrameBodyNodeGroups {
   return $groups
 }
 
+function Ensure-PageBottomBorder {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $wNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  foreach ($sectionProperties in @($Document.SelectNodes("//w:sectPr", $NamespaceManager))) {
+    foreach ($existingPageBorders in @($sectionProperties.SelectNodes("w:pgBorders", $NamespaceManager))) {
+      [void]$sectionProperties.RemoveChild($existingPageBorders)
+    }
+
+    $pageBorders = $Document.CreateElement("w", "pgBorders", $wNs)
+    [void]$pageBorders.Attributes.Append((New-WAttr -Document $Document -Name "offsetFrom" -Value "text"))
+
+    $bottomBorder = $Document.CreateElement("w", "bottom", $wNs)
+    Add-BorderAttrs -Document $Document -Element $bottomBorder
+    [void]$pageBorders.AppendChild($bottomBorder)
+
+    if ($sectionProperties.HasChildNodes) {
+      [void]$sectionProperties.InsertBefore($pageBorders, $sectionProperties.FirstChild)
+    } else {
+      [void]$sectionProperties.AppendChild($pageBorders)
+    }
+  }
+}
+
 function Write-ZipFromDirectory {
   param(
     [Parameter(Mandatory = $true)]
@@ -1019,6 +1049,7 @@ try {
   }
 
   Ensure-ParagraphAfterTable -Document $documentXml -Body $body -Table $mainTable -NamespaceManager $namespaceManager
+  Ensure-PageBottomBorder -Document $documentXml -NamespaceManager $namespaceManager
 
   $writerSettings = New-Object System.Xml.XmlWriterSettings
   $writerSettings.Encoding = New-Object System.Text.UTF8Encoding($false)

@@ -2096,6 +2096,7 @@ URL: https://example.com/network-lab
     -RequirementsPath (Join-Path $repoRoot 'examples\e2e-sample-requirements.json') `
     -OutputDir $buildReportOutputDir `
     -StyleFinalDocx `
+    -CreateTemplateFrameDocx `
     -StyleProfilePath $buildStyleProfilePath
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'generated-field-map.json')) -Message 'build-report did not create the generated field map.'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $buildReportOutputDir 'sample-template.filled.docx')) -Message 'build-report did not create the filled docx.'
@@ -2119,6 +2120,15 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$buildReportSummary.styleProfileReason -match 'explicitly requested') -Message 'build-report summary is missing the resolved excellent-style reason.'
   Assert-True -Condition ([int]$buildReportSummary.appliedStyleSettings.BodyLineTwips -eq 310) -Message 'build-report summary is missing the overridden style settings from the custom profile file.'
   Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
+  Assert-True -Condition (Test-Path -LiteralPath ([string]$buildReportSummary.templateFrameDocxPath)) -Message 'build-report summary is missing the template-frame docx path.'
+  $buildTemplateFrameInspect = Join-Path $tempRoot 'build-template-frame-inspect'
+  [System.IO.Compression.ZipFile]::ExtractToDirectory([string]$buildReportSummary.templateFrameDocxPath, $buildTemplateFrameInspect)
+  [xml]$buildTemplateFrameXml = [System.IO.File]::ReadAllText((Join-Path $buildTemplateFrameInspect 'word\document.xml'), (New-Object System.Text.UTF8Encoding($false)))
+  $buildTemplateFrameNamespaceManager = New-Object System.Xml.XmlNamespaceManager($buildTemplateFrameXml.NameTable)
+  $buildTemplateFrameNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
+  $buildTemplateFramePageBottomCount = @($buildTemplateFrameXml.SelectNodes('//w:sectPr/w:pgBorders/w:bottom[@w:val="single"]', $buildTemplateFrameNamespaceManager)).Count
+  Assert-True -Condition ($buildTemplateFramePageBottomCount -ge 1) -Message 'Template-frame docx is missing the per-page bottom border.'
+  Remove-Item -LiteralPath $buildTemplateFrameInspect -Recurse -Force
   $results.Add('build-report pipeline OK') | Out-Null
 
   $oneClickDemoOutputDir = Join-Path $tempRoot 'one-click-demo-output'
