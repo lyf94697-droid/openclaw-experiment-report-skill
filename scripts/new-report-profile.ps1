@@ -6,7 +6,7 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$DisplayName,
 
-  [ValidateSet("auto", "default", "compact", "school")]
+  [ValidateSet("auto", "default", "compact", "school", "excellent")]
   [string]$DefaultStyleProfile = "school",
 
   [string]$DefaultExperimentProperty = "Custom report",

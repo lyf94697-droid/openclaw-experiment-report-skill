@@ -1,7 +1,7 @@
 {
   "name": "experiment-report",
   "displayName": "实验报告",
-  "defaultStyleProfile": "auto",
+  "defaultStyleProfile": "excellent",
   "defaultExperimentProperty": "③验证性实验",
   "metadataFields": [
     { "key": "Name", "label": "姓名" },
@@ -66,6 +66,8 @@
     "实验内容"
   ],
   "imagePlacementDefaults": {
+    "defaultImageWidthCm": 15.8,
+    "autoRowLayout": "explicit-only",
     "fallbackSectionOrder": ["steps", "result", "environment", "analysis", "summary", "purpose"],
     "defaultCaptions": {
       "environment": "实验环境截图",
@@ -94,17 +96,18 @@
     {
       "matchAll": ["实验目的", "实验内容"],
       "blocks": [
-        { "heading": "一. 实验目的", "sectionIds": ["purpose"] },
-        { "heading": "二. 实验内容", "sectionIds": ["environment", "theory"] }
+        { "heading": "1 实验目的", "sectionIds": ["purpose"] },
+        { "heading": "2 实验内容", "sectionIds": ["environment"] },
+        { "heading": "3 实验原理", "sectionIds": ["theory"] }
       ]
     },
     {
       "matchAll": ["实验步骤", "实验小结"],
       "blocks": [
-        { "heading": "三. 实验步骤", "sectionIds": ["steps"] },
-        { "heading": "四. 实验结果", "sectionIds": ["result"] },
-        { "heading": "五. 问题分析", "sectionIds": ["analysis"] },
-        { "heading": "六.实验小结", "sectionIds": ["summary"] }
+        { "heading": "4 实验步骤", "sectionIds": ["steps"] },
+        { "heading": "5 实验结果", "sectionIds": ["result"] },
+        { "heading": "6 问题分析", "sectionIds": ["analysis"] },
+        { "heading": "7 实验小结", "sectionIds": ["summary"] }
       ]
     }
   ],
@@ -117,12 +120,13 @@
       ]
     },
     "full": {
-      "minChars": 1100,
+      "minChars": 2200,
       "promptGuidance": [
-        "Prefer a submit-ready report with substantial section content instead of a terse outline.",
-        "Unless the reference material is very sparse, aim for roughly 1200 to 1800 Chinese characters.",
-        "The purpose, environment, theory, analysis, and summary sections should each contain multiple complete sentences rather than a single short statement.",
+        "Prefer a submit-ready report with the density of a teacher-provided excellent example instead of a terse outline.",
+        "Unless the reference material is very sparse, aim for roughly 2200 to 3500 Chinese characters before screenshots.",
+        "Use 1, 2, 3 style section numbering and write concrete subsections such as topology, host configuration, command configuration, result verification, and summary when the experiment supports them.",
         "The steps and results sections should be the most detailed parts. Explain the setup order, key operations, command or configuration intent, observed outcomes, and why those outcomes support completion of the experiment.",
+        "When screenshots are available, write figure references near the corresponding operations and keep captions short and academic.",
         "If the webpages do not provide screenshots or exact measured values, keep the language concrete and validation-oriented instead of filling space with generic filler."
       ]
     }

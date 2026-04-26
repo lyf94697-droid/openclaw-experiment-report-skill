@@ -32,7 +32,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $reportProfile = Get-ReportProfile -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath -RepoRoot $script:RepoRoot
 $wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-$defaultImageWidthCm = 10.5
+$defaultImageWidthCm = Get-ReportProfileDefaultImageWidthCm -Profile $reportProfile -Fallback 10.5
 $sectionRules = @()
 $sectionInputAliasLookup = @{}
 $sectionRuleLookup = @{}
@@ -1075,6 +1075,12 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
   ) {
     $widthCm = [Math]::Max([double]$widthCm, 15.8)
   }
+  if (
+    [string]::Equals([string]$reportProfile.name, "experiment-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+    (-not $isRowLayout)
+  ) {
+    $widthCm = [Math]::Max([double]$widthCm, [double]$defaultImageWidthCm)
+  }
 
   $sectionHeading = ($discoveredSections | Where-Object { $_.id -eq $resolvedSectionId } | Select-Object -First 1 -ExpandProperty headingText)
 
@@ -1104,7 +1110,9 @@ for ($index = 0; $index -lt $imageSpecs.Count; $index++) {
     }) | Out-Null
 }
 
-Apply-AutoRowLayouts -Entries ($resolvedImageEntries.ToArray()) -Notes $notes -Columns 2
+if (Get-ReportProfileAutoRowLayoutEnabled -Profile $reportProfile -Fallback $true) {
+  Apply-AutoRowLayouts -Entries ($resolvedImageEntries.ToArray()) -Notes $notes -Columns 2
+}
 Apply-RowGroupAnchors -Entries ($resolvedImageEntries.ToArray()) -Notes $notes
 
 $resultImages = New-Object System.Collections.Generic.List[object]

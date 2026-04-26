@@ -10,7 +10,7 @@ param(
   [int]$MetadataCellMarginTwips = 108,
 
   [ValidateRange(0, 720)]
-  [int]$BodyCellMarginTwips = 260,
+  [int]$BodyCellMarginTwips = 108,
 
   [switch]$Overwrite
 )
@@ -125,7 +125,15 @@ function Set-CellMargins {
     [System.Xml.XmlElement]$Cell,
 
     [Parameter(Mandatory = $true)]
-    [int]$MarginTwips
+    [int]$MarginTwips,
+
+    [int]$TopTwips = $MarginTwips,
+
+    [int]$LeftTwips = $MarginTwips,
+
+    [int]$BottomTwips = $MarginTwips,
+
+    [int]$RightTwips = $MarginTwips
   )
 
   $wNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -143,13 +151,63 @@ function Set-CellMargins {
   }
 
   $cellMargins = $Document.CreateElement("w", "tcMar", $wNs)
-  foreach ($side in @("top", "left", "bottom", "right")) {
-    $margin = $Document.CreateElement("w", $side, $wNs)
-    [void]$margin.Attributes.Append((New-WAttr -Document $Document -Name "w" -Value ([string]$MarginTwips)))
+  foreach ($marginSpec in @(
+      @{ Name = "top"; Value = $TopTwips },
+      @{ Name = "left"; Value = $LeftTwips },
+      @{ Name = "bottom"; Value = $BottomTwips },
+      @{ Name = "right"; Value = $RightTwips }
+    )) {
+    $margin = $Document.CreateElement("w", $marginSpec.Name, $wNs)
+    [void]$margin.Attributes.Append((New-WAttr -Document $Document -Name "w" -Value ([string]$marginSpec.Value)))
     [void]$margin.Attributes.Append((New-WAttr -Document $Document -Name "type" -Value "dxa"))
     [void]$cellMargins.AppendChild($margin)
   }
   [void]$cellProperties.AppendChild($cellMargins)
+}
+
+function Set-CellHorizontalBorderValues {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlElement]$Cell,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager,
+
+    [ValidateSet("single", "nil")]
+    [string]$Top = "nil",
+
+    [ValidateSet("single", "nil")]
+    [string]$Bottom = "nil"
+  )
+
+  $wNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  $cellProperties = $Cell.SelectSingleNode("./w:tcPr", $NamespaceManager)
+  if ($null -eq $cellProperties) {
+    $cellProperties = $Document.CreateElement("w", "tcPr", $wNs)
+    [void]$Cell.PrependChild($cellProperties)
+  }
+
+  foreach ($existingBorders in @($cellProperties.SelectNodes("w:tcBorders", $NamespaceManager))) {
+    [void]$cellProperties.RemoveChild($existingBorders)
+  }
+
+  $cellBorders = $Document.CreateElement("w", "tcBorders", $wNs)
+  foreach ($borderSpec in @(
+      @{ Name = "top"; Value = $Top },
+      @{ Name = "bottom"; Value = $Bottom }
+    )) {
+    $border = $Document.CreateElement("w", $borderSpec.Name, $wNs)
+    if ([string]$borderSpec.Value -eq "single") {
+      Add-BorderAttrs -Document $Document -Element $border
+    } else {
+      [void]$border.Attributes.Append((New-WAttr -Document $Document -Name "val" -Value "nil"))
+    }
+    [void]$cellBorders.AppendChild($border)
+  }
+  [void]$cellProperties.AppendChild($cellBorders)
 }
 
 function Get-CellGridSpan {
@@ -567,29 +625,29 @@ function Set-MetadataRowsToTemplateStandard {
     [int]$MetadataCellMarginTwips
   )
 
-  Set-TableWidth -Document $Document -Table $Table -NamespaceManager $NamespaceManager -WidthValue "8522" -WidthType "dxa"
+  Set-TableWidth -Document $Document -Table $Table -NamespaceManager $NamespaceManager -WidthValue "10080" -WidthType "dxa"
   Set-TableJustification -Document $Document -Table $Table -NamespaceManager $NamespaceManager -Value "center"
   Set-TableLayout -Document $Document -Table $Table -NamespaceManager $NamespaceManager -LayoutType "fixed"
   Set-TableCellMargins -Document $Document -Table $Table -NamespaceManager $NamespaceManager -TopTwips 0 -LeftTwips $MetadataCellMarginTwips -BottomTwips 0 -RightTwips $MetadataCellMarginTwips
   Set-TableBorders -Document $Document -Table $Table -NamespaceManager $NamespaceManager
-  Set-TableGridColumns -Document $Document -Table $Table -NamespaceManager $NamespaceManager -ColumnWidths @(2988, 360, 1080, 1425, 2669)
+  Set-TableGridColumns -Document $Document -Table $Table -NamespaceManager $NamespaceManager -ColumnWidths @(3535, 426, 1277, 1686, 3156)
 
   $rowSpecs = New-Object object[] 4
   $rowSpecs[0] = @(
-    @{ Width = "2988"; Type = "dxa"; Span = 1 },
-    @{ Width = "2865"; Type = "dxa"; Span = 3 },
-    @{ Width = "2669"; Type = "dxa"; Span = 1 }
+    @{ Width = "3535"; Type = "dxa"; Span = 1 },
+    @{ Width = "3389"; Type = "dxa"; Span = 3 },
+    @{ Width = "3156"; Type = "dxa"; Span = 1 }
   )
   $rowSpecs[1] = @(
-    @{ Width = "3348"; Type = "dxa"; Span = 2 },
-    @{ Width = "5174"; Type = "dxa"; Span = 3 }
+    @{ Width = "3961"; Type = "dxa"; Span = 2 },
+    @{ Width = "6119"; Type = "dxa"; Span = 3 }
   )
   $rowSpecs[2] = @(
-    @{ Width = "8522"; Type = "dxa"; Span = 5 }
+    @{ Width = "10080"; Type = "dxa"; Span = 5 }
   )
   $rowSpecs[3] = @(
-    @{ Width = "4428"; Type = "dxa"; Span = 3 },
-    @{ Width = "4094"; Type = "dxa"; Span = 2 }
+    @{ Width = "5238"; Type = "dxa"; Span = 3 },
+    @{ Width = "4842"; Type = "dxa"; Span = 2 }
   )
 
   $rows = @($Table.SelectNodes("./w:tr", $NamespaceManager))
@@ -771,6 +829,63 @@ function Get-NodeGroupMode {
   return "single"
 }
 
+function Test-IsDrawingParagraphNode {
+  param(
+    [AllowNull()]
+    [System.Xml.XmlNode]$Node,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  return ($null -ne $Node -and $Node.LocalName -eq "p" -and $null -ne $Node.SelectSingleNode(".//w:drawing", $NamespaceManager))
+}
+
+function Test-IsFigureCaptionNode {
+  param(
+    [AllowNull()]
+    [System.Xml.XmlNode]$Node,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $text = Get-ParagraphNodeText -Paragraph $Node -NamespaceManager $NamespaceManager
+  return ($text -match '^图\s*\d+')
+}
+
+function Get-TemplateFrameBodyNodeGroups {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Collections.Generic.List[System.Xml.XmlNode]]$Nodes,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNamespaceManager]$NamespaceManager
+  )
+
+  $groups = New-Object System.Collections.Generic.List[object]
+  $index = 0
+  while ($index -lt $Nodes.Count) {
+    $group = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
+    $node = $Nodes[$index]
+    [void]$group.Add($node)
+
+    if (
+      (Test-IsDrawingParagraphNode -Node $node -NamespaceManager $NamespaceManager) -and
+      ($index + 1 -lt $Nodes.Count) -and
+      (Test-IsFigureCaptionNode -Node $Nodes[$index + 1] -NamespaceManager $NamespaceManager)
+    ) {
+      $index++
+      [void]$group.Add($Nodes[$index])
+    }
+
+    [void]$groups.Add($group.ToArray())
+    $index++
+  }
+
+  return $groups
+}
+
 function Write-ZipFromDirectory {
   param(
     [Parameter(Mandatory = $true)]
@@ -868,29 +983,39 @@ try {
 
   $movedBlockCount = 0
   if ($nodesToMove.Count -gt 0) {
-    $tableRow = $documentXml.CreateElement("w", "tr", $wNs)
-    $tableCell = $documentXml.CreateElement("w", "tc", $wNs)
-    Set-CellWidthAndSpan -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -WidthValue ([string]$mainTableWidthTwips) -WidthType "dxa" -GridSpan $columnSpan
-    Set-CellMargins -Document $documentXml -Cell $tableCell -MarginTwips $BodyCellMarginTwips
+    $nodeGroups = @(Get-TemplateFrameBodyNodeGroups -Nodes $nodesToMove -NamespaceManager $namespaceManager)
+    for ($groupIndex = 0; $groupIndex -lt $nodeGroups.Count; $groupIndex++) {
+      $tableRow = $documentXml.CreateElement("w", "tr", $wNs)
+      $tableCell = $documentXml.CreateElement("w", "tc", $wNs)
+      Set-CellWidthAndSpan -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -WidthValue ([string]$mainTableWidthTwips) -WidthType "dxa" -GridSpan $columnSpan
 
-    foreach ($node in $nodesToMove) {
-      [void]$body.RemoveChild($node)
-      [void]$tableCell.AppendChild($node)
-      $movedBlockCount++
-    }
+      $topMargin = if ($groupIndex -eq 0) { $BodyCellMarginTwips } else { 0 }
+      $bottomMargin = if ($groupIndex -eq ($nodeGroups.Count - 1)) { $BodyCellMarginTwips } else { 0 }
+      Set-CellMargins -Document $documentXml -Cell $tableCell -MarginTwips $BodyCellMarginTwips -TopTwips $topMargin -BottomTwips $bottomMargin
 
-    $lastCellChild = if ($tableCell.ChildNodes.Count -gt 0) {
-      $tableCell.ChildNodes[$tableCell.ChildNodes.Count - 1]
-    } else {
-      $null
-    }
-    if ($null -eq $lastCellChild -or $lastCellChild.LocalName -ne "p") {
-      $emptyParagraph = $documentXml.CreateElement("w", "p", $wNs)
-      [void]$tableCell.AppendChild($emptyParagraph)
-    }
+      $topBorder = if ($groupIndex -eq 0) { "single" } else { "nil" }
+      $bottomBorder = if ($groupIndex -eq ($nodeGroups.Count - 1)) { "single" } else { "nil" }
+      Set-CellHorizontalBorderValues -Document $documentXml -Cell $tableCell -NamespaceManager $namespaceManager -Top $topBorder -Bottom $bottomBorder
 
-    [void]$tableRow.AppendChild($tableCell)
-    [void]$mainTable.AppendChild($tableRow)
+      foreach ($node in @($nodeGroups[$groupIndex])) {
+        [void]$body.RemoveChild($node)
+        [void]$tableCell.AppendChild($node)
+        $movedBlockCount++
+      }
+
+      $lastCellChild = if ($tableCell.ChildNodes.Count -gt 0) {
+        $tableCell.ChildNodes[$tableCell.ChildNodes.Count - 1]
+      } else {
+        $null
+      }
+      if ($null -eq $lastCellChild -or $lastCellChild.LocalName -ne "p") {
+        $emptyParagraph = $documentXml.CreateElement("w", "p", $wNs)
+        [void]$tableCell.AppendChild($emptyParagraph)
+      }
+
+      [void]$tableRow.AppendChild($tableCell)
+      [void]$mainTable.AppendChild($tableRow)
+    }
   }
 
   Ensure-ParagraphAfterTable -Document $documentXml -Body $body -Table $mainTable -NamespaceManager $namespaceManager

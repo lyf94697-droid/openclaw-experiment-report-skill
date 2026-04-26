@@ -7,7 +7,7 @@ param(
 
   [switch]$Overwrite,
 
-  [ValidateSet("auto", "default", "compact", "school")]
+  [ValidateSet("auto", "default", "compact", "school", "excellent")]
   [string]$Profile = "auto",
 
   [string]$ProfilePath,
@@ -54,7 +54,9 @@ param(
 
   [int]$CommandLineTwips = 240,
 
-  [int]$CommandFontHalfPoints = 20
+  [int]$CommandFontHalfPoints = 20,
+
+  [string]$InstitutionName = "云南师范大学信息学院"
 )
 
 Set-StrictMode -Version Latest
@@ -184,6 +186,30 @@ function Get-StyleProfileSettings {
         CommandFontHalfPoints = 20
       }
     }
+    "excellent" {
+      return [ordered]@{
+        BodyFirstLineTwips = 480
+        BodyLineTwips = 312
+        BodyAfterTwips = 0
+        HeadingBeforeTwips = 130
+        HeadingAfterTwips = 60
+        CaptionAfterTwips = 90
+        TitleAfterTwips = 100
+        ImageBeforeTwips = 70
+        ImageAfterTwips = 30
+        TitleFontHalfPoints = 44
+        HeadingFontHalfPoints = 30
+        BodyFontHalfPoints = 24
+        CaptionFontHalfPoints = 24
+        MetadataFontHalfPoints = 24
+        ListFontHalfPoints = 24
+        ListAfterTwips = 0
+        CommandBeforeTwips = 40
+        CommandAfterTwips = 40
+        CommandLineTwips = 300
+        CommandFontHalfPoints = 20
+      }
+    }
     default {
       throw "Unsupported style profile: $ProfileName"
     }
@@ -281,7 +307,7 @@ function Read-StyleProfileFile {
     $baseProfile = $baseProfile.ToLowerInvariant()
   }
 
-  if (-not [string]::IsNullOrWhiteSpace($baseProfile) -and @("auto", "default", "compact", "school") -notcontains $baseProfile) {
+  if (-not [string]::IsNullOrWhiteSpace($baseProfile) -and @("auto", "default", "compact", "school", "excellent") -notcontains $baseProfile) {
     throw "Style profile file has unsupported baseProfile/profile value '$baseProfile'."
   }
 
@@ -665,6 +691,23 @@ function Test-IsTitleParagraph {
 
   $compact = ($Text -replace '\s+', '')
   return ($compact -match '实验报告(?:[（(][^）)]+[）)])?$')
+}
+
+function Test-IsInstitutionParagraph {
+  param(
+    [AllowNull()]
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    return $false
+  }
+
+  $normalized = Normalize-OpenXmlText -Text $Text
+  return (
+    $normalized -match '大学.*学院$' -or
+    $normalized -match '学院$'
+  )
 }
 
 function Test-IsCaptionParagraph {
@@ -1512,6 +1555,84 @@ function Ensure-CourseDesignCoverUsesDifferentFirstPage {
   return (Ensure-SectionHasTitlePageElement -SectionProperties $sectPr)
 }
 
+function New-PlainTextParagraph {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Text
+  )
+
+  $paragraph = $Document.CreateElement("w", "p", $wordNamespace)
+  $run = $Document.CreateElement("w", "r", $wordNamespace)
+  $textNode = $Document.CreateElement("w", "t", $wordNamespace)
+  $textNode.InnerText = $Text
+  [void]$run.AppendChild($textNode)
+  [void]$paragraph.AppendChild($run)
+  return ([System.Xml.XmlNode]$paragraph)
+}
+
+function Ensure-ExcellentInstitutionHeading {
+  param(
+    [Parameter(Mandatory = $true)]
+    [xml]$Document,
+
+    [Parameter(Mandatory = $true)]
+    [System.Xml.XmlNode]$Body,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Name)) {
+    return $false
+  }
+
+  $titleParagraph = $null
+  foreach ($child in @($Body.ChildNodes)) {
+    if ($child.LocalName -ne "p") {
+      continue
+    }
+
+    $text = Get-ParagraphText -Paragraph $child -NamespaceManager $script:namespaceManager
+    if (Test-IsTitleParagraph -Text $text) {
+      $titleParagraph = $child
+      break
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($text)) {
+      return $false
+    }
+  }
+
+  if ($null -eq $titleParagraph) {
+    return $false
+  }
+
+  $previous = $titleParagraph.PreviousSibling
+  while ($null -ne $previous) {
+    if ($previous.LocalName -eq "p") {
+      $previousText = Get-ParagraphText -Paragraph $previous -NamespaceManager $script:namespaceManager
+      if ([string]::IsNullOrWhiteSpace($previousText)) {
+        $previous = $previous.PreviousSibling
+        continue
+      }
+
+      return (Test-IsInstitutionParagraph -Text $previousText)
+    }
+
+    if ($previous.LocalName -ne "sectPr") {
+      break
+    }
+    $previous = $previous.PreviousSibling
+  }
+
+  $institutionParagraph = New-PlainTextParagraph -Document $Document -Text $Name
+  [void]$Body.InsertBefore($institutionParagraph, $titleParagraph)
+  return $true
+}
+
 function Resolve-StyleProfileDecision {
   param(
     [Parameter(Mandatory = $true)]
@@ -1571,8 +1692,8 @@ function Resolve-StyleProfileDecision {
   if ($null -ne $firstPreHeadingTableSignal -and -not $firstPreHeadingTableSignal.HasDrawing -and -not $firstPreHeadingTableSignal.HasSectionHeading -and $firstPreHeadingTableSignal.RowCount -ge 4 -and $firstPreHeadingTableSignal.MetadataParagraphCount -ge 4) {
     return [pscustomobject]@{
       RequestedProfile = $RequestedProfile
-      ResolvedProfile = "compact"
-      Reason = "Detected a cover-style metadata table before the first report section."
+      ResolvedProfile = "excellent"
+      Reason = "Detected a cover-style metadata table before the first report section, so the excellent-example style was used."
     }
   }
 
@@ -1701,9 +1822,14 @@ try {
     $styleSettings.CaptionAfterTwips = 40
   }
   $useTemplateLikeCompactStyle = ([string]$profileDecision.ResolvedProfile -eq "compact")
+  $isExcellentStyle = [string]::Equals([string]$profileDecision.ResolvedProfile, "excellent", [System.StringComparison]::OrdinalIgnoreCase)
   $usePaginationHints = (-not $useTemplateLikeCompactStyle)
+  if ($isExcellentStyle) {
+    [void](Ensure-ExcellentInstitutionHeading -Document $documentXml -Body $body -Name $InstitutionName)
+  }
 
   $paragraphs = @($documentXml.SelectNodes("//w:p", $script:namespaceManager))
+  $styledInstitutionCount = 0
   $styledTitleCount = 0
   $styledHeadingCount = 0
   $styledSubheadingCount = 0
@@ -1736,13 +1862,28 @@ try {
       continue
     }
 
+    if ($isExcellentStyle -and (Test-IsInstitutionParagraph -Text $text)) {
+      Set-ParagraphJustification -Paragraph $paragraph -Value "center"
+      Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
+      Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After 100 -Line 360
+      Set-RunTypography -Paragraph $paragraph -FontName "宋体" -SizeHalfPoints 36
+      Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
+      $styledInstitutionCount++
+      if ($isInTable) { $styledTableParagraphCount++ }
+      continue
+    }
+
     if (Test-IsTitleParagraph -Text $text) {
+      if ($isExcellentStyle) {
+        Set-ParagraphText -Paragraph $paragraph -Text "实验报告"
+      }
       Set-ParagraphJustification -Paragraph $paragraph -Value "center"
       Set-ParagraphIndent -Paragraph $paragraph -FirstLine 0
       Set-ParagraphSpacing -Paragraph $paragraph -Before 0 -After $styleSettings.TitleAfterTwips -Line $styleSettings.BodyLineTwips
       Set-ParagraphBold -Paragraph $paragraph
       if (-not $useTemplateLikeCompactStyle) {
-        Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.TitleFontHalfPoints
+        $titleFontName = if ($isExcellentStyle) { "宋体" } else { "黑体" }
+        Set-RunTypography -Paragraph $paragraph -FontName $titleFontName -SizeHalfPoints $styleSettings.TitleFontHalfPoints
       }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledTitleCount++
@@ -1770,7 +1911,8 @@ try {
       Set-ParagraphOutlineLevel -Paragraph $paragraph -Level 0
       Set-ParagraphBold -Paragraph $paragraph
       if (-not $useTemplateLikeCompactStyle) {
-        Set-RunTypography -Paragraph $paragraph -FontName "黑体" -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
+        $headingFontName = if ($isExcellentStyle) { "宋体" } else { "黑体" }
+        Set-RunTypography -Paragraph $paragraph -FontName $headingFontName -SizeHalfPoints $styleSettings.HeadingFontHalfPoints
       }
       Set-ParagraphPagination -Paragraph $paragraph -KeepNext $usePaginationHints -KeepLines $usePaginationHints
       $styledHeadingCount++
@@ -1895,6 +2037,7 @@ try {
     profileReason = $profileDecision.Reason
     styleProfile = $profileDecision.ResolvedProfile
     appliedSettings = $styleSettings
+    styledInstitutionCount = $styledInstitutionCount
     styledTitleCount = $styledTitleCount
     styledHeadingCount = $styledHeadingCount
     styledSubheadingCount = $styledSubheadingCount

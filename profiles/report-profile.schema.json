@@ -24,7 +24,7 @@
     },
     "defaultStyleProfile": {
       "type": "string",
-      "enum": ["auto", "default", "compact", "school"]
+      "enum": ["auto", "default", "compact", "school", "excellent"]
     },
     "defaultExperimentProperty": {
       "type": "string"
@@ -91,6 +91,19 @@
               }
             }
           }
+        },
+        "defaultImageWidthCm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "autoRowLayout": {
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "string",
+              "enum": ["true", "false", "auto", "enabled", "disabled", "explicit-only"]
+            }
+          ]
         }
       }
     },

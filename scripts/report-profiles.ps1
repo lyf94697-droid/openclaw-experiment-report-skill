@@ -520,7 +520,7 @@ function Get-ReportProfileDefaultStyleProfile {
   }
 
   $normalized = $rawValue.Trim().ToLowerInvariant()
-  if (@("auto", "default", "compact", "school") -notcontains $normalized) {
+  if (@("auto", "default", "compact", "school", "excellent") -notcontains $normalized) {
     throw "Report profile '$([string]$Profile.name)' has unsupported defaultStyleProfile '$rawValue'"
   }
 
@@ -591,6 +591,57 @@ function Get-ReportProfileImagePlacementDefaults {
     )
     defaultCaptions = $defaultCaptions
     filenameCaptionRules = @($imagePlacementDefaults["filenameCaptionRules"])
+    defaultImageWidthCm = $imagePlacementDefaults["defaultImageWidthCm"]
+    autoRowLayout = $imagePlacementDefaults["autoRowLayout"]
+  }
+}
+
+function Get-ReportProfileDefaultImageWidthCm {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [double]$Fallback = 10.5
+  )
+
+  $imagePlacementDefaults = Get-ReportProfileImagePlacementDefaults -Profile $Profile
+  $rawValue = $imagePlacementDefaults.defaultImageWidthCm
+  if ($null -eq $rawValue -or [string]::IsNullOrWhiteSpace([string]$rawValue)) {
+    return $Fallback
+  }
+
+  $parsed = 0.0
+  if (-not [double]::TryParse([string]$rawValue, [ref]$parsed) -or $parsed -le 0) {
+    throw "Report profile '$([string]$Profile.name)' has invalid imagePlacementDefaults.defaultImageWidthCm '$rawValue'."
+  }
+
+  return $parsed
+}
+
+function Get-ReportProfileAutoRowLayoutEnabled {
+  param(
+    [Parameter(Mandatory = $true)]
+    [psobject]$Profile,
+
+    [bool]$Fallback = $true
+  )
+
+  $imagePlacementDefaults = Get-ReportProfileImagePlacementDefaults -Profile $Profile
+  $rawValue = $imagePlacementDefaults.autoRowLayout
+  if ($null -eq $rawValue -or [string]::IsNullOrWhiteSpace([string]$rawValue)) {
+    return $Fallback
+  }
+
+  if ($rawValue -is [bool]) {
+    return [bool]$rawValue
+  }
+
+  switch (([string]$rawValue).Trim().ToLowerInvariant()) {
+    { $_ -in @("true", "yes", "auto", "enabled", "on") } { return $true }
+    { $_ -in @("false", "no", "none", "disabled", "off", "explicit-only") } { return $false }
+    default {
+      throw "Report profile '$([string]$Profile.name)' has invalid imagePlacementDefaults.autoRowLayout '$rawValue'."
+    }
   }
 }
 

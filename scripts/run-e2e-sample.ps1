@@ -55,7 +55,7 @@ param(
 
   [switch]$StyleFinalDocx,
 
-  [ValidateSet("auto", "default", "compact", "school")]
+  [ValidateSet("auto", "default", "compact", "school", "excellent")]
   [string]$StyleProfile = "default",
 
   [string]$StyleProfilePath,

@@ -34,6 +34,7 @@
   - figure captions
   - recommended insertion positions
 - Prefer one screenshot per line when images are dense. Use two per row only when they are clearly paired and the template has enough width.
+- In the current `experiment-report` default, imitate the teacher excellent example: large centered single screenshots with a `15.8 cm` lower-bound width. Automatic two-column grouping is disabled; use row/2x2 only when the input explicitly says the images should be side by side.
 
 ## 5. Course-design flowcharts
 

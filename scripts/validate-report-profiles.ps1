@@ -475,6 +475,21 @@ function Test-ImagePlacementDefaults {
     }
   }
 
+  $defaultImageWidthCm = Get-OptionalPropertyValue -InputObject $ImagePlacementDefaults -Name "defaultImageWidthCm"
+  if ($null -ne $defaultImageWidthCm -and -not [string]::IsNullOrWhiteSpace([string]$defaultImageWidthCm)) {
+    $parsedWidth = 0.0
+    if (-not [double]::TryParse([string]$defaultImageWidthCm, [ref]$parsedWidth) -or $parsedWidth -le 0) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "image-default-width-invalid" -Path "$Path.defaultImageWidthCm" -Message "defaultImageWidthCm must be a positive number."
+    }
+  }
+
+  $autoRowLayout = Get-OptionalPropertyValue -InputObject $ImagePlacementDefaults -Name "autoRowLayout"
+  if ($null -ne $autoRowLayout -and -not [string]::IsNullOrWhiteSpace([string]$autoRowLayout)) {
+    if (($autoRowLayout -isnot [bool]) -and (@("true", "false", "auto", "enabled", "disabled", "explicit-only") -notcontains ([string]$autoRowLayout).Trim().ToLowerInvariant())) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "image-auto-row-layout-invalid" -Path "$Path.autoRowLayout" -Message "autoRowLayout must be a boolean or one of true, false, auto, enabled, disabled, explicit-only."
+    }
+  }
+
   $defaultCaptions = Get-OptionalPropertyValue -InputObject $ImagePlacementDefaults -Name "defaultCaptions"
   if ($null -eq $defaultCaptions) {
     Add-ProfileFinding -Findings $Findings -Severity error -Code "image-default-captions-missing" -Path "$Path.defaultCaptions" -Message "defaultCaptions must be defined."
@@ -669,8 +684,8 @@ function Test-ReportProfile {
 
   $styleProfile = [string](Get-OptionalPropertyValue -InputObject $Profile -Name "defaultStyleProfile")
   if (Assert-NonEmptyString -Findings $Findings -Value $styleProfile -Code "profile-default-style-empty" -Path "$Path.defaultStyleProfile" -Message "defaultStyleProfile must not be empty.") {
-    if (@("auto", "default", "compact", "school") -notcontains $styleProfile.Trim().ToLowerInvariant()) {
-      Add-ProfileFinding -Findings $Findings -Severity error -Code "profile-default-style-unsupported" -Path "$Path.defaultStyleProfile" -Message "defaultStyleProfile must be auto, default, compact, or school."
+    if (@("auto", "default", "compact", "school", "excellent") -notcontains $styleProfile.Trim().ToLowerInvariant()) {
+      Add-ProfileFinding -Findings $Findings -Severity error -Code "profile-default-style-unsupported" -Path "$Path.defaultStyleProfile" -Message "defaultStyleProfile must be auto, default, compact, school, or excellent."
     }
   }
 

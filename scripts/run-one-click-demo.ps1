@@ -5,7 +5,7 @@ param(
   [ValidateSet("fast", "full")]
   [string]$PipelineMode = "full",
 
-  [ValidateSet("auto", "default", "compact", "school")]
+  [ValidateSet("auto", "default", "compact", "school", "excellent")]
   [string]$StyleProfile = "auto"
 )
 

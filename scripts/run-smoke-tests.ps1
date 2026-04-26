@@ -730,11 +730,13 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($reportProfileSections.Count -ge 7) -Message 'Report profile is missing required section definitions.'
   Assert-True -Condition ((Get-ReportProfileRequiredHeadings -Profile $reportProfile) -contains '问题分析') -Message 'Report profile required headings are missing 问题分析.'
   $fullDetailProfile = Get-ReportProfileDetailProfile -Profile $reportProfile -DetailLevel 'full'
-  Assert-True -Condition ([int]$fullDetailProfile.minChars -eq 1100) -Message 'Report profile full detail level is missing the expected minChars.'
-  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $reportProfile) -eq 'auto') -Message 'Report profile is missing the expected defaultStyleProfile.'
+  Assert-True -Condition ([int]$fullDetailProfile.minChars -eq 2200) -Message 'Report profile full detail level is missing the expected minChars.'
+  Assert-True -Condition ([string](Get-ReportProfileDefaultStyleProfile -Profile $reportProfile) -eq 'excellent') -Message 'Report profile is missing the expected defaultStyleProfile.'
   Assert-True -Condition ((Get-ReportProfileMetadataPrefixes -Profile $reportProfile) -contains '课程名称') -Message 'Report profile metadata prefixes are missing 课程名称.'
   Assert-True -Condition ((Get-ReportProfileExtraSectionHeadings -Profile $reportProfile) -contains '实验内容') -Message 'Report profile extra section headings are missing 实验内容.'
   Assert-True -Condition ([string](Get-ReportProfileDefaultImageCaptionBody -Profile $reportProfile -SectionId 'steps' -BaseName 'setup-step') -eq '实验步骤截图') -Message 'Report profile image caption defaults are missing the steps caption.'
+  Assert-True -Condition ([double](Get-ReportProfileDefaultImageWidthCm -Profile $reportProfile -Fallback 10.5) -eq 15.8) -Message 'Report profile is missing the excellent-example default image width.'
+  Assert-True -Condition (-not (Get-ReportProfileAutoRowLayoutEnabled -Profile $reportProfile -Fallback $true)) -Message 'Report profile should disable automatic row layout by default.'
   Assert-True -Condition (@(Get-ReportProfileFieldMapCompositeRules -Profile $reportProfile).Count -ge 2) -Message 'Report profile field-map composite rules are missing.'
   $courseDesignProfile = Get-ReportProfile -ProfileName 'course-design-report' -RepoRoot $repoRoot
   Assert-True -Condition ([string]$courseDesignProfile.name -eq 'course-design-report') -Message 'Course-design profile loader returned an unexpected profile name.'
@@ -1029,9 +1031,9 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([string]$coverBodyTableBlock.rows[0].cells[1].text -eq '姓名：张三') -Message 'Cover-body fill did not update the student name in the cover table.'
   Assert-True -Condition ([string]$coverBodyTableBlock.rows[1].cells[0].text -eq '课程名称：计算机网络') -Message 'Cover-body fill did not update the course name in the cover table.'
   Assert-True -Condition ([string]$coverBodyTableBlock.rows[2].cells[0].text -match '实验性质： ①综合性实验 ②设计性实验 √③验证性实验') -Message 'Cover-body fill did not mark the selected experiment property option in the cover table.'
-  Assert-True -Condition ([string]$coverBodyFilledOutlineJson.blocks[2].text -eq '一. 实验目的') -Message 'Cover-body fill should insert the purpose heading immediately after the table.'
+  Assert-True -Condition ([string]$coverBodyFilledOutlineJson.blocks[2].text -eq '1 实验目的') -Message 'Cover-body fill should insert the purpose heading immediately after the table.'
   Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -match '通过本次实验掌握局域网的基本搭建方法' }).Count) -ge 1) -Message 'Cover-body fill did not move the purpose content after the table.'
-  Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '三. 实验步骤' }).Count) -ge 1) -Message 'Cover-body fill did not insert the procedure heading after the table.'
+  Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -eq '4 实验步骤' }).Count) -ge 1) -Message 'Cover-body fill did not insert the procedure heading after the table.'
   Assert-True -Condition ((@($coverBodyFilledOutlineJson.blocks | Where-Object { $_.type -eq 'paragraph' -and $_.text -match '实验结果表明，两台主机能够正常互通' }).Count) -ge 1) -Message 'Cover-body fill did not move the result content after the table.'
   $results.Add('docx cover-body fill OK') | Out-Null
 
@@ -1043,7 +1045,11 @@ URL: https://example.com/network-lab
   "defaultStyleProfile": "auto",
   "defaultExperimentProperty": "③验证性实验",
   "metadataFields": [
-    { "key": "Name", "label": "姓名" }
+    { "key": "CourseName", "label": "课程名称" },
+    { "key": "ExperimentName", "label": "实验名称" },
+    { "key": "Name", "label": "姓名" },
+    { "key": "StudentId", "label": "学号" },
+    { "key": "ClassName", "label": "班级" }
   ],
   "extraLabels": [],
   "sectionFields": [
@@ -1527,8 +1533,8 @@ URL: https://example.com/network-lab
   $mixedGroupNamespaceManager.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
   Assert-True -Condition (@($mixedGroupDocumentXml.SelectNodes('//w:tbl', $mixedGroupNamespaceManager)).Count -eq 2) -Message 'Mixed-group image insertion should add exactly one image layout table.'
   $mixedGroupDocumentText = $mixedGroupDocumentXml.OuterXml
-  $resultHeadingIndex = $mixedGroupDocumentText.IndexOf('四. 实验结果')
-  $analysisHeadingIndex = $mixedGroupDocumentText.IndexOf('五. 问题分析')
+  $resultHeadingIndex = $mixedGroupDocumentText.IndexOf('5 实验结果')
+  $analysisHeadingIndex = $mixedGroupDocumentText.IndexOf('6 问题分析')
   $analysisCaptionIndex = $mixedGroupDocumentText.IndexOf('图3 分析A')
   Assert-True -Condition ($resultHeadingIndex -ge 0 -and $analysisHeadingIndex -gt $resultHeadingIndex) -Message 'Mixed-group image insertion document is missing the expected section headings.'
   Assert-True -Condition ($analysisCaptionIndex -gt $resultHeadingIndex -and $analysisCaptionIndex -lt $analysisHeadingIndex) -Message 'Mixed-group image insertion should keep the whole 2x2 block under the shared 实验结果 anchor.'
@@ -1605,9 +1611,8 @@ URL: https://example.com/network-lab
     $uploadedRelativeImageMapRoot = (Get-Content -LiteralPath $uploadedRelativeImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
     Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].path -eq $uploadedImageOnePath) -Message 'Image-map generator did not resolve the first uploaded relative media path against the workspace root.'
     Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[1].path -eq $uploadedImageTwoPath) -Message 'Image-map generator did not resolve the second uploaded relative media path against the workspace root.'
-    Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].layout.mode -eq 'row') -Message 'Image-map generator should add row layout for same-section uploaded image paths.'
-    Assert-True -Condition ([int]$uploadedRelativeImageMapRoot.images[0].layout.columns -eq 2) -Message 'Image-map generator should use 2 columns for auto row layout.'
-    Assert-True -Condition ([string]$uploadedRelativeImageMapRoot.images[0].layout.group -eq [string]$uploadedRelativeImageMapRoot.images[1].layout.group) -Message 'Image-map generator should put same-section uploaded image paths in one auto row group.'
+    Assert-True -Condition (-not ($uploadedRelativeImageMapRoot.images[0].PSObject.Properties.Name -contains 'layout')) -Message 'Experiment-report image-map generator should not auto-row uploaded image paths by default.'
+    Assert-True -Condition ([double]$uploadedRelativeImageMapRoot.images[0].widthCm -eq 15.8) -Message 'Experiment-report image-map generator should use the excellent-example default image width.'
 
     $uploadedRelativeFilledDocx = Join-Path $tempRoot 'sample-template.uploaded-relative-images.docx'
     $uploadedRelativeInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $uploadedRelativeImageMapPath -OutPath $uploadedRelativeFilledDocx
@@ -1643,11 +1648,9 @@ URL: https://example.com/network-lab
   & (Join-Path $repoRoot 'scripts\generate-docx-image-map.ps1') -DocxPath $generatedFilledDocx -ImageSpecsPath $wideScreenshotSpecsPath -Format json -OutFile $wideScreenshotImageMapPath | Out-Null
   $wideScreenshotMapRoot = (Get-Content -LiteralPath $wideScreenshotImageMapPath -Raw -Encoding UTF8) | ConvertFrom-Json
   Assert-True -Condition (@($wideScreenshotMapRoot.images).Count -eq 2) -Message 'Wide screenshot image-map generator produced an unexpected number of images.'
-  Assert-True -Condition ([string]$wideScreenshotMapRoot.images[0].layout.mode -eq 'row') -Message 'Wide screenshot image-map generator should still auto-row same-section screenshots.'
-  Assert-True -Condition ([int]$wideScreenshotMapRoot.images[0].layout.columns -eq 2) -Message 'Wide screenshot image-map generator should keep the two-column default.'
-  Assert-True -Condition ([double]$wideScreenshotMapRoot.images[0].widthCm -eq 10.5) -Message 'Wide screenshot image-map generator did not use the standard default image width.'
-  Assert-True -Condition ([string]$wideScreenshotMapRoot.images[0].layout.group -eq [string]$wideScreenshotMapRoot.images[1].layout.group) -Message 'Wide screenshot image-map generator should put same-section screenshots in one auto row group.'
-  $results.Add('docx image-map wide screenshot row layout OK') | Out-Null
+  Assert-True -Condition (-not ($wideScreenshotMapRoot.images[0].PSObject.Properties.Name -contains 'layout')) -Message 'Wide screenshot image-map generator should not auto-row experiment-report screenshots by default.'
+  Assert-True -Condition ([double]$wideScreenshotMapRoot.images[0].widthCm -eq 15.8) -Message 'Wide screenshot image-map generator did not use the excellent-example default image width.'
+  $results.Add('docx image-map wide screenshot full-width layout OK') | Out-Null
 
   $sectionImageFilledDocx = Join-Path $tempRoot 'sample-template.section-images.docx'
   $sectionImageInsertResult = & (Join-Path $repoRoot 'scripts\insert-docx-images.ps1') -DocxPath $generatedFilledDocx -MappingPath $generatedImageMapPath -OutPath $sectionImageFilledDocx
@@ -1904,7 +1907,7 @@ URL: https://example.com/network-lab
   Assert-True -Condition (@($rowImageDocumentXml.SelectNodes('//w:tbl[.//wp:inline]', $rowNamespaceManager)).Count -ge 1) -Message 'Row-layout image insertion is missing the expected image table.'
   Assert-True -Condition (@($rowImageDocumentXml.SelectNodes('//wp:inline', $rowNamespaceManager)).Count -ge 4) -Message 'Row-layout image insertion is missing expected drawing nodes.'
   $rowImageWidthsCm = @($rowImageDocumentXml.SelectNodes('//wp:inline/wp:extent', $rowNamespaceManager) | ForEach-Object { [Math]::Round(([int64]$_.cx) / 360000.0, 2) })
-  Assert-True -Condition (@($rowImageWidthsCm | Where-Object { $_ -gt 8.0 }).Count -eq 0) -Message 'Row-layout image insertion should cap over-wide images to the available column width.'
+  Assert-True -Condition (@($rowImageWidthsCm | Where-Object { $_ -gt 8.6 }).Count -eq 0) -Message 'Row-layout image insertion should cap over-wide images to the available column width.'
   Assert-True -Condition (@($rowImageWidthsCm | Where-Object { $_ -ge 10.2 }).Count -eq 0) -Message 'Row-layout image insertion did not shrink images that were too wide for two columns.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图1 主机 A 的 ping 测试结果') -Message 'Row-layout image insertion is missing the first row caption.'
   Assert-True -Condition ($rowImageDocumentXml.OuterXml -match '图4 主机 B 的 arp -a 邻居缓存结果') -Message 'Row-layout image insertion is missing the final row caption.'
@@ -1957,9 +1960,9 @@ URL: https://example.com/network-lab
   $results.Add('docx image insertion row layout OK') | Out-Null
 
   $styledDocx = Join-Path $tempRoot 'sample-template.row-images.styled.docx'
-  $styleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $styledDocx -Overwrite
+  $styleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $rowImageFilledDocx -OutPath $styledDocx -Overwrite -Profile default
   Assert-True -Condition (Test-Path -LiteralPath $styledDocx) -Message 'Docx style formatter did not create the styled docx.'
-  Assert-True -Condition ([string]$styleResult.styleProfile -eq 'default') -Message 'Docx style formatter should default to the default style profile.'
+  Assert-True -Condition ([string]$styleResult.styleProfile -eq 'default') -Message 'Docx style formatter should apply the explicit default style profile.'
   Assert-True -Condition ($styleResult.styledTitleCount -ge 1) -Message 'Docx style formatter did not detect the report title.'
   Assert-True -Condition ($styleResult.styledHeadingCount -ge 3) -Message 'Docx style formatter did not detect enough section headings.'
   Assert-True -Condition ($styleResult.styledBodyCount -ge 5) -Message 'Docx style formatter did not detect enough body paragraphs.'
@@ -2034,20 +2037,22 @@ URL: https://example.com/network-lab
   Assert-True -Condition ($customStyledDocumentXml.OuterXml -match 'w:spacing[^>]*w:line="290"') -Message 'Custom styled docx is missing the expected profile-file line spacing.'
   Remove-Item -LiteralPath $customStyledDocxTemp -Recurse -Force
 
-  $autoCompactStyledDocx = Join-Path $tempRoot 'cover-body-template.auto-compact-styled.docx'
-  $autoCompactStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $coverBodyFilledDocx -OutPath $autoCompactStyledDocx -Overwrite -Profile auto
-  Assert-True -Condition (Test-Path -LiteralPath $autoCompactStyledDocx) -Message 'Auto style profile did not create the compact-styled cover-body docx.'
-  Assert-True -Condition ([string]$autoCompactStyleResult.requestedProfile -eq 'auto') -Message 'Auto compact style result is missing the requested profile.'
-  Assert-True -Condition ([string]$autoCompactStyleResult.styleProfile -eq 'compact') -Message 'Auto style profile should resolve the cover-body template to compact.'
-  Assert-True -Condition ([string]$autoCompactStyleResult.profileReason -match 'cover-style metadata table') -Message 'Auto compact style result is missing the expected decision reason.'
-  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyLineTwips -eq 320) -Message 'Auto compact style result did not apply compact body spacing.'
-  Assert-True -Condition ([int]$autoCompactStyleResult.appliedSettings.BodyFontHalfPoints -eq 24) -Message 'Auto compact style result did not apply compact body font size.'
+  $autoExcellentStyledDocx = Join-Path $tempRoot 'cover-body-template.auto-excellent-styled.docx'
+  $autoExcellentStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $coverBodyFilledDocx -OutPath $autoExcellentStyledDocx -Overwrite -Profile auto
+  Assert-True -Condition (Test-Path -LiteralPath $autoExcellentStyledDocx) -Message 'Auto style profile did not create the excellent-styled cover-body docx.'
+  Assert-True -Condition ([string]$autoExcellentStyleResult.requestedProfile -eq 'auto') -Message 'Auto excellent style result is missing the requested profile.'
+  Assert-True -Condition ([string]$autoExcellentStyleResult.styleProfile -eq 'excellent') -Message 'Auto style profile should resolve experiment reports to the excellent-example profile.'
+  Assert-True -Condition ([string]$autoExcellentStyleResult.profileReason -match 'defaultStyleProfile') -Message 'Auto excellent style result is missing the expected profile-default decision reason.'
+  Assert-True -Condition ([int]$autoExcellentStyleResult.appliedSettings.BodyLineTwips -eq 312) -Message 'Auto excellent style result did not apply excellent body spacing.'
+  Assert-True -Condition ([int]$autoExcellentStyleResult.appliedSettings.TitleFontHalfPoints -eq 44) -Message 'Auto excellent style result did not apply the expected report-title size.'
+  Assert-True -Condition ([int]$autoExcellentStyleResult.appliedSettings.BodyFontHalfPoints -eq 24) -Message 'Auto excellent style result did not apply 12pt body font size.'
+  Assert-True -Condition ($autoExcellentStyleResult.styledInstitutionCount -ge 1) -Message 'Auto excellent style result did not insert or style the institution heading.'
 
   $paragraphCoverDocx = Join-Path $tempRoot 'paragraph-cover-template.docx'
   New-ParagraphCoverTemplateDocx -Path $paragraphCoverDocx
   Assert-True -Condition (Test-Path -LiteralPath $paragraphCoverDocx) -Message 'Failed to create the paragraph-cover template fixture.'
   $autoSchoolStyledDocx = Join-Path $tempRoot 'paragraph-cover-template.auto-school-styled.docx'
-  $autoSchoolStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $paragraphCoverDocx -OutPath $autoSchoolStyledDocx -Overwrite -Profile auto
+  $autoSchoolStyleResult = & (Join-Path $repoRoot 'scripts\format-docx-report-style.ps1') -DocxPath $paragraphCoverDocx -OutPath $autoSchoolStyledDocx -Overwrite -Profile auto -ReportProfilePath $customCompositeProfilePath
   Assert-True -Condition (Test-Path -LiteralPath $autoSchoolStyledDocx) -Message 'Auto style profile did not create the school-styled paragraph-cover docx.'
   Assert-True -Condition ([string]$autoSchoolStyleResult.styleProfile -eq 'school') -Message 'Auto style profile should resolve the paragraph-cover template to school.'
   Assert-True -Condition ([string]$autoSchoolStyleResult.profileReason -match 'paragraph-based cover area') -Message 'Auto school style result is missing the expected decision reason.'
@@ -2108,10 +2113,10 @@ URL: https://example.com/network-lab
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutImageCount -eq 4) -Message 'build-report summary is missing the expected layout image count.'
   Assert-True -Condition ([int]$buildReportSummary.expectedLayoutCaptionCount -eq 4) -Message 'build-report summary is missing the expected layout caption count.'
   Assert-True -Condition ([string]$buildReportSummary.reportProfileName -eq 'experiment-report') -Message 'build-report summary is missing the expected report profile name.'
-  Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'auto') -Message 'build-report should default the requested style profile from the report profile.'
+  Assert-True -Condition ([string]$buildReportSummary.requestedStyleProfile -eq 'excellent') -Message 'build-report should default the requested style profile from the report profile.'
   Assert-True -Condition ([string]$buildReportSummary.styleProfilePath -eq $buildStyleProfilePath) -Message 'build-report summary is missing the custom style profile path.'
-  Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'default') -Message 'build-report summary should resolve the sample template to the default style profile.'
-  Assert-True -Condition ([string]$buildReportSummary.styleProfileReason -match 'default profile') -Message 'build-report summary is missing the resolved auto-style reason.'
+  Assert-True -Condition ([string]$buildReportSummary.styleProfile -eq 'excellent') -Message 'build-report summary should resolve experiment reports to the excellent-example style profile.'
+  Assert-True -Condition ([string]$buildReportSummary.styleProfileReason -match 'explicitly requested') -Message 'build-report summary is missing the resolved excellent-style reason.'
   Assert-True -Condition ([int]$buildReportSummary.appliedStyleSettings.BodyLineTwips -eq 310) -Message 'build-report summary is missing the overridden style settings from the custom profile file.'
   Assert-True -Condition ((Split-Path -Leaf $buildReportSummary.finalDocxPath) -eq 'sample-template.filled.images.styled.docx') -Message 'build-report summary is missing the expected final docx path.'
   $results.Add('build-report pipeline OK') | Out-Null

@@ -49,6 +49,8 @@ description: Write Chinese university lab reports and course-design reports, or 
 
 - When the user says to use the previous standard, the fixed standard is: experiment reports keep the original-template outer frame, course-design reports use a large standalone flowchart, and generated flowchart titles have no side decoration lines.
 - For experiment-report template-frame output, keep normal table lines in the top metadata table. Put the body into one full-width framed body area, without horizontal separator lines between paragraphs or sections.
+- For `experiment-report`, default to the teacher excellent-example style: `云南师范大学信息学院` heading, compact `实验报告` title, metadata table, one outer body frame, 12pt SimSun body text, about 15pt bold SimSun section headings, about 22pt SimSun report title, and dense full-page body content.
+- For `experiment-report` screenshots, use large centered single images by default with a `15.8 cm` lower-bound width. Do not auto-collapse screenshots into a two-column row unless the input explicitly requests a row or 2x2 layout.
 - For `course-design-report`, render the overall design flowchart / process diagram near full body width. The default lower bound is `15.8 cm`.
 - Do not auto-place course-design flowcharts side by side with screenshots. Flowcharts are standalone design diagrams; screenshots can still use row layouts when they are clearly paired.
 - For generated black-and-white flowcharts, keep the title as centered text only. Do not draw left/right decorative horizontal lines around the title.

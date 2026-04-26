@@ -46,3 +46,10 @@
 - Put the main body into one full-width framed body area so the body keeps only the outer border.
 - Do not create horizontal separator lines between body paragraphs or sections.
 - Use this as the default for the current template-frame workflow unless the user explicitly asks for dense table lines.
+
+## 7. Teacher excellent-example standard
+
+- For the current experiment-report workflow, treat the teacher优秀示例 as the default visual target.
+- The first page should start with the institution line `云南师范大学信息学院`, then the compact title `实验报告`, then the metadata table, then the body content. Do not insert a separate cover page unless the source template requires it.
+- Use a formal Chinese report type scale: body 12pt 宋体, section headings about 15pt 宋体加粗, report title about 22pt 宋体, institution heading about 18pt 宋体.
+- Keep body text dense enough to resemble a real submitted report instead of a short outline. Prefer numbered headings such as `1 实验目的`, `2 实验内容`, `3 实验原理`.

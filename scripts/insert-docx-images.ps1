@@ -749,18 +749,20 @@ function Apply-ProfileSpecificImageSpecAdjustments {
     [object]$ReportProfile
   )
 
-  if (-not [string]::Equals([string]$ReportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase)) {
-    return $ImageSpecs
-  }
-
   foreach ($imageSpec in $ImageSpecs) {
     $isRowLayout = ($null -ne $imageSpec.Layout -and [string]::Equals([string]$imageSpec.Layout.Mode, "row", [System.StringComparison]::OrdinalIgnoreCase))
     if ($isRowLayout) {
       continue
     }
 
-    if (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $imageSpec) {
+    if (
+      [string]::Equals([string]$ReportProfile.name, "course-design-report", [System.StringComparison]::OrdinalIgnoreCase) -and
+      (Test-IsCourseDesignFlowchartImageSpec -ImageSpec $imageSpec)
+    ) {
       $imageSpec.WidthCm = [Math]::Max([double]$imageSpec.WidthCm, 15.8)
+    }
+    if ([string]::Equals([string]$ReportProfile.name, "experiment-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+      $imageSpec.WidthCm = [Math]::Max([double]$imageSpec.WidthCm, (Get-ReportProfileDefaultImageWidthCm -Profile $ReportProfile -Fallback $defaultImageWidthCm))
     }
   }
 
@@ -1584,6 +1586,7 @@ $script:ImagePathProbeRoots = Get-ImagePathProbeRoots -DocxPath $resolvedDocxPat
 
 $imageMappingDocument = Get-ImageMappingRootObject -PathToJson $MappingPath -InlineJson $ImagesJson
 $reportProfile = Resolve-ImageMappingReportProfile -RootObject $imageMappingDocument.RootObject -ProfileName $ReportProfileName -ProfilePath $ReportProfilePath
+$defaultImageWidthCm = Get-ReportProfileDefaultImageWidthCm -Profile $reportProfile -Fallback $defaultImageWidthCm
 Initialize-SectionRules -ReportProfile $reportProfile
 
 $imageItems = Get-ImageMappingItems -RootObject $imageMappingDocument.RootObject
@@ -1640,6 +1643,9 @@ try {
     throw "Could not locate /w:document/w:body in $resolvedDocxPath"
   }
   $bodyWidthCm = Get-DocumentBodyWidthCm -DocumentXml $documentXml -NamespaceManager $namespaceManager
+  if ([string]::Equals([string]$reportProfile.name, "experiment-report", [System.StringComparison]::OrdinalIgnoreCase)) {
+    $bodyWidthCm = [Math]::Max([double]$bodyWidthCm, 17.8)
+  }
 
   $anchorLookup = Build-AnchorLookup -Body $body -NamespaceManager $namespaceManager
   $sectionLookup = Build-SectionLookup -Body $body -NamespaceManager $namespaceManager
