@@ -1,0 +1,48 @@
+{
+  "images": [
+    {
+      "path": ".\\demo\\assets\\step-network-config.png",
+      "section": "实验结果",
+      "caption": "图1 主机 A 网络参数配置结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "network-dos-results"
+      }
+    },
+    {
+      "path": ".\\demo\\assets\\step-ipconfig.png",
+      "section": "实验结果",
+      "caption": "图2 主机 B ipconfig 地址查看结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "network-dos-results"
+      }
+    },
+    {
+      "path": ".\\demo\\assets\\result-ping.png",
+      "section": "实验结果",
+      "caption": "图3 ping 命令连通性测试结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "network-dos-results"
+      }
+    },
+    {
+      "path": ".\\demo\\assets\\result-arp.png",
+      "section": "实验结果",
+      "caption": "图4 arp -a 邻居缓存查看结果",
+      "widthCm": 7.8,
+      "layout": {
+        "mode": "row",
+        "columns": 2,
+        "group": "network-dos-results"
+      }
+    }
+  ]
+}

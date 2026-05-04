@@ -4,10 +4,22 @@
 
 ## 推荐先看
 
+- [cases/README.md](cases/README.md)
 - [demo-one-click/README.md](demo-one-click/README.md)
 - [report-templates/README.md](report-templates/README.md)
 
-## 目录说明
+## 典型案例
+
+- [cases/network-dos](cases/network-dos/README.md)
+  计算机网络实验案例，包含 prompt、metadata、requirements 和 `image-specs.json`，可以直接跑完整 `docx` 流程。
+
+- [cases/os-process-scheduling](cases/os-process-scheduling/README.md)
+  操作系统进程调度实验案例，包含示例正文，适合看算法类实验报告如何组织。
+
+- [cases/course-design-student-management](cases/course-design-student-management/README.md)
+  学生成绩管理系统课程设计案例，演示 `course-design-report` profile 的使用方式。
+
+## 通用样例文件
 
 - `demo-one-click/`
   自带演示用的正文、metadata 和 requirements，配合 `scripts/run-one-click-demo.ps1` 直接可跑。
@@ -38,5 +50,6 @@
 ## 使用建议
 
 - 想最快感受效果：先跑 `scripts/run-one-click-demo.ps1`
+- 想看完整场景：从 `cases/network-dos` 开始
 - 想理解 JSON 格式：看 `docx-field-map.json` 和 `docx-image-specs*.json`
-- 想适配你自己的模板：先看 `report-templates/README.md`
+- 想适配自己的模板：先看 `report-templates/README.md` 和 `../docs/template-filling.md`
