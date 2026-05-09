@@ -1,0 +1,33 @@
+{
+  "courseName": "Java 程序设计",
+  "experimentName": "学生成绩管理系统",
+  "minChars": 1000,
+  "sections": [
+    { "name": "设计目标", "aliases": ["设计目标", "课程设计目的"], "minChars": 60 },
+    { "name": "开发环境", "aliases": ["开发环境", "运行环境"], "minChars": 40 },
+    { "name": "需求分析", "aliases": ["需求分析", "功能需求"], "minChars": 120 },
+    { "name": "方案设计与实现", "aliases": ["方案设计与实现", "总体设计", "详细设计"], "minChars": 180 },
+    { "name": "运行结果", "aliases": ["运行结果", "测试结果"], "minChars": 100 },
+    { "name": "问题与改进", "aliases": ["问题与改进", "问题分析"], "minChars": 80 },
+    { "name": "设计总结", "aliases": ["设计总结", "总结"], "minChars": 60 }
+  ],
+  "requiredKeywords": [
+    "学生信息",
+    "课程信息",
+    "成绩录入",
+    "成绩查询",
+    "统计分析",
+    "模块"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "以下是一份",
+    "示例",
+    "样例",
+    "ChatGPT",
+    "Claude",
+    "AI生成"
+  ]
+}

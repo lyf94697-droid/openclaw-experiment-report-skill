@@ -16,6 +16,9 @@
 - `run-one-click-demo.ps1`
   仓库自带的一键演示，不需要自己准备素材。
 
+- `check-project-readiness.ps1`
+  面向展示 / 发布 / 简历场景的轻量检查，确认 README、关键 docs、典型案例和案例 JSON 齐全。
+
 ## 模板处理
 
 - `extract-docx-template.ps1`
@@ -42,7 +45,9 @@
 - `validate-report-draft.ps1`
 - `check-docx-layout.ps1`
 - `check-report-profile-template-fit.ps1`
+- `check-fast-report-session.ps1`
 - `run-smoke-tests.ps1`
+- `check-project-readiness.ps1`
 - `self-check.ps1`
 
 ## 环境与安装

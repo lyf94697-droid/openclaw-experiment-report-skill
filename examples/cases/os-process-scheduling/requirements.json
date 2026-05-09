@@ -1,0 +1,33 @@
+{
+  "courseName": "操作系统",
+  "experimentName": "进程调度算法模拟",
+  "minChars": 800,
+  "sections": [
+    { "name": "实验目的", "aliases": ["实验目的"], "minChars": 40 },
+    { "name": "实验环境", "aliases": ["实验环境", "实验设备与环境"], "minChars": 30 },
+    { "name": "实验原理或任务要求", "aliases": ["实验原理或任务要求", "实验原理", "任务要求"], "minChars": 80 },
+    { "name": "实验步骤", "aliases": ["实验步骤", "实验过程"], "minChars": 90 },
+    { "name": "实验结果", "aliases": ["实验结果", "实验现象与结果记录"], "minChars": 90 },
+    { "name": "问题分析", "aliases": ["问题分析", "结果分析"], "minChars": 60 },
+    { "name": "实验总结", "aliases": ["实验总结", "总结与思考"], "minChars": 40 }
+  ],
+  "requiredKeywords": [
+    "FCFS",
+    "SJF",
+    "时间片轮转",
+    "等待时间",
+    "周转时间",
+    "带权周转时间"
+  ],
+  "forbiddenPatterns": [
+    "TODO",
+    "待补充",
+    "自行填写",
+    "以下是一份",
+    "示例",
+    "样例",
+    "ChatGPT",
+    "Claude",
+    "AI生成"
+  ]
+}
