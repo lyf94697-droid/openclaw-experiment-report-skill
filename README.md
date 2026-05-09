@@ -253,6 +253,36 @@ powershell -ExecutionPolicy Bypass -File .\scripts\self-check.ps1
 
 如果你想公开发布，先看 [docs/GITHUB_LAUNCH.md](docs/GITHUB_LAUNCH.md)；如果要同步做小红书 / 抖音内容，看 [docs/social-launch-kit.md](docs/social-launch-kit.md)。
 
+## Local Web UI
+
+The repository includes a Gradio UI for local report generation. It supports the same common inputs used in chat: student info, course name, experiment name, requirements, reference links, DOCX/DOC template upload, screenshots, and code files. You can also paste the whole chat-style request into the "对话式需求" box, including CSDN links and screenshot-folder paths. By default it writes final artifacts to:
+
+- `E:\实验报告\docx`
+- `E:\实验报告\pdf`
+- `E:\实验报告\预览图`
+
+If no template is uploaded, the experiment-report mode uses `E:\实验报告\00-模板\实验报告模版1.docx` when it exists. The course-design mode uses `E:\新建文件夹\课程设计-模板.doc` when it exists.
+
+Install the optional UI dependencies:
+
+```powershell
+python -m pip install -r requirements-web.txt
+```
+
+Start the UI:
+
+```powershell
+python web_ui.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:7860
+```
+
+The page returns download buttons for DOCX, PDF, and a preview PNG, and it also displays the preview image in the page after generation. The default generation mode tries the local OpenClaw chat gateway for a longer, more polished body; if that is unavailable, it falls back to a deterministic local draft and keeps the warning in the UI. See [examples/web_demo.md](examples/web_demo.md).
+
 ## License
 
 MIT

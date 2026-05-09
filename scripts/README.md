@@ -45,6 +45,7 @@
 - `validate-report-draft.ps1`
 - `check-docx-layout.ps1`
 - `check-report-profile-template-fit.ps1`
+- `check-fast-report-session.ps1`
 - `run-smoke-tests.ps1`
 - `check-project-readiness.ps1`
 - `self-check.ps1`
